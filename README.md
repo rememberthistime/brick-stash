@@ -16,20 +16,44 @@ npm run fetch-data # refresh the Rebrickable part catalogue (public/data/parts.j
 
 Your project is saved in `data/project.json` (with the version before it in `project.previous.json`), and photos go in `photos/`. A browser that already has a project moves it to the server the first time it opens the app at the same address. Elsewhere, use **Save project** and **Open…**. There's no password, so keep it on your home network: don't forward a port to it. Tailscale is fine for reaching it while you're out.
 
-### On Unraid
+### On Unraid (always on, with Claude there too)
 
-So it's there when the PC is off. Copy this folder to the NAS, leaving out `node_modules`, `dist`, `data-raw` and `photos`, for example to `/mnt/user/appdata/brick-stash-src`. Then, in the Unraid terminal:
+This runs everything on the NAS, so the PC doesn't need to be on:
+- **The app** (container `brick-stash`) at `http://<NAS address>:5173`, with `/snap` and `/review`, for every device on your network.
+- **A development box** (container `brick-stash-dev`) with Node, git, GitHub CLI, Claude Code and Python. You and Claude work on the code there over SSH, it tests on port 5174 with copies of your data, and it runs the evening photo reading.
 
-```bash
-mkdir -p /mnt/user/appdata/brick-stash/photos
-chown -R 99:100 /mnt/user/appdata/brick-stash
-cd /mnt/user/appdata/brick-stash-src
-docker build -t brick-stash .
-docker run -d --name brick-stash --restart unless-stopped --user 99:100 \
-  -p 5173:5173 -v /mnt/user/appdata/brick-stash:/data brick-stash
-```
+Your data lives in `/mnt/user/appdata/brick-stash` (`project.json` and `photos/`), outside both containers, so rebuilding either one never touches it. The development box keeps its home folder, logins and SSH keys in `/mnt/user/appdata/brick-stash-dev`.
 
-It then appears on the Docker tab, at `http://<your NAS's address>:5173`, with the phone page at `/snap`. Bring your project over with **Save project** on the PC and **Open…** on the NAS address, copy the contents of `photos/` to `/mnt/user/appdata/brick-stash/photos`, and re-enter your Rebrickable key, as browsers keep it per address. To update, copy the folder again, then repeat the build, `docker rm -f brick-stash`, and the run.
+**Setting it up (once)**
+
+1. On the PC, stop `npm run serve`, so your project doesn't change while it's copied.
+2. Copy this whole folder to the NAS, leaving out `node_modules`, `dist` and `data-raw`. Do bring `.git`, `data/` and `photos/`. For example, copy it into a share, then in the Unraid terminal move it to `/mnt/user/appdata/brick-stash-dev/repo`. `nas/authorized_keys` holds your PC's SSH public key, so it comes along and lets you sign in.
+3. In the Unraid terminal:
+   ```bash
+   bash /mnt/user/appdata/brick-stash-dev/repo/nas/install.sh
+   ```
+   This copies your project and photos into the app's data folder, unless the NAS already has them. It then builds and starts both containers. Add `--no-docker` if you'd rather the development box couldn't use the NAS's Docker: it then can't redeploy the app, and you run `nas/deploy.sh` in the Unraid terminal yourself. Giving it Docker effectively gives it full control of the NAS, which is the trade-off for Claude being able to deploy.
+4. Sign in to the development box from the PC: `ssh -p 2222 dev@<NAS address>`. Then, once:
+   ```bash
+   gh auth login        # GitHub.com, HTTPS, log in with a browser
+   gh auth setup-git
+   claude               # sign in to your Claude account, then /exit
+   cd ~/brick-stash && npm ci && npm test
+   ```
+5. Open the app at `http://<NAS address>:5173` on each device and re-enter your Rebrickable key, as browsers keep it per address. Then turn off the PC's evening task (Scheduled in the Claude app sidebar), so photos aren't read twice.
+
+Give the NAS a fixed address on your router, so bookmarks and SSH keep working. There's no password on the app, so keep it on your home network; Tailscale is fine for reaching it while you're out.
+
+**Working on it from any device**
+- **Claude desktop app:** add an SSH connection to `dev@<NAS address>` on port 2222 and open a Code session in `~/brick-stash`. Claude then runs on the NAS. VS Code's Remote-SSH works the same way.
+- **Phone or browser:** start Claude in the development box (`claude`) and turn on Remote Control to carry on from claude.ai or the Claude app.
+- **Testing a change:** `bash nas/dev-server.sh` serves the working copy at `http://<NAS address>:5174`, with fresh copies of the live data that get thrown away.
+- **Putting it live:** commit to `main`, then `bash nas/deploy.sh`. It refuses a branch other than `main` or uncommitted changes unless given `--force`, and keeps your data.
+- **Updating the development box** (for a newer Claude Code): `bash nas/install.sh --dev-only` in the Unraid terminal. Your logins and files are kept.
+
+**The evening photo reading** runs at 9:07pm, in the NAS's time zone, in the development box. It follows `nas/read-photos.md`, can only read and write files and run Python, and logs to `~/logs/read-photos.log`. Run it by hand with `bash nas/read-photos.sh`. Pause it with `touch ~/read-photos.off`, and delete that file to start it again.
+
+`photos/` in the repository holds a copy of the drafts, reviews, box names and notes from when it was last committed. On the NAS, the live versions are in the app's data folder (`/live/photos` in the development box).
 
 ## Using it
 
@@ -87,6 +111,7 @@ There's also a reality check. Plain bricks, plates and tiles can't pack loose an
 - `src/lib/recommend.ts`, `src/lib/presets.ts` — advice and storage catalogue (preset sizes are approximate)
 - `src/lib/rebrickable.ts` — Rebrickable API (proxied at `/rb-api`)
 - `server/api.mjs` — the shared project and photos, used by both servers; `server/index.mjs` — runs the built app for the network
+- `nas/` — running it on the Unraid NAS: `install.sh` (one-time setup), `deploy.sh` (put `main` live), `dev-server.sh` (test copy on 5174), `read-photos.sh` and `read-photos.md` (the evening photo reading), and `dev/` (the development box's image)
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `src/components/Snap.tsx`, `src/lib/photos.ts` — the phone page and photos
 - `src/components/PartImage.tsx` — part pictures: Rebrickable LDraw renders, falling back to BrickLink images

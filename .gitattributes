@@ -1,0 +1,5 @@
+# Keep line endings as Unix ones everywhere, so scripts run on the NAS whichever machine they were copied from
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gz binary
