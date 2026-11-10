@@ -23,6 +23,57 @@ afterEach(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+describe('versions', () => {
+  const save = async (note, rev) => (await (await fetch(`${base}/api/project`, { method: 'PUT', headers: rev ? { 'X-Base-Rev': rev } : {}, body: project({ note }) })).json()).rev;
+  const today = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  it('keeps the project as it was before the day’s first change, however many saves follow', async () => {
+    expect(await (await fetch(`${base}/api/versions`)).json()).toEqual([]);
+    let rev = await save('one');
+    expect(await (await fetch(`${base}/api/versions`)).json()).toEqual([]);
+    for (const note of ['two', 'three', 'four']) {
+      await new Promise((r) => setTimeout(r, 15));
+      rev = await save(note, rev);
+    }
+    const list = await (await fetch(`${base}/api/versions`)).json();
+    expect(list.map((v) => v.date)).toEqual([today()]);
+    expect((await (await fetch(`${base}/api/versions/${list[0].name}`)).json()).note).toBe('one');
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'data', 'project.previous.json'), 'utf8')).note).toBe('three');
+  });
+
+  it('keeps thirty days of them, newest first', async () => {
+    const backups = path.join(dir, 'data', 'backups');
+    fs.mkdirSync(backups, { recursive: true });
+    for (let d = 1; d <= 31; d++) fs.writeFileSync(path.join(backups, `project-2020-01-${String(d).padStart(2, '0')}.json`), project({ note: `day ${d}` }));
+    fs.writeFileSync(path.join(backups, 'notes.txt'), 'not one of ours');
+    const rev = await save('one');
+    await new Promise((r) => setTimeout(r, 15));
+    await save('two', rev);
+    const dates = (await (await fetch(`${base}/api/versions`)).json()).map((v) => v.date);
+    expect(dates).toHaveLength(30);
+    expect(dates[0]).toBe(today());
+    expect(dates.at(-1)).toBe('2020-01-03');
+    expect(fs.existsSync(path.join(backups, 'notes.txt'))).toBe(true);
+  });
+
+  it('still saves when a version can’t be kept', async () => {
+    const rev = await save('one');
+    fs.writeFileSync(path.join(dir, 'data', 'backups'), 'a file where the folder should be');
+    await new Promise((r) => setTimeout(r, 15));
+    await save('two', rev);
+    expect((await (await fetch(`${base}/api/project`)).json()).note).toBe('two');
+  });
+
+  it('only hands out its own files', async () => {
+    fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'data', 'project-2020-01-01.json'), '{}');
+    for (const name of ['..%2Fproject-2020-01-01.json', 'project.json', 'project-2020-01-01.json']) expect((await fetch(`${base}/api/versions/${name}`)).status).toBe(404);
+  });
+});
+
 describe('project', () => {
   it('has none to begin with, then returns what was saved', async () => {
     expect((await fetch(`${base}/api/project`)).status).toBe(404);

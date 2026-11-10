@@ -1,14 +1,17 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3 -I
 """The only Python the evening photo reading may run (see nas/read-photos.sh).
 
 It reads photos from the live photos folder and writes only to the work folder, and fetches reference
 pictures only from Rebrickable's CDN, so a run can't be talked into doing anything else with Python.
+The development box's image holds its own copy, /usr/local/bin/photo-tools, which the evening job can't
+change. That's the one it runs, so rebuild the box (nas/install.sh --dev-only) after changing this file.
 
-  python3 nas/photo-tools.py info  A1-top.jpg [more...]          size and modified time of photos
-  python3 nas/photo-tools.py shrink A1-top.jpg [--max 1600]       a downsized copy
-  python3 nas/photo-tools.py crop  A1-top.jpg X Y W H [--max 900] a box cut out, in percent of the photo
-  python3 nas/photo-tools.py ref   3001 [COLOUR]                  Rebrickable's picture of a part (colour 71 by default)
+  photo-tools info  A1-top.jpg [more...]          size and modified time of photos
+  photo-tools shrink A1-top.jpg [--max 1600]       a downsized copy
+  photo-tools crop  A1-top.jpg X Y W H [--max 900] a box cut out, in percent of the photo
+  photo-tools ref   3001 [COLOUR]                  Rebrickable's picture of a part (colour 71 by default)
 
+By hand, from the repo: python3 nas/photo-tools.py info A1-top.jpg
 Photos are named relative to the photos folder; output paths are printed.
 """
 import os

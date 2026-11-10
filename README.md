@@ -14,7 +14,7 @@ npm run fetch-data # refresh the Rebrickable part catalogue (public/data/parts.j
 
 `npm run serve` prints the address to open on your phone, which is also shown on the My setup tab. Phone and computer need to be on the same network, and Windows may ask you to let Node through its firewall the first time.
 
-Your project is saved in `data/project.json` (with the version before it in `project.previous.json`), and photos go in `photos/`. A browser that already has a project moves it to the server the first time it opens the app at the same address. Elsewhere, use **Save project** and **Open…**. There's no password, so keep it on your home network: don't forward a port to it. Tailscale is fine for reaching it while you're out.
+Your project is saved in `data/project.json` (with the version before it in `project.previous.json`), and photos go in `photos/`. The server also keeps the project as it stood before the first change of each day, for 30 days, in `data/backups/`; **Earlier versions…** at the top of the app lists them and brings one back. A browser that already has a project moves it to the server the first time it opens the app at the same address. Elsewhere, use **Save project** and **Open…**. There's no password, so keep it on your home network: don't forward a port to it. Tailscale is fine for reaching it while you're out.
 
 ### On Unraid (always on, with Claude there too)
 
@@ -51,7 +51,7 @@ Give the NAS a fixed address on your router, so bookmarks and SSH keep working. 
 - **Putting it live:** commit to `main`, then in the Unraid terminal `bash /mnt/user/appdata/brick-stash-dev/repo/nas/deploy.sh`. It refuses a branch other than `main`, uncommitted changes, or a data folder with no project in it, unless given `--force`, and keeps your data.
 - **Updating the development box** (for a newer Claude Code): `bash /mnt/user/appdata/brick-stash-dev/repo/nas/install.sh --dev-only` in the Unraid terminal. Your logins and files are kept.
 
-**The evening photo reading** runs at 9:07pm, in the NAS's time zone, in the development box. It follows `nas/read-photos.md`, can only read and write files and run `nas/photo-tools.py` (crops and Rebrickable reference pictures), and logs to `~/logs/read-photos.log`. Run it by hand with `bash nas/read-photos.sh`. Pause it with `touch ~/read-photos.off`, and delete that file to start it again.
+**The evening photo reading** runs at 9:07pm, in the NAS's time zone, in the development box. It follows `nas/read-photos.md` and logs to `~/logs/read-photos.log`. It can read anything, but write only in the live photos folder and its work folder (`~/work/photo-reading`), so not your project or the code. The only program it can run is the photo tool (crops and Rebrickable reference pictures), from the copy built into the development box at `/usr/local/bin/photo-tools`, which it can't change. After changing `nas/photo-tools.py`, rebuild the box (`install.sh --dev-only`) for the job to pick it up. Run it by hand with `bash nas/read-photos.sh`. Pause it with `touch ~/read-photos.off`, and delete that file to start it again.
 
 `photos/` in the repository holds a copy of the drafts, reviews, box names and notes from when it was last committed. On the NAS, the live versions are in the app's data folder (`/live/photos` in the development box).
 

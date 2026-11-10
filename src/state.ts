@@ -6,7 +6,10 @@ import { DEFAULT_KEEP_OUT, DEFAULT_SETTINGS, EMPTY_BASIS, EMPTY_SETUP } from './
 const KEY = 'brick-stash-project';
 /** The server version this browser last agreed with */
 const KEY_REV = 'brick-stash-rev';
-/** Set while this browser holds edits the server hasn't confirmed */
+/**
+ * Set while this browser holds edits the server hasn't confirmed, to the server version they were made on top of.
+ * KEY_REV can't say that: every tab shares it, so another tab's save moves it on.
+ */
 const KEY_DIRTY = 'brick-stash-dirty';
 
 export const emptyProject = (): Project => ({ version: 1, rows: [], units: [], spaces: [], settings: DEFAULT_SETTINGS, volumeOverrides: {}, excluded: [], keepOut: DEFAULT_KEEP_OUT, moves: [], basis: EMPTY_BASIS, measurements: [], setup: EMPTY_SETUP });
@@ -81,7 +84,8 @@ export function useProject() {
         rev.current = (await r.json()).rev as string;
         remember(KEY_REV, rev.current);
         confirmed.current = sending;
-        if (latest.current === sending) remember(KEY_DIRTY, null);
+        // Edits made while this was being sent now sit on top of the version just saved
+        remember(KEY_DIRTY, latest.current === sending ? null : rev.current);
         setSync('ok');
       } catch {
         setSync('offline');
@@ -92,13 +96,18 @@ export function useProject() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    const unsent = recall(KEY_DIRTY);
+    // '1' is how older versions of the app marked unsent edits, without saying what they were based on
+    const dirtyBase = unsent === '1' ? rev.current ?? '' : unsent;
+    // Unsent edits are what this tab opens with, so the version they were based on is the one it's at
+    if (dirtyBase !== null) rev.current = dirtyBase || null;
     (async () => {
       try {
         const r = await fetch('/api/project');
         if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`);
         const serverRev = r.ok ? r.headers.get('X-Rev') : null;
         const local = latest.current;
-        const action = startupAction({ hasLocal: local.rows.length > 0 || local.units.length > 0, dirty: recall(KEY_DIRTY) !== null, savedRev: rev.current, serverRev });
+        const action = startupAction({ hasLocal: local.rows.length > 0 || local.units.length > 0, dirtyBase, serverRev });
         if (action === 'conflict') {
           blocked.current = true;
           setSync('conflict');
@@ -123,7 +132,8 @@ export function useProject() {
   useEffect(() => {
     remember(KEY, JSON.stringify(project));
     if (!ready.current || project === confirmed.current) return;
-    remember(KEY_DIRTY, '1');
+    // Once saving has stopped for a conflict, later edits are still based on the version this tab last had
+    remember(KEY_DIRTY, rev.current ?? '');
     const timer = setTimeout(push, SAVE_AFTER_MS);
     return () => clearTimeout(timer);
   }, [project, push]);
