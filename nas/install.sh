@@ -1,19 +1,28 @@
 #!/bin/bash
 # One-time setup on the Unraid NAS: the always-on app and the development box. Safe to run again.
-# From the Unraid terminal:  bash /path/to/brick-stash/nas/install.sh [--no-docker] [--dev-only]
-#   --no-docker   don't give the development box the NAS's Docker, so it can't deploy (you run nas/deploy.sh yourself)
-#   --dev-only    just rebuild and restart the development box, e.g. to update Claude Code
+# From the Unraid terminal:  bash /path/to/brick-stash/nas/install.sh [--dev-only] [--with-docker]
+#   --dev-only     just rebuild and restart the development box, e.g. to update Claude Code
+#   --with-docker  give the development box the NAS's Docker, so Claude there can deploy. That is root over the whole
+#                  NAS, so it's off by default: you run nas/deploy.sh in the Unraid terminal instead.
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-LIVE=${LIVE:-/mnt/user/appdata/brick-stash}
+# Your project and photos: personal data, kept with your other projects rather than in appdata
+LIVE=${LIVE:-/mnt/user/data/projects/lego}
 DEV=${DEV:-/mnt/user/appdata/brick-stash-dev}
 SSH_PORT=${SSH_PORT:-2222}
 TEST_PORT=${TEST_PORT:-5174}
-WITH_DOCKER=yes
+# The addresses the reverse proxy gives the app and the test server: the Docker tab's WebUI links, and the name
+# the test server must answer to
+WEB=${WEB:-https://lego.brindo.de}
+TEST_WEB=${TEST_WEB:-https://lego-dev.brindo.de}
+TEST_HOST=${TEST_WEB#*://}
+TEST_HOST=${TEST_HOST%%[:/]*}
+WITH_DOCKER=no
 DEV_ONLY=no
 for arg in "$@"; do
   case "$arg" in
+    --with-docker) WITH_DOCKER=yes ;;
     --no-docker) WITH_DOCKER=no ;;
     --dev-only) DEV_ONLY=yes ;;
     *) echo "Unknown option: $arg"; exit 1 ;;
@@ -56,7 +65,8 @@ extra=()
 if [ "$WITH_DOCKER" = yes ]; then extra+=(-v /var/run/docker.sock:/var/run/docker.sock); fi
 docker run -d --name brick-stash-dev --restart unless-stopped --hostname brick-stash-dev \
   -p "$SSH_PORT:22" -p "$TEST_PORT:5174" \
-  -e LIVE_HOST="$LIVE" \
+  -e LIVE_HOST="$LIVE" -e BRICK_TEST_HOSTS="$TEST_HOST" \
+  --label net.unraid.docker.webui="$TEST_WEB" \
   -v "$DEV/home:/home/dev" \
   -v "$REPO:/home/dev/brick-stash" \
   -v "$LIVE:/live" \
@@ -67,7 +77,7 @@ docker run -d --name brick-stash-dev --restart unless-stopped --hostname brick-s
 echo "Development box running: ssh -p $SSH_PORT dev@<this NAS's address>"
 
 if [ "$DEV_ONLY" = no ]; then
-  LIVE_HOST="$LIVE" bash "$REPO/nas/deploy.sh" --force
+  LIVE_HOST="$LIVE" WEB="$WEB" bash "$REPO/nas/deploy.sh" --force
 fi
 
 if [ ! -s "$DEV/home/.ssh/authorized_keys" ] && [ ! -s "$REPO/nas/authorized_keys" ]; then

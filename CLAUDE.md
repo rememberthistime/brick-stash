@@ -8,7 +8,7 @@ A LEGO storage planner (Vite, React, TypeScript, Vitest, a dependency-free Node 
 - They keep a "Flagged issues" list at the end of README.md. Tick items off there with a short note.
 
 ## Where it runs
-- **On the NAS** (the normal setup), the app runs in the `brick-stash` container on port 5173, built from `main` by `nas/deploy.sh`. Its live data is `/live/project.json` and `/live/photos/` inside the development box (`/mnt/user/appdata/brick-stash` on the NAS).
+- **On the NAS** (the normal setup), the app runs in the `brick-stash` container on port 5173, built from `main` by `nas/deploy.sh`. Its live data is `/live/project.json` and `/live/photos/` inside the development box (`/mnt/user/data/projects/lego` on the NAS). It's served at https://lego.brindo.de, and the test server at https://lego-dev.brindo.de, through the NAS's reverse proxy.
 - **On the PC**, `npm run serve` serves the built `dist/` on 5173 from `data/` and `photos/`.
 
 ## Rules
@@ -16,7 +16,7 @@ A LEGO storage planner (Vite, React, TypeScript, Vitest, a dependency-free Node 
 - On the PC, never build into `dist/`, as that changes the page the user's running server sends out. Check builds with `npx vite build --outDir <scratch folder>`.
 - After changing server code, the running app needs redeploying (NAS) or restarting `npm run serve` (PC). Say so.
 - Run `npm test` and `npx tsc --noEmit` before calling work done.
-- Commit and push only when asked. Deploy (`bash nas/deploy.sh`) only when asked, from `main` with everything committed.
+- Commit and push only when asked. The development box has no access to the NAS's Docker, so it can't deploy: the user runs `nas/deploy.sh` in the Unraid terminal, from `main` with everything committed. Say when a change needs deploying.
 - Never enter the user's Rebrickable key or any other credentials. Don't build Brick Architect's label artwork into the app: it isn't licensed for reuse.
 
 ## Reading drawer photos

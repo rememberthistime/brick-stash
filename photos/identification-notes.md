@@ -8,7 +8,7 @@ How to get better at identifying parts from photos of the drawers. Read this bef
 
 The phone page (`/snap`) names them automatically, and adds `A1-piece-1.jpg`, `A1-piece-2.jpg` for single pieces and `A1-closeup.jpg`, `A1-closeup-2.jpg` for close-ups of one box. A piece or close-up may end `-at-62-15`: that's where it came from, as percent across and down the drawer's most recent top photo taken before it. Crop the top photo around that point to see the box. Without it, the photo only says the part is somewhere in the drawer.
 
-Boxes the user has named on the phone ("Fences", "Food") are in `boxes.json`, by drawer code and place on the top photo. Give the matching pocket in a draft a `label` with that name, and treat the name as a strong hint to what's in the box. On the NAS, the live folder is `/mnt/user/appdata/brick-stash/photos`, which is `/live/photos` inside the development box. The copy in the repository is only a snapshot.
+Boxes the user has named on the phone ("Fences", "Food") are in `boxes.json`, by drawer code and place on the top photo. Give the matching pocket in a draft a `label` with that name, and treat the name as a strong hint to what's in the box. On the NAS, the live folder is `/mnt/user/data/projects/lego/photos`, which is `/live/photos` inside the development box. The copy in the repository is only a snapshot.
 
 ## Writing drafts, and reading the user's answers
 

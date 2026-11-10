@@ -17,10 +17,11 @@ fi
 
 mkdir -p "$HOME/work/photo-reading"
 echo "$(date '+%F %T') Reading new drawer photos"
-# Only what the job needs: reading and writing files, and Python for cropping photos and fetching reference pictures.
-# Anything else is refused rather than asked about, as nobody is there to answer.
+# Only what the job needs: reading and writing files, and nas/photo-tools.py for crops and reference pictures.
+# No free-form Python or shell, so text in a photo can't talk a run into anything else. Anything not allowed is
+# refused rather than asked about, as nobody is there to answer.
 claude -p "$(cat nas/read-photos.md)" \
   --permission-mode acceptEdits \
-  --allowedTools "Read" "Write" "Edit" "Glob" "Grep" "Bash(python3:*)" "Bash(ls:*)" "Bash(cp:*)" "Bash(mkdir:*)" \
+  --allowedTools "Read" "Write" "Edit" "Glob" "Grep" "Bash(python3 nas/photo-tools.py:*)" "Bash(ls:*)" \
   --add-dir /live "$HOME/work/photo-reading"
 echo "$(date '+%F %T') Done"

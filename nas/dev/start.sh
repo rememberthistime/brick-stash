@@ -29,7 +29,8 @@ cat > /etc/profile.d/brick-stash.sh <<'EOF'
 export BRICK_LIVE=/live
 export PATH="$HOME/.local/bin:$PATH"
 EOF
-echo "export LIVE_HOST=${LIVE_HOST:-/mnt/user/appdata/brick-stash}" >> /etc/profile.d/brick-stash.sh
+echo "export LIVE_HOST=${LIVE_HOST:-/mnt/user/data/projects/lego}" >> /etc/profile.d/brick-stash.sh
+echo "export BRICK_TEST_HOSTS=${BRICK_TEST_HOSTS:-}" >> /etc/profile.d/brick-stash.sh
 [ -f /home/dev/.bashrc ] || printf '%s\n' '[ -f /etc/profile.d/brick-stash.sh ] && . /etc/profile.d/brick-stash.sh' > /home/dev/.bashrc
 chown 99:100 /home/dev/.bashrc
 

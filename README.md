@@ -19,10 +19,10 @@ Your project is saved in `data/project.json` (with the version before it in `pro
 ### On Unraid (always on, with Claude there too)
 
 This runs everything on the NAS, so the PC doesn't need to be on:
-- **The app** (container `brick-stash`) at `http://<NAS address>:5173`, with `/snap` and `/review`, for every device on your network.
-- **A development box** (container `brick-stash-dev`) with Node, git, GitHub CLI, Claude Code and Python. You and Claude work on the code there over SSH, it tests on port 5174 with copies of your data, and it runs the evening photo reading.
+- **The app** (container `brick-stash`, port 5173) at `https://lego.brindo.de`, with `/snap` and `/review`, for every device on your network. HTTPS comes from the reverse proxy (SWAG), which also lets the phone use its camera.
+- **A development box** (container `brick-stash-dev`) with Node, git, GitHub CLI, Claude Code and Python. You and Claude work on the code there over SSH (port 2222), it tests on port 5174 (`https://lego-dev.brindo.de`) with copies of your data, and it runs the evening photo reading.
 
-Your data lives in `/mnt/user/appdata/brick-stash` (`project.json` and `photos/`), outside both containers, so rebuilding either one never touches it. The development box keeps its home folder, logins and SSH keys in `/mnt/user/appdata/brick-stash-dev`.
+Your data lives in `/mnt/user/data/projects/lego` (`project.json` and `photos/`), with your other projects and outside both containers, so rebuilding either one never touches it. It isn't in the appdata backup, so back that folder up separately. The code and the development box's home folder, logins and SSH keys are in `/mnt/user/appdata/brick-stash-dev`. The addresses and folders are set at the top of `nas/install.sh` and `nas/deploy.sh`.
 
 **Setting it up (once)**
 
@@ -32,7 +32,7 @@ Your data lives in `/mnt/user/appdata/brick-stash` (`project.json` and `photos/`
    ```bash
    bash /mnt/user/appdata/brick-stash-dev/repo/nas/install.sh
    ```
-   This copies your project and photos into the app's data folder, unless the NAS already has them. It then builds and starts both containers. Add `--no-docker` if you'd rather the development box couldn't use the NAS's Docker: it then can't redeploy the app, and you run `nas/deploy.sh` in the Unraid terminal yourself. Giving it Docker effectively gives it full control of the NAS, which is the trade-off for Claude being able to deploy.
+   This copies your project and photos into the app's data folder, unless the NAS already has them. It then builds and starts both containers. The development box can't use the NAS's Docker, so Claude there can't redeploy the app: you do that in the Unraid terminal. `--with-docker` would let it, but that gives it full control of the NAS, so it's off by default.
 4. Sign in to the development box from the PC: `ssh -p 2222 dev@<NAS address>`. Then, once:
    ```bash
    gh auth login        # GitHub.com, HTTPS, log in with a browser
@@ -40,18 +40,18 @@ Your data lives in `/mnt/user/appdata/brick-stash` (`project.json` and `photos/`
    claude               # sign in to your Claude account, then /exit
    cd ~/brick-stash && npm ci && npm test
    ```
-5. Open the app at `http://<NAS address>:5173` on each device and re-enter your Rebrickable key, as browsers keep it per address. Then turn off the PC's evening task (Scheduled in the Claude app sidebar), so photos aren't read twice.
+5. Open the app at `https://lego.brindo.de` on each device and re-enter your Rebrickable key, as browsers keep it (and the first-open move of a project) per address. Use that address from the start, rather than the NAS's IP and port, so you only do this once. Then turn off the PC's evening task (Scheduled in the Claude app sidebar), so photos aren't read twice.
 
 Give the NAS a fixed address on your router, so bookmarks and SSH keep working. There's no password on the app, so keep it on your home network; Tailscale is fine for reaching it while you're out.
 
 **Working on it from any device**
 - **Claude desktop app:** add an SSH connection to `dev@<NAS address>` on port 2222 and open a Code session in `~/brick-stash`. Claude then runs on the NAS. VS Code's Remote-SSH works the same way.
 - **Phone or browser:** start Claude in the development box (`claude`) and turn on Remote Control to carry on from claude.ai or the Claude app.
-- **Testing a change:** `bash nas/dev-server.sh` serves the working copy at `http://<NAS address>:5174`, with fresh copies of the live data that get thrown away.
-- **Putting it live:** commit to `main`, then `bash nas/deploy.sh`. It refuses a branch other than `main` or uncommitted changes unless given `--force`, and keeps your data.
-- **Updating the development box** (for a newer Claude Code): `bash nas/install.sh --dev-only` in the Unraid terminal. Your logins and files are kept.
+- **Testing a change:** `bash nas/dev-server.sh` serves the working copy at `https://lego-dev.brindo.de`, with fresh copies of the live data that get thrown away.
+- **Putting it live:** commit to `main`, then in the Unraid terminal `bash /mnt/user/appdata/brick-stash-dev/repo/nas/deploy.sh`. It refuses a branch other than `main`, uncommitted changes, or a data folder with no project in it, unless given `--force`, and keeps your data.
+- **Updating the development box** (for a newer Claude Code): `bash /mnt/user/appdata/brick-stash-dev/repo/nas/install.sh --dev-only` in the Unraid terminal. Your logins and files are kept.
 
-**The evening photo reading** runs at 9:07pm, in the NAS's time zone, in the development box. It follows `nas/read-photos.md`, can only read and write files and run Python, and logs to `~/logs/read-photos.log`. Run it by hand with `bash nas/read-photos.sh`. Pause it with `touch ~/read-photos.off`, and delete that file to start it again.
+**The evening photo reading** runs at 9:07pm, in the NAS's time zone, in the development box. It follows `nas/read-photos.md`, can only read and write files and run `nas/photo-tools.py` (crops and Rebrickable reference pictures), and logs to `~/logs/read-photos.log`. Run it by hand with `bash nas/read-photos.sh`. Pause it with `touch ~/read-photos.off`, and delete that file to start it again.
 
 `photos/` in the repository holds a copy of the drafts, reviews, box names and notes from when it was last committed. On the NAS, the live versions are in the app's data folder (`/live/photos` in the development box).
 
@@ -111,7 +111,7 @@ There's also a reality check. Plain bricks, plates and tiles can't pack loose an
 - `src/lib/recommend.ts`, `src/lib/presets.ts` — advice and storage catalogue (preset sizes are approximate)
 - `src/lib/rebrickable.ts` — Rebrickable API (proxied at `/rb-api`)
 - `server/api.mjs` — the shared project and photos, used by both servers; `server/index.mjs` — runs the built app for the network
-- `nas/` — running it on the Unraid NAS: `install.sh` (one-time setup), `deploy.sh` (put `main` live), `dev-server.sh` (test copy on 5174), `read-photos.sh` and `read-photos.md` (the evening photo reading), and `dev/` (the development box's image)
+- `nas/` — running it on the Unraid NAS: `install.sh` (one-time setup), `deploy.sh` (put `main` live), `dev-server.sh` (test copy on 5174), `read-photos.sh`, `read-photos.md` and `photo-tools.py` (the evening photo reading, and the only Python it may run), and `dev/` (the development box's image)
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `src/components/Snap.tsx`, `src/lib/photos.ts` — the phone page and photos
 - `src/components/PartImage.tsx` — part pictures: Rebrickable LDraw renders, falling back to BrickLink images
