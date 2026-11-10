@@ -1,0 +1,1291 @@
+{
+  "note": "Drawers read from photos and corrected by hand, for 'Load drawer drafts' on the My setup tab. Fill levels are rough readings from the photos. Z is left out because it was recorded by hand in the app.",
+  "drawers": [
+    {
+      "code": "H2",
+      "pockets": [
+        {
+          "where": "Front left",
+          "share": 0.08,
+          "fill": 0.4,
+          "parts": [
+            "33243"
+          ],
+          "area": {
+            "x": 14,
+            "y": 0,
+            "w": 24,
+            "h": 26
+          }
+        },
+        {
+          "where": "Lower left",
+          "share": 0.05,
+          "fill": 0.4,
+          "parts": [
+            "6005"
+          ],
+          "area": {
+            "x": 38,
+            "y": 0,
+            "w": 18,
+            "h": 27
+          }
+        },
+        {
+          "where": "Middle left",
+          "share": 0.06,
+          "fill": 0.35,
+          "parts": [
+            "24201",
+            "13547",
+            "32803"
+          ],
+          "area": {
+            "x": 55,
+            "y": 0,
+            "w": 20,
+            "h": 29
+          }
+        },
+        {
+          "where": "Back left",
+          "share": 0.07,
+          "fill": 0.45,
+          "parts": [
+            "18653",
+            "78666",
+            "70681"
+          ],
+          "area": {
+            "x": 74,
+            "y": 3,
+            "w": 23,
+            "h": 27
+          }
+        },
+        {
+          "where": "Front centre",
+          "share": 0.13,
+          "fill": 0.4,
+          "parts": [
+            "37352"
+          ],
+          "area": {
+            "x": 14,
+            "y": 27,
+            "w": 24,
+            "h": 43
+          }
+        },
+        {
+          "where": "Lower centre",
+          "share": 0.09,
+          "fill": 0.35,
+          "parts": [
+            "49307",
+            "3563",
+            "79756",
+            "6191"
+          ],
+          "area": {
+            "x": 38,
+            "y": 28,
+            "w": 17,
+            "h": 42
+          }
+        },
+        {
+          "where": "Middle centre",
+          "share": 0.1,
+          "fill": 0.4,
+          "parts": [
+            "6091"
+          ],
+          "area": {
+            "x": 54,
+            "y": 29,
+            "w": 21,
+            "h": 41
+          }
+        },
+        {
+          "where": "Back middle",
+          "share": 0.12,
+          "fill": 0.4,
+          "parts": [
+            "61678",
+            "93606"
+          ],
+          "area": {
+            "x": 74,
+            "y": 30,
+            "w": 24,
+            "h": 41
+          }
+        },
+        {
+          "where": "Front right",
+          "share": 0.09,
+          "fill": 0.35,
+          "parts": [
+            "85970"
+          ],
+          "area": {
+            "x": 12,
+            "y": 71,
+            "w": 25,
+            "h": 29
+          }
+        },
+        {
+          "where": "Right, tall",
+          "share": 0.13,
+          "fill": 0.65,
+          "parts": [
+            "15068",
+            "11477",
+            "28192"
+          ],
+          "area": {
+            "x": 37,
+            "y": 71,
+            "w": 38,
+            "h": 29
+          }
+        },
+        {
+          "where": "Back right",
+          "share": 0.08,
+          "fill": 0.45,
+          "parts": [
+            "50950",
+            "24309"
+          ],
+          "area": {
+            "x": 74,
+            "y": 71,
+            "w": 24,
+            "h": 29
+          }
+        }
+      ],
+      "note": "The drawer photographed as A1 in the first round, now at H2. All boxes checked; your answers are folded in."
+    },
+    {
+      "code": "A3?",
+      "pockets": [
+        {
+          "where": "Large, left",
+          "container": {
+            "name": "Eazystorage 2.5l, Large",
+            "w": 125,
+            "d": 125,
+            "h": 50
+          },
+          "parts": [
+            "98138"
+          ],
+          "fill": 0.4
+        },
+        {
+          "where": "Large, middle",
+          "container": {
+            "name": "Eazystorage 2.5l, Large",
+            "w": 125,
+            "d": 125,
+            "h": 50
+          },
+          "parts": [
+            "3070a"
+          ],
+          "fill": 0.35
+        },
+        {
+          "where": "Medium, top right",
+          "container": {
+            "name": "Eazystorage 2.5l, Medium",
+            "w": 125,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [
+            "41855",
+            "30602"
+          ],
+          "fill": 0.4
+        },
+        {
+          "where": "Medium, left",
+          "container": {
+            "name": "Eazystorage 2.5l, Medium",
+            "w": 125,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [
+            "30165"
+          ],
+          "fill": 0.5
+        },
+        {
+          "where": "Small, 1 x 1 side studs",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [
+            "47905",
+            "4733"
+          ],
+          "fill": 0.5
+        },
+        {
+          "where": "Small, gears",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [
+            "3647",
+            "32270",
+            "6589",
+            "4265a",
+            "35442"
+          ],
+          "fill": 0.55,
+          "label": "Cogs and Gears"
+        },
+        {
+          "where": "Small, roof slopes",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [
+            "3039",
+            "3038",
+            "3037"
+          ],
+          "fill": 0.45
+        },
+        {
+          "where": "Small, pointed slopes",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [
+            "3048a",
+            "3044a"
+          ],
+          "fill": 0.5
+        },
+        {
+          "where": "Small, empty 1",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": []
+        },
+        {
+          "where": "Small, empty 2",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": []
+        },
+        {
+          "where": "Small, empty 3",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": []
+        },
+        {
+          "where": "Small, empty 4",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": []
+        }
+      ],
+      "note": "Photos labelled A3 were of a Sterilite Large drawer. You gave it the code A3, but it was photographed again as H3 (see that draft), so this one may be a duplicate.",
+      "photos": "A3"
+    },
+    {
+      "code": "H1",
+      "pockets": [
+        {
+          "where": "Large, back left: minifig props (assumed by type)",
+          "container": {
+            "name": "Eazystorage 2.5l, Large",
+            "w": 125,
+            "d": 125,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "36752a",
+            "57467",
+            "3962a",
+            "4006",
+            "6120",
+            "30162",
+            "61482",
+            "98137",
+            "2343",
+            "4528",
+            "60752",
+            "64727",
+            "90370",
+            "10187",
+            "30340",
+            "34172",
+            "3837",
+            "3847",
+            "3836",
+            "4332",
+            "6256",
+            "3849",
+            "53705",
+            "80179",
+            "30089a",
+            "4497",
+            "93058",
+            "3900",
+            "4360",
+            "4449",
+            "24482",
+            "79735",
+            "94720",
+            "3959",
+            "6124",
+            "18950",
+            "24324",
+            "33009",
+            "93555",
+            "98141",
+            "2516",
+            "2530",
+            "2562",
+            "6936",
+            "24093",
+            "30088",
+            "30132",
+            "31990",
+            "62698",
+            "90509",
+            "92585",
+            "95199",
+            "95228",
+            "97783",
+            "3852b",
+            "2488",
+            "2542",
+            "2570",
+            "3835",
+            "4341",
+            "4529",
+            "6117",
+            "10172",
+            "11010",
+            "11640",
+            "18920",
+            "30106",
+            "30193",
+            "30194",
+            "35485",
+            "55295",
+            "55296",
+            "55297",
+            "55298",
+            "57899",
+            "58247",
+            "62808",
+            "64000",
+            "64728",
+            "66909",
+            "87993",
+            "88704",
+            "90397",
+            "92738",
+            "94718",
+            "94719",
+            "94721",
+            "94722",
+            "94723",
+            "94724",
+            "96480",
+            "96482",
+            "96484",
+            "96488",
+            "97781",
+            "97782",
+            "98341",
+            "98369",
+            "102498pat0001",
+            "18957pat0002",
+            "3841",
+            "3846",
+            "4499",
+            "4522",
+            "6075",
+            "10169",
+            "11103",
+            "12885",
+            "15071",
+            "15621",
+            "25375",
+            "30035",
+            "37776",
+            "42511",
+            "55299",
+            "55300",
+            "68504",
+            "92290",
+            "93091",
+            "93550",
+            "93552",
+            "95673",
+            "98139",
+            "98370",
+            "98375",
+            "68495pat0002",
+            "2614a",
+            "2342",
+            "2495",
+            "2561",
+            "4496",
+            "4714",
+            "4715",
+            "6900",
+            "11096",
+            "11107",
+            "11245",
+            "13549",
+            "13790",
+            "13808",
+            "15445",
+            "15534",
+            "18746",
+            "18855",
+            "19118",
+            "22407",
+            "23860",
+            "23861",
+            "23984",
+            "23985",
+            "23986",
+            "24085",
+            "24086",
+            "24312",
+            "25111",
+            "27150",
+            "30229",
+            "30304",
+            "30924",
+            "33061",
+            "37178",
+            "37704",
+            "38799",
+            "57506",
+            "61199",
+            "72824",
+            "79736",
+            "79741",
+            "87989",
+            "90826",
+            "91884",
+            "93092",
+            "97785",
+            "97787",
+            "97790",
+            "97791",
+            "97793",
+            "98134",
+            "98288",
+            "98721",
+            "4629c01",
+            "36512a",
+            "55707a",
+            "25975pr0002"
+          ],
+          "area": {
+            "x": 23,
+            "y": 0,
+            "w": 29,
+            "h": 35
+          },
+          "label": "Minifigure accessories"
+        },
+        {
+          "where": "Large, back middle: one-wide arches and curves",
+          "container": {
+            "name": "Eazystorage 2.5l, Large",
+            "w": 125,
+            "d": 125,
+            "h": 50
+          },
+          "fill": 0.45,
+          "parts": [
+            "93273"
+          ],
+          "area": {
+            "x": 53,
+            "y": 0,
+            "w": 27,
+            "h": 37
+          }
+        },
+        {
+          "where": "Medium, left: animal parts and bones (assumed by type)",
+          "container": {
+            "name": "Eazystorage 2.5l, Medium",
+            "w": 125,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "53451",
+            "89522",
+            "87747",
+            "40379",
+            "13564",
+            "93160",
+            "80497",
+            "92691",
+            "11089",
+            "67361",
+            "2547",
+            "2548",
+            "11091",
+            "64847",
+            "16770",
+            "40378"
+          ],
+          "area": {
+            "x": 22,
+            "y": 35,
+            "w": 30,
+            "h": 20
+          }
+        },
+        {
+          "where": "Medium, middle: small special tiles",
+          "container": {
+            "name": "Eazystorage 2.5l, Medium",
+            "w": 125,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.45,
+          "parts": [
+            "25269",
+            "24246",
+            "1748",
+            "39739",
+            "11609",
+            "35787"
+          ],
+          "area": {
+            "x": 52,
+            "y": 36,
+            "w": 28,
+            "h": 19
+          }
+        },
+        {
+          "where": "Small, empty 1",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 22,
+            "y": 55,
+            "w": 15,
+            "h": 20
+          }
+        },
+        {
+          "where": "Small, empty 2",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 37,
+            "y": 55,
+            "w": 15,
+            "h": 20
+          }
+        },
+        {
+          "where": "Small, empty 3",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 52,
+            "y": 55,
+            "w": 14,
+            "h": 20
+          }
+        },
+        {
+          "where": "Small, empty 4",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 66,
+            "y": 55,
+            "w": 14,
+            "h": 20
+          }
+        },
+        {
+          "where": "Small, front left: food (assumed by type)",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "22667",
+            "33051",
+            "33078",
+            "64648",
+            "33085",
+            "6254",
+            "30222",
+            "33057",
+            "33172",
+            "33125",
+            "51270",
+            "97784",
+            "1411pat0001",
+            "4342",
+            "24946",
+            "25386"
+          ],
+          "area": {
+            "x": 21,
+            "y": 74,
+            "w": 15,
+            "h": 22
+          }
+        },
+        {
+          "where": "Small, front, nearly empty",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 36,
+            "y": 76,
+            "w": 15,
+            "h": 21
+          }
+        },
+        {
+          "where": "Small, front: Technic towballs and long pins",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.3,
+          "parts": [
+            "2736"
+          ],
+          "area": {
+            "x": 51,
+            "y": 75,
+            "w": 15,
+            "h": 21
+          }
+        },
+        {
+          "where": "Small, front right: rounded plates with two studs",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "35480"
+          ],
+          "area": {
+            "x": 66,
+            "y": 76,
+            "w": 14,
+            "h": 21
+          }
+        },
+        {
+          "where": "Clear box, back right: angled tiles, wedge plates, shields",
+          "share": 0.5,
+          "fill": 0.5,
+          "parts": [
+            "22385",
+            "22408",
+            "29119",
+            "29120"
+          ],
+          "area": {
+            "x": 80,
+            "y": 3,
+            "w": 9,
+            "h": 40
+          }
+        },
+        {
+          "where": "Clear box, front right: Technic connectors",
+          "share": 0.5,
+          "fill": 0.7,
+          "parts": [
+            "62462",
+            "18654",
+            "71076",
+            "6553",
+            "6536",
+            "53586"
+          ],
+          "area": {
+            "x": 79,
+            "y": 45,
+            "w": 10,
+            "h": 41
+          }
+        }
+      ]
+    },
+    {
+      "code": "I2",
+      "pockets": [
+        {
+          "where": "Front left",
+          "share": 0.092,
+          "fill": 0.45,
+          "parts": [
+            "3829c01",
+            "298c02",
+            "98397",
+            "30031"
+          ],
+          "area": {
+            "x": 19,
+            "y": 0,
+            "w": 21,
+            "h": 25
+          }
+        },
+        {
+          "where": "Middle left",
+          "share": 0.099,
+          "fill": 0.5,
+          "parts": [
+            "61409",
+            "2412a"
+          ],
+          "area": {
+            "x": 41,
+            "y": 0,
+            "w": 25,
+            "h": 26
+          }
+        },
+        {
+          "where": "Back left",
+          "share": 0.093,
+          "fill": 0.5,
+          "parts": [
+            "4207",
+            "30134",
+            "6020",
+            "62113"
+          ],
+          "area": {
+            "x": 69,
+            "y": 0,
+            "w": 26,
+            "h": 30
+          },
+          "label": "Ladders"
+        },
+        {
+          "where": "Front middle",
+          "share": 0.065,
+          "fill": 0.45,
+          "parts": [
+            "43719",
+            "11291",
+            "93274",
+            "2399",
+            "52038"
+          ],
+          "area": {
+            "x": 17,
+            "y": 28,
+            "w": 8,
+            "h": 37
+          }
+        },
+        {
+          "where": "Lower middle",
+          "share": 0.07,
+          "fill": 0.2,
+          "parts": [
+            "4218",
+            "4219"
+          ],
+          "area": {
+            "x": 26,
+            "y": 28,
+            "w": 14,
+            "h": 37
+          }
+        },
+        {
+          "where": "Centre",
+          "share": 0.142,
+          "fill": 0.5,
+          "parts": [
+            "2335",
+            "51000",
+            "4495a",
+            "44676",
+            "30259",
+            "30350a",
+            "649"
+          ],
+          "area": {
+            "x": 41,
+            "y": 29,
+            "w": 25,
+            "h": 36
+          },
+          "label": "Flags"
+        },
+        {
+          "where": "Back middle",
+          "share": 0.129,
+          "fill": 0.55,
+          "parts": [
+            "2486",
+            "4083",
+            "30055",
+            "30056",
+            "6583",
+            "4873",
+            "3185",
+            "19121",
+            "20309"
+          ],
+          "area": {
+            "x": 69,
+            "y": 30,
+            "w": 25,
+            "h": 35
+          },
+          "label": "Fences"
+        },
+        {
+          "where": "Front right",
+          "share": 0.054,
+          "fill": 0.3,
+          "parts": [
+            "78c05",
+            "78c09",
+            "87580",
+            "50943",
+            "40620"
+          ],
+          "area": {
+            "x": 17,
+            "y": 67,
+            "w": 8,
+            "h": 33
+          }
+        },
+        {
+          "where": "Lower right",
+          "share": 0.061,
+          "fill": 0.4,
+          "parts": [
+            "4590",
+            "61072",
+            "3839b"
+          ],
+          "area": {
+            "x": 27,
+            "y": 67,
+            "w": 12,
+            "h": 33
+          }
+        },
+        {
+          "where": "Narrow gap",
+          "share": 0.039,
+          "parts": [],
+          "area": {
+            "x": 41,
+            "y": 67,
+            "w": 25,
+            "h": 15
+          }
+        },
+        {
+          "where": "Middle right",
+          "share": 0.059,
+          "fill": 0.55,
+          "parts": [
+            "6538a",
+            "32034",
+            "32015",
+            "32016",
+            "32192",
+            "10288",
+            "32014"
+          ],
+          "area": {
+            "x": 41,
+            "y": 83,
+            "w": 25,
+            "h": 17
+          }
+        },
+        {
+          "where": "Back narrow",
+          "share": 0.045,
+          "fill": 0.5,
+          "parts": [
+            "47755",
+            "2508",
+            "4596",
+            "4714"
+          ],
+          "area": {
+            "x": 69,
+            "y": 67,
+            "w": 25,
+            "h": 16
+          }
+        },
+        {
+          "where": "Back right",
+          "share": 0.053,
+          "fill": 0.45,
+          "parts": [
+            "2432",
+            "98834"
+          ],
+          "area": {
+            "x": 69,
+            "y": 84,
+            "w": 26,
+            "h": 16
+          }
+        }
+      ]
+    },
+    {
+      "code": "H3",
+      "pockets": [
+        {
+          "where": "Medium, back left: curved bricks with a lip",
+          "container": {
+            "name": "Eazystorage 2.5l, Medium",
+            "w": 125,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.35,
+          "parts": [
+            "41855",
+            "30602"
+          ],
+          "ask": "What is the small red curved piece at the bottom of the piece photo?",
+          "area": {
+            "x": 2,
+            "y": 5,
+            "w": 42,
+            "h": 16
+          }
+        },
+        {
+          "where": "Small, back, empty 1",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 43,
+            "y": 4,
+            "w": 21,
+            "h": 16
+          }
+        },
+        {
+          "where": "Small, back, empty 2",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 64,
+            "y": 4,
+            "w": 23,
+            "h": 16
+          }
+        },
+        {
+          "where": "Large, left: 1 x 1 tiles",
+          "container": {
+            "name": "Eazystorage 2.5l, Large",
+            "w": 125,
+            "d": 125,
+            "h": 50
+          },
+          "fill": 0.45,
+          "parts": [
+            "3070a"
+          ],
+          "area": {
+            "x": 2,
+            "y": 20,
+            "w": 43,
+            "h": 32
+          }
+        },
+        {
+          "where": "Small, empty 3",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 45,
+            "y": 20,
+            "w": 21,
+            "h": 16
+          }
+        },
+        {
+          "where": "Small, empty 4",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "parts": [],
+          "area": {
+            "x": 66,
+            "y": 20,
+            "w": 22,
+            "h": 16
+          }
+        },
+        {
+          "where": "Small: cogs and gears",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.55,
+          "parts": [
+            "3647",
+            "32270",
+            "6589",
+            "4265a",
+            "35442"
+          ],
+          "maybe": [
+            "32269"
+          ],
+          "ask": "What is the black round part with six notches in the piece photo?",
+          "area": {
+            "x": 44,
+            "y": 36,
+            "w": 22,
+            "h": 16
+          },
+          "label": "Cogs and gears"
+        },
+        {
+          "where": "Small: pointed slopes",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "22388"
+          ],
+          "maybe": [
+            "35464",
+            "3048a",
+            "3044a",
+            "35787",
+            "3040a"
+          ],
+          "ask": "Is the flat blue piece in the piece photo a 2 x 2 triangle tile (35787)?",
+          "area": {
+            "x": 66,
+            "y": 36,
+            "w": 22,
+            "h": 16
+          }
+        },
+        {
+          "where": "Large, front left: round 1 x 1 tiles",
+          "container": {
+            "name": "Eazystorage 2.5l, Large",
+            "w": 125,
+            "d": 125,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "98138",
+            "4150"
+          ],
+          "area": {
+            "x": 0,
+            "y": 51,
+            "w": 42,
+            "h": 34
+          }
+        },
+        {
+          "where": "Small: 1 x 1 bricks with side studs",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.5,
+          "parts": [
+            "4733",
+            "47905"
+          ],
+          "maybe": [
+            "26604"
+          ],
+          "ask": "Are some of these studded on two sides next to each other (26604), like the left brown one in the photo?",
+          "area": {
+            "x": 42,
+            "y": 52,
+            "w": 22,
+            "h": 16
+          }
+        },
+        {
+          "where": "Small: roof slopes",
+          "container": {
+            "name": "Eazystorage 2.5l, Small",
+            "w": 60,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.45,
+          "parts": [
+            "3037",
+            "3039",
+            "3040a"
+          ],
+          "maybe": [
+            "3038"
+          ],
+          "area": {
+            "x": 64,
+            "y": 53,
+            "w": 23,
+            "h": 16
+          }
+        },
+        {
+          "where": "Medium, front: curved bricks with two studs",
+          "container": {
+            "name": "Eazystorage 2.5l, Medium",
+            "w": 125,
+            "d": 60,
+            "h": 50
+          },
+          "fill": 0.45,
+          "parts": [
+            "30165"
+          ],
+          "area": {
+            "x": 41,
+            "y": 68,
+            "w": 46,
+            "h": 19
+          }
+        }
+      ],
+      "note": "The same drawer as the round 2 photos filed as A3?, turned a quarter turn. Parts you confirmed on A3? are carried over. You gave A3? the code A3, but these photos were taken as H3: if H3 is right, the A3? draft can be dropped."
+    }
+  ]
+}

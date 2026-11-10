@@ -1,0 +1,420 @@
+{
+ "H2": {
+  "pockets": {
+   "Front left": {
+    "parts": {
+     "6191": "no",
+     "33243": "yes"
+    },
+    "done": true
+   },
+   "Lower left": {
+    "parts": {
+     "6005": "yes"
+    },
+    "done": true
+   },
+   "Middle left": {
+    "parts": {
+     "13547": "yes",
+     "24201": "yes",
+     "32803": "yes",
+     "42023": "no"
+    },
+    "done": true
+   },
+   "Back left": {
+    "parts": {
+     "18653": "yes",
+     "70681": "yes",
+     "78666": "yes"
+    },
+    "done": true
+   },
+   "Front centre": {
+    "parts": {
+     "3563": "no",
+     "37352": "yes"
+    },
+    "done": true
+   },
+   "Lower centre": {
+    "parts": {
+     "3563": "yes",
+     "6191": "yes",
+     "49307": "yes",
+     "79756": "yes",
+     "88930": "no"
+    },
+    "done": true
+   },
+   "Back middle": {
+    "parts": {
+     "61678": "yes"
+    },
+    "added": [
+     "93606"
+    ],
+    "done": true
+   },
+   "Front right": {
+    "parts": {
+     "85970": "yes"
+    },
+    "done": true
+   },
+   "Right, tall": {
+    "parts": {
+     "11477": "yes",
+     "15068": "yes",
+     "28192": "yes"
+    },
+    "done": true
+   },
+   "Back right": {
+    "parts": {
+     "24309": "yes",
+     "29119": "no",
+     "29120": "no",
+     "50950": "yes"
+    },
+    "done": true
+   },
+   "Middle centre": {
+    "parts": {
+     "6091": "yes"
+    },
+    "done": true
+   }
+  },
+  "updated": 1794142350381
+ },
+ "A3?": {
+  "pockets": {
+   "Large, left": {
+    "parts": {
+     "6141": "no",
+     "18674": "no",
+     "98138": "yes"
+    },
+    "done": true
+   },
+   "Large, middle": {
+    "parts": {
+     "3024": "no",
+     "3070a": "yes"
+    },
+    "done": true
+   },
+   "Medium, top right": {
+    "parts": {
+     "30602": "yes",
+     "41855": "yes"
+    },
+    "done": true
+   },
+   "Medium, left": {
+    "parts": {
+     "30165": "yes"
+    },
+    "done": true
+   },
+   "Small, 1 x 1 side studs": {
+    "parts": {
+     "4733": "yes",
+     "47905": "yes",
+     "87087": "no"
+    },
+    "done": true
+   },
+   "Small, gears": {
+    "parts": {
+     "3647": "yes",
+     "6589": "yes",
+     "32270": "yes",
+     "35442": "yes",
+     "4265a": "yes"
+    },
+    "label": "Cogs and Gears",
+    "note": "Several other similar piece types in here",
+    "done": true
+   }
+  },
+  "code": "A3",
+  "updated": 1794142063039
+ },
+ "H1": {
+  "pockets": {
+   "Large, back left: minifig props (assumed by type)": {
+    "parts": {
+     "4349": "no",
+     "5059": "no",
+     "11253": "no",
+     "21459": "no",
+     "23306": "no",
+     "37762": "no",
+     "38014": "no",
+     "58367": "no",
+     "59275": "no",
+     "64644": "no",
+     "36752a": "yes",
+     "4599a": "no"
+    },
+    "done": true
+   },
+   "Medium, left: animal parts and bones (assumed by type)": {
+    "parts": {
+     "11089": "yes",
+     "11100": "no",
+     "13564": "yes",
+     "15082": "no",
+     "40379": "yes",
+     "53451": "yes",
+     "67361": "yes",
+     "80497": "yes",
+     "87747": "yes",
+     "89522": "yes",
+     "92691": "yes",
+     "93160": "yes"
+    },
+    "done": true
+   },
+   "Medium, middle: small special tiles": {
+    "parts": {
+     "1748": "yes",
+     "11609": "yes",
+     "24246": "yes",
+     "25269": "yes",
+     "35787": "yes",
+     "39739": "yes"
+    },
+    "done": true
+   },
+   "Small, empty 2": {
+    "done": true
+   },
+   "Small, empty 3": {
+    "done": true
+   },
+   "Small, empty 4": {
+    "done": true
+   },
+   "Small, front left: food (assumed by type)": {
+    "parts": {
+     "6254": "yes",
+     "22667": "yes",
+     "30222": "yes",
+     "33051": "yes",
+     "33057": "yes",
+     "33078": "yes",
+     "33085": "yes",
+     "33125": "yes",
+     "33172": "yes",
+     "33183": "no",
+     "51270": "yes",
+     "64648": "yes"
+    },
+    "done": true
+   },
+   "Small, front, nearly empty": {
+    "done": true
+   },
+   "Small, front: Technic towballs and long pins": {
+    "parts": {
+     "2736": "yes",
+     "32054": "no"
+    },
+    "done": true
+   },
+   "Small, front right: rounded plates with two studs": {
+    "parts": {
+     "35480": "yes"
+    },
+    "done": true
+   },
+   "Clear box, back right: angled tiles, wedge plates, shields": {
+    "parts": {
+     "22385": "yes",
+     "22408": "yes",
+     "26601": "no"
+    },
+    "added": [
+     "29119",
+     "29120"
+    ],
+    "done": true
+   },
+   "Large, back middle: one-wide arches and curves": {
+    "parts": {
+     "3455": "no",
+     "3659": "no",
+     "42022": "no",
+     "93273": "yes"
+    },
+    "done": true
+   },
+   "Small, empty 1": {
+    "done": true
+   },
+   "Clear box, front right: Technic connectors": {
+    "parts": {
+     "18654": "yes",
+     "62462": "yes"
+    },
+    "added": [
+     "53586"
+    ],
+    "done": true
+   }
+  },
+  "updated": 1794143018617
+ },
+ "I2": {
+  "pockets": {
+   "Front left": {
+    "parts": {
+     "48723": "no",
+     "3829c01": "yes",
+     "298c02": "yes",
+     "3794a": "no"
+    },
+    "added": [
+     "98397",
+     "30031"
+    ],
+    "done": true
+   },
+   "Middle left": {
+    "parts": {
+     "61409": "yes",
+     "2412a": "yes"
+    },
+    "done": true
+   },
+   "Back left": {
+    "parts": {
+     "4207": "yes",
+     "6020": "yes",
+     "30134": "yes",
+     "62113": "yes"
+    },
+    "done": true
+   },
+   "Front middle": {
+    "parts": {
+     "11291": "yes"
+    },
+    "added": [
+     "2399",
+     "52038"
+    ],
+    "done": true
+   },
+   "Lower middle": {
+    "parts": {
+     "4218": "yes"
+    },
+    "added": [
+     "4219"
+    ],
+    "done": true
+   },
+   "Centre": {
+    "parts": {
+     "2335": "yes",
+     "30259": "yes",
+     "44676": "yes",
+     "51000": "yes",
+     "4495a": "yes",
+     "30350a": "yes"
+    },
+    "added": [
+     "649"
+    ],
+    "done": true
+   },
+   "Back middle": {
+    "parts": {
+     "2486": "yes",
+     "3185": "yes",
+     "4083": "yes",
+     "4873": "yes",
+     "6583": "yes",
+     "19121": "yes",
+     "20309": "yes",
+     "30055": "yes",
+     "30056": "yes"
+    },
+    "done": true
+   },
+   "Front right": {
+    "parts": {
+     "78c05": "yes"
+    },
+    "added": [
+     "50943",
+     "40620"
+    ],
+    "done": true
+   },
+   "Lower right": {
+    "parts": {
+     "4590": "yes",
+     "4623": "no",
+     "23443": "no"
+    },
+    "added": [
+     "61072",
+     "3839b"
+    ],
+    "done": true
+   },
+   "Narrow gap": {
+    "done": true
+   },
+   "Middle right": {
+    "parts": {
+     "6536": "no",
+     "18654": "no",
+     "32013": "no",
+     "32034": "yes",
+     "42003": "no",
+     "62462": "no",
+     "6538a": "yes"
+    },
+    "added": [
+     "32015",
+     "32016",
+     "32192",
+     "10288",
+     "32014"
+    ],
+    "done": true
+   },
+   "Back right": {
+    "parts": {
+     "2432": "yes",
+     "2540": "no",
+     "99563": "no",
+     "3044a": "no"
+    },
+    "added": [
+     "98834"
+    ],
+    "done": true
+   },
+   "Back narrow": {
+    "parts": {
+     "47755": "yes"
+    },
+    "added": [
+     "2508",
+     "4596",
+     "4714"
+    ],
+    "done": true
+   }
+  },
+  "updated": 1794143978683
+ }
+}

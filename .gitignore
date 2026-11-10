@@ -1,0 +1,17 @@
+node_modules
+dist
+data-raw
+*.tmp
+
+# Your own data: the project the app saves, and exports of it
+/data
+/brick-stash-project.json
+
+# Drawer photos stay on this PC and the NAS; their drafts, reviews, box names and notes are kept
+/photos/*.jpg
+/photos/*.jpeg
+/photos/*.png
+/photos/*.webp
+/photos/*.backup.json
+
+.claude/settings.local.json

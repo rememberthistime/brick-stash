@@ -1,0 +1,230 @@
+// Storage products. Compartment sizes are internal, in mm. The Australian retail products below were
+// measured or taken from retailer specs where noted; everything else is approximate, so measure yours
+// and check current specs before buying. `price` is a rough AUD guide for comparing options only.
+import type { CompartmentSpec, Dims } from './types';
+
+export interface Preset {
+  id: string;
+  name: string;
+  kind: 'drawers' | 'small-drawers' | 'box' | 'organiser';
+  /** Heading in the catalogue list */
+  retailer: string;
+  /** Product codes or link fragments that identify it in a pasted list */
+  match?: string[];
+  external: Dims;
+  compartments: Omit<CompartmentSpec, 'id'>[];
+  price?: number;
+  notes?: string;
+}
+
+const OTHER = 'Other (approximate sizes)';
+
+export const PRESETS: Preset[] = [
+  {
+    id: 'ezy-sort-it-2-5',
+    name: 'Ezy Storage Sort It 2.5L, 6 compartment',
+    kind: 'organiser',
+    retailer: 'Officeworks',
+    match: ['sort6comp'],
+    external: { w: 155, d: 350, h: 70 },
+    compartments: [
+      { label: 'Large', w: 125, d: 125, h: 50, qty: 1, noDividers: true },
+      { label: 'Medium', w: 125, d: 60, h: 50, qty: 1, noDividers: true },
+      { label: 'Small', w: 60, d: 60, h: 50, qty: 4 },
+    ],
+    price: 8,
+    notes: 'Compartment sizes hand-measured.',
+  },
+  {
+    id: 'ezy-a4-clip-4-8',
+    name: 'Ezy Storage 4.8L A4 clip lock container',
+    kind: 'box',
+    retailer: 'Officeworks',
+    match: ['ezya4clip'],
+    external: { w: 290, d: 355, h: 70 },
+    compartments: [{ label: 'Box', w: 264, d: 332, h: 59, qty: 1 }],
+    price: 7,
+    notes: 'Internal size from the retailer.',
+  },
+  {
+    id: 'jburrows-5-drawer',
+    name: 'J.Burrows desktop file organiser, 5 drawer',
+    kind: 'drawers',
+    retailer: 'Officeworks',
+    match: ['jb5drwdkbk', 'owdd105pbk'],
+    external: { w: 250, d: 340, h: 230 },
+    compartments: [{ label: 'Drawer', w: 220, d: 300, h: 30, qty: 5, noDividers: true }],
+    price: 20,
+    notes: 'Drawer size hand-measured. Shallow, so best for plates and tiles.',
+  },
+  {
+    id: 'sterilite-3-drawer',
+    name: 'Sterilite Clearview 3 drawer unit',
+    kind: 'drawers',
+    retailer: 'Howards Storage World',
+    match: ['sterilite-clearview-3-drawer'],
+    external: { w: 280, d: 340, h: 240 },
+    compartments: [{ label: 'Drawer', w: 220, d: 290, h: 70, qty: 3 }],
+    price: 69,
+    notes: 'Drawer size hand-measured.',
+  },
+  {
+    id: 'sterilite-scrapbook-3-drawer',
+    name: 'Sterilite Clearview scrapbook organiser, 3 drawer',
+    kind: 'drawers',
+    retailer: 'Howards Storage World',
+    match: ['sterilite-clearview-scrapbook'],
+    external: { w: 364, d: 360, h: 270 },
+    compartments: [{ label: 'Drawer', w: 310, d: 310, h: 60, qty: 3 }],
+    price: 99,
+    notes: 'Drawer size hand-measured.',
+  },
+  {
+    id: 'boxsweden-6-section',
+    name: 'Boxsweden 6 section compartment storer, 10L',
+    kind: 'organiser',
+    retailer: 'Spotlight',
+    match: ['80615345', 'boxsweden-6-section'],
+    external: { w: 260, d: 570, h: 95 },
+    compartments: [{ label: 'Section', w: 90, d: 225, h: 80, qty: 6, noDividers: true }],
+    price: 15,
+    notes: 'Section size estimated from the outside size and 10L capacity: measure one. Comes with 5 insert dividers.',
+  },
+  {
+    id: 'boxsweden-4-section',
+    name: 'Boxsweden 4 section compartment storer, 6L',
+    kind: 'organiser',
+    retailer: 'Spotlight',
+    match: ['80615344', 'boxsweden-4-section'],
+    external: { w: 257, d: 395, h: 95 },
+    compartments: [{ label: 'Section', w: 90, d: 225, h: 80, qty: 4, noDividers: true }],
+    price: 10,
+    notes: 'Section size estimated from the outside size and 6L capacity: measure one. Comes with 3 insert dividers.',
+  },
+  {
+    id: 'ikea-alex-9',
+    name: 'IKEA ALEX drawer unit, 9 drawers',
+    kind: 'drawers',
+    retailer: OTHER,
+    external: { w: 360, d: 580, h: 1160 },
+    compartments: [{ label: 'Drawer', w: 290, d: 500, h: 85, qty: 9 }],
+    price: 220,
+    notes: 'Shallow drawers — great for sorted parts with dividers.',
+  },
+  {
+    id: 'ikea-alex-5',
+    name: 'IKEA ALEX drawer unit, 5 drawers',
+    kind: 'drawers',
+    retailer: OTHER,
+    external: { w: 360, d: 580, h: 700 },
+    compartments: [{ label: 'Drawer', w: 290, d: 500, h: 100, qty: 5 }],
+    price: 170,
+  },
+  {
+    id: 'ikea-helmer',
+    name: 'IKEA HELMER drawer unit, 6 drawers',
+    kind: 'drawers',
+    retailer: OTHER,
+    external: { w: 280, d: 430, h: 690 },
+    compartments: [{ label: 'Drawer', w: 240, d: 380, h: 90, qty: 6 }],
+    price: 90,
+  },
+  {
+    id: 'ikea-trofast-shallow',
+    name: 'IKEA TROFAST shallow box',
+    kind: 'box',
+    retailer: OTHER,
+    external: { w: 420, d: 300, h: 100 },
+    compartments: [{ label: 'Box', w: 380, d: 270, h: 90, qty: 1 }],
+    price: 6,
+    notes: 'Fits TROFAST frames; needs a frame.',
+  },
+  {
+    id: 'ikea-trofast-deep',
+    name: 'IKEA TROFAST medium box',
+    kind: 'box',
+    retailer: OTHER,
+    external: { w: 420, d: 300, h: 230 },
+    compartments: [{ label: 'Box', w: 380, d: 270, h: 210, qty: 1 }],
+    price: 10,
+  },
+  {
+    id: 'ikea-kallax-drona',
+    name: 'IKEA DRÖNA / KALLAX box',
+    kind: 'box',
+    retailer: OTHER,
+    external: { w: 330, d: 380, h: 330 },
+    compartments: [{ label: 'Box', w: 310, d: 360, h: 310, qty: 1, noDividers: true }],
+    price: 12,
+    notes: 'Fabric — deep and floppy; best for bulk basics or as a carrier for smaller tubs.',
+  },
+  {
+    id: 'ikea-samla-11',
+    name: 'IKEA SAMLA box 11 L',
+    kind: 'box',
+    retailer: OTHER,
+    external: { w: 390, d: 280, h: 140 },
+    compartments: [{ label: 'Box', w: 350, d: 240, h: 130, qty: 1 }],
+    price: 8,
+  },
+  {
+    id: 'rub-4',
+    name: 'Really Useful Box 4 L',
+    kind: 'box',
+    retailer: OTHER,
+    external: { w: 395, d: 255, h: 85 },
+    compartments: [{ label: 'Box', w: 350, d: 215, h: 70, qty: 1 }],
+    price: 12,
+    notes: 'Optional divider trays available.',
+  },
+  {
+    id: 'rub-9',
+    name: 'Really Useful Box 9 L',
+    kind: 'box',
+    retailer: OTHER,
+    external: { w: 395, d: 255, h: 155 },
+    compartments: [{ label: 'Box', w: 350, d: 215, h: 140, qty: 1 }],
+    price: 16,
+  },
+  {
+    id: 'akro-64',
+    name: 'Small-parts cabinet, 64 drawers (Akro-Mils 10164 style)',
+    kind: 'small-drawers',
+    retailer: OTHER,
+    external: { w: 510, d: 160, h: 400 },
+    compartments: [{ label: 'Drawer', w: 50, d: 135, h: 40, qty: 64, noDividers: true }],
+    price: 120,
+    notes: 'Ideal for small, numerous part types (1×1s, clips, technic pins).',
+  },
+  {
+    id: 'akro-44',
+    name: 'Small-parts cabinet, 44 drawers (16 large + 28 small)',
+    kind: 'small-drawers',
+    retailer: OTHER,
+    external: { w: 510, d: 160, h: 400 },
+    compartments: [
+      { label: 'Small drawer', w: 50, d: 135, h: 40, qty: 28, noDividers: true },
+      { label: 'Large drawer', w: 110, d: 135, h: 55, qty: 16 },
+    ],
+    price: 110,
+  },
+  {
+    id: 'raaco-150-20',
+    name: 'Raaco Handy Cabinet, 20 drawers',
+    kind: 'small-drawers',
+    retailer: OTHER,
+    external: { w: 306, d: 150, h: 552 },
+    compartments: [{ label: 'Drawer', w: 120, d: 135, h: 65, qty: 20 }],
+    price: 80,
+  },
+  {
+    id: 'stanley-organiser',
+    name: 'Compartment organiser case (Stanley Sortmaster style)',
+    kind: 'organiser',
+    retailer: OTHER,
+    external: { w: 430, d: 330, h: 90 },
+    compartments: [{ label: 'Cup', w: 75, d: 100, h: 70, qty: 18, noDividers: true }],
+    price: 40,
+    notes: 'Removable cups — portable; good for minifig parts and accessories.',
+  },
+];
