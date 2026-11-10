@@ -59,7 +59,7 @@ echo "Copied $copied photo files to $LIVE/photos (anything already there was lef
 chown -R 99:100 "$LIVE" "$DEV/home" "$REPO"
 
 echo "Building the development box…"
-docker build -t brick-stash-dev "$REPO/nas/dev"
+docker build -t brick-stash-dev -f "$REPO/nas/dev/Dockerfile" "$REPO/nas"
 docker rm -f brick-stash-dev >/dev/null 2>&1 || true
 extra=()
 if [ "$WITH_DOCKER" = yes ]; then extra+=(-v /var/run/docker.sock:/var/run/docker.sock); fi

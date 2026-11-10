@@ -20,6 +20,9 @@ export const UPSTREAMS = {
 };
 
 const MAX_PROJECT = 64 * 1024 * 1024;
+/** How many days' versions of the project are kept */
+const KEEP_VERSIONS = 30;
+const VERSION_NAME = /^project-(\d{4}-\d{2}-\d{2})\.json$/;
 const MAX_PHOTO = 40 * 1024 * 1024;
 const VIEWS = ['piece', 'closeup', 'top', 'side'];
 const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
@@ -59,6 +62,33 @@ function readBody(req, limit) {
 export function createApi({ dataDir, photosDir }) {
   const projectFile = path.join(dataDir, 'project.json');
   const revOf = () => (fs.existsSync(projectFile) ? String(fs.statSync(projectFile).mtimeMs) : null);
+
+  // The project as it stood before the first change of each day it changed. project.previous.json only goes back one
+  // save, and saves follow every edit, so on its own a mistake is out of reach a couple of edits later.
+  const versionsDir = path.join(dataDir, 'backups');
+  const listVersions = () =>
+    (fs.existsSync(versionsDir) ? fs.readdirSync(versionsDir) : [])
+      .flatMap((name) => {
+        const m = name.match(VERSION_NAME);
+        return m ? [{ name, date: m[1], size: fs.statSync(path.join(versionsDir, name)).size }] : [];
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+  /** Called just before the project file is replaced. Never stops a save: the newest work matters most. */
+  function keepVersion() {
+    try {
+      const now = new Date();
+      const two = (n) => String(n).padStart(2, '0');
+      const file = path.join(versionsDir, `project-${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}.json`);
+      if (fs.existsSync(file)) return;
+      fs.mkdirSync(versionsDir, { recursive: true });
+      fs.copyFileSync(projectFile, `${file}.tmp`);
+      fs.renameSync(`${file}.tmp`, file);
+      for (const old of listVersions().slice(KEEP_VERSIONS)) fs.unlinkSync(path.join(versionsDir, old.name));
+    } catch (e) {
+      console.error(`Couldn't keep a version of the project in ${versionsDir}: ${e.message}`);
+    }
+  }
 
   function listPhotos() {
     if (!fs.existsSync(photosDir)) return [];
@@ -237,7 +267,10 @@ export function createApi({ dataDir, photosDir }) {
     fs.mkdirSync(dataDir, { recursive: true });
     const temp = `${projectFile}.tmp`;
     fs.writeFileSync(temp, JSON.stringify(project));
-    if (current !== null) fs.copyFileSync(projectFile, path.join(dataDir, 'project.previous.json'));
+    if (current !== null) {
+      fs.copyFileSync(projectFile, path.join(dataDir, 'project.previous.json'));
+      keepVersion();
+    }
     fs.renameSync(temp, projectFile);
     return send(res, 200, { rev: revOf() });
   }
@@ -284,7 +317,7 @@ export function createApi({ dataDir, photosDir }) {
       .flat()
       .filter((a) => a && a.family === 'IPv4' && !a.internal && /^(192\.168|10)\./.test(a.address))
       .map((a) => `http://${a.address}:${port}/snap`);
-    return send(res, 200, { urls: addresses, features: ['spots', 'refile', 'boxes', 'reviews'] });
+    return send(res, 200, { urls: addresses, features: ['spots', 'refile', 'boxes', 'reviews', 'versions'] });
   }
 
   /** Resolves true if it answered the request */
@@ -304,7 +337,14 @@ export function createApi({ dataDir, photosDir }) {
           send(res, 200, project, { 'X-Rev': rev, 'Cache-Control': 'no-store' });
         }
       } else if (p === '/api/project' && req.method === 'PUT') await saveProject(req, res);
-      else if (p === '/api/photos' && req.method === 'GET') send(res, 200, listPhotos(), { 'Cache-Control': 'no-store' });
+      else if (p === '/api/versions' && req.method === 'GET') send(res, 200, listVersions(), { 'Cache-Control': 'no-store' });
+      else if (p.startsWith('/api/versions/') && req.method === 'GET') {
+        // The pattern allows no slashes or dots beyond the extension, so a name can't leave the folder
+        const name = p.slice('/api/versions/'.length);
+        const file = VERSION_NAME.test(name) ? path.join(versionsDir, name) : null;
+        if (!file || !fs.existsSync(file)) send(res, 404, { error: 'No such version.' });
+        else send(res, 200, JSON.parse(fs.readFileSync(file, 'utf8')), { 'Cache-Control': 'no-store' });
+      } else if (p === '/api/photos' && req.method === 'GET') send(res, 200, listPhotos(), { 'Cache-Control': 'no-store' });
       else if (p === '/api/photos' && req.method === 'POST') await addPhoto(req, res, url);
       else if (p.startsWith('/api/photos/') && req.method === 'GET') {
         const file = photoFile(res, p.slice('/api/photos/'.length));

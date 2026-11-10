@@ -38,9 +38,12 @@ RUN mkdir -p /run/sshd /etc/ssh/keys \
       'AcceptEnv LANG LC_*' \
       > /etc/ssh/sshd_config.d/brick-stash.conf
 
-COPY start.sh /usr/local/bin/start.sh
-COPY read-photos.cron /etc/cron.d/brick-stash
-RUN chmod 755 /usr/local/bin/start.sh && chmod 644 /etc/cron.d/brick-stash
+# Built from the nas folder (see install.sh), so the photo tool can be copied in. The evening job runs this copy,
+# which belongs to root, rather than the one in the repo, which the job could otherwise rewrite and then run.
+COPY dev/start.sh /usr/local/bin/start.sh
+COPY dev/read-photos.cron /etc/cron.d/brick-stash
+COPY photo-tools.py /usr/local/bin/photo-tools
+RUN chmod 755 /usr/local/bin/start.sh /usr/local/bin/photo-tools && chmod 644 /etc/cron.d/brick-stash
 
 EXPOSE 22 5174
 CMD ["/usr/local/bin/start.sh"]

@@ -11,6 +11,7 @@ import CollectionTab from './components/CollectionTab';
 import StorageTab from './components/StorageTab';
 import PlanTab from './components/PlanTab';
 import SetupTab from './components/SetupTab';
+import Versions from './components/Versions';
 
 type Tab = 'collection' | 'storage' | 'plan' | 'setup';
 
@@ -20,6 +21,7 @@ export default function App() {
   const { catalog, error } = useCatalog();
   const { project, update, replace, sync, takeServerCopy } = useProject();
   const [tab, setTab] = useState<Tab>('collection');
+  const [versions, setVersions] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const owned = useMemo(() => mergeToParts(project.rows, catalog, project.volumeOverrides), [project.rows, catalog, project.volumeOverrides]);
@@ -59,6 +61,9 @@ export default function App() {
     try {
       const p = JSON.parse(await f.text()) as Project;
       if (p.version !== 1 || !Array.isArray(p.rows)) throw new Error('not a Brick Stash project');
+      // Opening a file replaces the project on every device, so it shouldn't happen on a stray click
+      const has = project.rows.length || project.units.length;
+      if (has && !confirm(`Replace your project with ${f.name}? What's here now goes, on every device. Earlier versions lists what can be brought back.`)) return;
       replace(withDefaults(p));
     } catch (e) {
       alert(`Couldn't open that file: ${(e as Error).message}`);
@@ -103,7 +108,21 @@ export default function App() {
           <button className="ghost" onClick={() => fileRef.current?.click()}>
             Open…
           </button>
-          <input ref={fileRef} type="file" accept=".json" hidden onChange={(e) => e.target.files?.[0] && importProject(e.target.files[0])} />
+          <button className="ghost" onClick={() => setVersions((v) => !v)}>
+            Earlier versions…
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              // Cleared so choosing the same file again still counts as a change
+              e.target.value = '';
+              if (f) void importProject(f);
+            }}
+          />
         </div>
       </header>
 
@@ -117,6 +136,8 @@ export default function App() {
           </button>
         </div>
       )}
+
+      {versions && <Versions restore={replace} close={() => setVersions(false)} />}
 
       <main>
         {tab === 'collection' && <CollectionTab project={project} update={update} catalog={catalog} parts={parts} totals={plan.stats} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />}
