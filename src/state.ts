@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { withUnitCodes } from './lib/codes';
 import { startupAction } from './lib/sync';
 import type { Catalog, Project } from './lib/types';
 import { DEFAULT_KEEP_OUT, DEFAULT_SETTINGS, EMPTY_BASIS, EMPTY_SETUP } from './lib/types';
@@ -12,10 +13,16 @@ const KEY_REV = 'brick-stash-rev';
  */
 const KEY_DIRTY = 'brick-stash-dirty';
 
-export const emptyProject = (): Project => ({ version: 1, rows: [], units: [], spaces: [], settings: DEFAULT_SETTINGS, volumeOverrides: {}, excluded: [], keepOut: DEFAULT_KEEP_OUT, moves: [], basis: EMPTY_BASIS, measurements: [], setup: EMPTY_SETUP });
+export const emptyProject = (): Project => ({ version: 1, rows: [], units: [], spaces: [], settings: DEFAULT_SETTINGS, volumeOverrides: {}, excluded: [], keepOut: DEFAULT_KEEP_OUT, moves: [], basis: EMPTY_BASIS, measurements: [], setup: EMPTY_SETUP, lock: null });
 
 /** A project as saved by any version, with anything added since filled in */
-export const withDefaults = (p: Project): Project => ({ ...emptyProject(), ...p, settings: { ...DEFAULT_SETTINGS, ...p.settings }, setup: { ...EMPTY_SETUP, ...p.setup } });
+export const withDefaults = (p: Project): Project => settled({ ...emptyProject(), ...p, settings: { ...DEFAULT_SETTINGS, ...p.settings }, setup: { ...EMPTY_SETUP, ...p.setup } });
+
+/** Every unit has a letter of its own before a project is used or saved, so drawer codes never depend on the order of the list */
+function settled(p: Project): Project {
+  const units = withUnitCodes(p.units);
+  return units === p.units ? p : { ...p, units };
+}
 
 function load(): Project {
   try {
@@ -151,8 +158,8 @@ export function useProject() {
   };
 
   const update = (patch: Partial<Project> | ((p: Project) => Partial<Project>)) =>
-    setProject((p) => ({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) }));
-  return { project, update, replace: setProject, sync, takeServerCopy };
+    setProject((p) => settled({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) }));
+  return { project, update, replace: (p: Project) => setProject(settled(p)), sync, takeServerCopy };
 }
 
 export function useCatalog() {

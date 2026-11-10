@@ -41,7 +41,7 @@ function without(node: TreeNode, partNum: string): TreeNode {
 }
 
 /** How full a compartment is with these sections: dividers cost a little room once there are several */
-const usedBy = (sections: Section[]) => sections.reduce((t, s, i) => t + s.volume * (i ? SHARE_OVERHEAD : 1), 0);
+export const usedBy = (sections: Section[]) => sections.reduce((t, s, i) => t + s.volume * (i ? SHARE_OVERHEAD : 1), 0);
 
 export interface MovedPlan {
   plan: Plan;

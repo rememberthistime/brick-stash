@@ -57,6 +57,27 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 16px
 .tabs .active .step { background: var(--accent); color: var(--accent-ink); }
 .badge { font-size: 11px; color: var(--muted); font-weight: 400; }
 .project-actions { display: flex; gap: 6px; }
+.pick-view { max-width: 900px; margin: 0 auto; }
+.pick-view textarea { width: 100%; margin: 6px 0; font: inherit; }
+.pick-file { border: 1px solid var(--line); border-radius: 8px; padding: 7px 14px; cursor: pointer; background: var(--card); }
+.pick-drawer h3 { margin: 0 0 8px; display: flex; align-items: baseline; gap: 10px; }
+.pick-drawer h3 .code { font-size: 20px; font-weight: 700; }
+.pick-lines { list-style: none; margin: 0; padding: 0; }
+.pick-lines li { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-top: 1px solid var(--line); }
+.pick-lines li.picked { opacity: 0.45; }
+.pick-lines li.picked .pick-name { text-decoration: line-through; }
+.pick-qty { font-weight: 700; min-width: 44px; text-align: right; }
+.pick-name { flex: 1; min-width: 0; }
+.pick-detail { display: block; color: var(--muted); }
+.pick-detail b { color: var(--ink, inherit); }
+.pick-short { color: var(--bad); }
+@media print {
+  .pick-view .card { border: none; padding: 0 0 8px; break-inside: avoid; }
+  .pick-lines li { padding: 2px 0; }
+}
+.lock-card { border-left: 3px solid var(--accent); }
+.lock-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+.lock-head p { margin: 4px 0 0; }
 .versions { max-width: 640px; margin: 16px auto 0; }
 .versions-head { display: flex; justify-content: space-between; align-items: center; }
 .versions-head h2 { margin: 0; }
@@ -133,6 +154,9 @@ input.vol.overridden { border-color: var(--accent); }
 .unit-name { flex: 1; font-weight: 600; }
 .unit-meta { display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0; font-size: 12px; color: var(--muted); }
 .unit-meta label { display: flex; align-items: center; gap: 6px; }
+.unit-meta { align-items: center; }
+.unit-row-body .unit-meta input.unit-code { width: 44px; text-align: center; text-transform: uppercase; font-weight: 600; }
+.unit-codes { margin-left: 8px; font-weight: 600; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
 .comps input { width: 100%; }
 .comps input[type='number'] { width: 64px; }
 .dims { display: inline-flex; align-items: center; gap: 2px; }

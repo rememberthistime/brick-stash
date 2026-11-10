@@ -2,6 +2,7 @@ import type { Granularity, Part, Settings, StorageUnit } from './types';
 import { FAMILIES, bucketOrder, catOrder, familyFor, familyGroup, familyOrder, parseSize, sizeBucket } from './taxonomy';
 import { compartmentVolume } from './volume';
 import { partVolume } from './collection';
+import { inReachOrder, withUnitCodes } from './codes';
 
 // ─── Tree ────────────────────────────────────────────────────────────────────
 
@@ -158,6 +159,8 @@ export interface Compartment {
   key: string;
   unitId: string;
   unitName: string;
+  /** the unit's letter: the A in A1 */
+  unitCode?: string;
   label: string;
   w: number;
   d: number;
@@ -176,8 +179,7 @@ export const targetFill = (s: Settings) => s.practicalFill / (1 + s.growth);
 
 export function expandCompartments(units: StorageUnit[], s: Settings): Compartment[] {
   const out: Compartment[] = [];
-  const ordered = units.map((u, i) => ({ u, i })).sort((a, b) => b.u.accessibility - a.u.accessibility || a.i - b.i);
-  for (const { u } of ordered) {
+  for (const u of inReachOrder(withUnitCodes(units))) {
     for (const spec of u.compartments) {
       for (let i = 0; i < spec.qty; i++) {
         const volume = compartmentVolume(spec);
@@ -187,6 +189,7 @@ export function expandCompartments(units: StorageUnit[], s: Settings): Compartme
           key: `${u.id}:${spec.id}:${i}`,
           unitId: u.id,
           unitName: u.name,
+          unitCode: u.code,
           label: spec.qty > 1 ? `${spec.label} ${i + 1}` : spec.label,
           w: spec.w,
           d: spec.d,
