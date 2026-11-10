@@ -3,7 +3,7 @@ import type { Catalog, InventoryRow, Part, Project } from '../lib/types';
 import { TEMPLATE_CSV, onePieceVolume, parseInventory, partVolume, type SubtractResult } from '../lib/collection';
 import type { TreeNode } from '../lib/planner';
 import { familyLabel, leaves } from '../lib/planner';
-import { formatSetLines, parseSetLines, parseSetList, pause, resolveBrickLinkId, setParts } from '../lib/rebrickable';
+import { API_KEY_STORE, formatSetLines, parseSetLines, parseSetList, pause, resolveBrickLinkId, setParts } from '../lib/rebrickable';
 import { pickPart, toggleFamily, type KeptPart, type KeptSummary } from '../lib/keepOut';
 import { download } from '../state';
 import BuiltSets from './BuiltSets';
@@ -32,7 +32,7 @@ interface PartSort {
 /** cm³ up to a litre, then litres */
 const formatVolume = (cm3: number) => (cm3 < 1000 ? `${Math.round(cm3)} cm³` : `${(cm3 / 1000).toFixed(2)} L`);
 
-const KEY_STORE = 'brick-stash-rb-key';
+const KEY_STORE = API_KEY_STORE;
 const readKey = () => {
   try {
     return localStorage.getItem(KEY_STORE) ?? '';

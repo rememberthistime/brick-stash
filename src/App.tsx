@@ -3,6 +3,7 @@ import { download, useCatalog, useProject, withDefaults } from './state';
 import { mergeToParts, subtractParts } from './lib/collection';
 import { splitKeptOut, summariseKept } from './lib/keepOut';
 import { applyMeasured, calibrationFrom, withCalibration } from './lib/measure';
+import { lockedPlan, suggestHomes } from './lib/lock';
 import { applyMoves, basisChanges, basisOf } from './lib/moves';
 import { setupComps, setupMeasurements } from './lib/setup';
 import { buildTree, leaves, plan as runPlan } from './lib/planner';
@@ -48,14 +49,25 @@ export default function App() {
     () => leaves(buildTree(forPlanning.filter((p) => leftOut.has(p.partNum)), catalog?.categories ?? {}, project.settings.volumeScale)).filter((l) => l.part),
     [planningKey, basisKey, calibrated, catalog, project.settings.volumeScale],
   );
-  const basePlan = useMemo(() => runPlan(tree, project.units, project.settings, new Set(Object.values(basis.pins))), [tree, project.units, project.settings, basisKey]);
-  const { plan: movedPlan, stale: staleMoves, expanded } = useMemo(() => applyMoves(basePlan, project.moves, picked, detached), [basePlan, project.moves, picked, detached]);
+  // A locked plan is read back from where everything was when it was locked, and the planner isn't run at all
+  const lock = project.lock ?? null;
+  const lockTree = useMemo(
+    () => (lock ? buildTree(forPlanning, catalog?.categories ?? {}, project.settings.volumeScale) : null),
+    [!!lock, planningKey, calibrated, catalog, project.settings.volumeScale],
+  );
+  const basePlan = useMemo(
+    () => (lock && lockTree ? lockedPlan(lock, lockTree, project.units, project.settings) : runPlan(tree, project.units, project.settings, new Set(Object.values(basis.pins)))),
+    [lock, lockTree, tree, project.units, project.settings, basisKey],
+  );
+  const { plan: movedPlan, stale: staleMoves, expanded } = useMemo(() => applyMoves(basePlan, project.moves, picked, lock ? [] : detached), [basePlan, project.moves, picked, detached, !!lock]);
+  const homes = useMemo(() => (lock && lockTree ? suggestHomes(movedPlan, lockTree, project.settings) : []), [!!lock, lockTree, movedPlan, project.settings]);
   const plan = useMemo(() => applyMeasured(movedPlan, project.measurements), [movedPlan, project.measurements]);
   // A recorded setup only teaches the planner if the user has said it should
   const fromSetup = useMemo(() => (project.setup.useFills ? setupMeasurements(project.setup, setupComps(plan.compartments.map((c) => c.comp), project.setup.open), parts) : []), [project.setup, plan.compartments, parts]);
   const measuredCalibration = useMemo(() => calibrationFrom([...project.measurements, ...fromSetup], project.settings.volumeScale), [project.measurements, fromSetup, project.settings.volumeScale]);
   const currentBasis = useMemo(() => basisOf(expanded, picked, measuredCalibration), [expanded, picked, measuredCalibration]);
-  const pendingChanges = basisChanges(basis, currentBasis);
+  // Re-planning is what a lock holds off, so there's nothing pending while one is on
+  const pendingChanges = lock ? 0 : basisChanges(basis, currentBasis);
 
   const importProject = async (f: File) => {
     try {
@@ -143,7 +155,7 @@ export default function App() {
         {tab === 'collection' && <CollectionTab project={project} update={update} catalog={catalog} parts={parts} totals={plan.stats} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />}
         {tab === 'storage' && <StorageTab project={project} update={update} plan={plan} />}
         {tab === 'setup' && <SetupTab project={project} update={update} plan={plan} parts={parts} categories={catalog?.categories ?? NO_CATEGORIES} goTo={setTab} />}
-        {tab === 'plan' && <PlanTab project={project} update={update} plan={plan} parts={parts} goTo={setTab} keptSummary={keptSummary} staleMoves={staleMoves} kept={kept} pendingChanges={pendingChanges} currentBasis={currentBasis} expandedMoves={expanded} />}
+        {tab === 'plan' && <PlanTab project={project} update={update} plan={plan} parts={parts} goTo={setTab} keptSummary={keptSummary} staleMoves={staleMoves} kept={kept} pendingChanges={pendingChanges} currentBasis={currentBasis} expandedMoves={expanded} homes={homes} catalog={catalog} />}
       </main>
 
       <footer className="no-print">

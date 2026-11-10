@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Calibration, Granularity, Measurement, Part, PartMove, PlanBasis, Project, Settings } from '../lib/types';
+import type { Calibration, Catalog, Granularity, Measurement, Part, PartMove, PlanBasis, Project, Settings } from '../lib/types';
 import { DEFAULT_SETTINGS } from '../lib/types';
 import type { Plan, PlannedCompartment, Section } from '../lib/planner';
 import { familyLabel, leaves, sectionLabel, targetFill } from '../lib/planner';
@@ -11,13 +11,17 @@ import { download, uid } from '../state';
 import { Stat } from './CollectionTab';
 import { calibratedVolume, isCurrent, measureCompartment, measuredFactor, withMeasurement } from '../lib/measure';
 import { latestMoves, withMove } from '../lib/moves';
-import { unitLetter } from '../lib/setup';
+import { lockOf, withHomes, type HomeSuggestion } from '../lib/lock';
+import { lettersFor, unitLetter } from '../lib/codes';
 import { stem } from '../lib/storageList';
 import Fold, { useFolds, type Folds } from './Fold';
 import MovePicker, { type MoveRequest } from './MovePicker';
 import PartImage from './PartImage';
 import Labels from './Labels';
 import { planLabels } from '../lib/labels';
+import { planPlaces, setupPlaces } from '../lib/pickList';
+import { setupComps } from '../lib/setup';
+import PickListView from './PickList';
 
 interface Props {
   project: Project;
@@ -32,6 +36,9 @@ interface Props {
   pendingChanges: number;
   currentBasis: PlanBasis;
   expandedMoves: PartMove[];
+  /** while the plan is locked: where each part with no home could go */
+  homes: HomeSuggestion[];
+  catalog: Catalog | null;
 }
 
 /** A compartment with at least this much of it free is worth pointing out */
@@ -46,12 +53,11 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 export { unitLetter };
 
-/** A1, A2… B1 — letter per unit in layout order, number per compartment */
+/** A1, A2… B1 — each unit's own letter, and a number per compartment */
 function locate(plan: Plan): Located[] {
-  const letters = new Map<string, string>();
+  const letters = lettersFor(plan.compartments.map((c) => c.comp));
   const counters = new Map<string, number>();
   return plan.compartments.map((c) => {
-    if (!letters.has(c.comp.unitId)) letters.set(c.comp.unitId, unitLetter(letters.size));
     const n = (counters.get(c.comp.unitId) ?? 0) + 1;
     counters.set(c.comp.unitId, n);
     return { ...c, code: `${letters.get(c.comp.unitId)}${n}` };
@@ -61,10 +67,11 @@ function locate(plan: Plan): Located[] {
 const sectionParts = (s: Section) => leaves(s.node).filter((l) => l.part).map((l) => l.part!);
 const topParts = (s: Section, n: number) => sectionParts(s).sort((a, b) => b.qty - a.qty).slice(0, n);
 
-export default function PlanTab({ project, update, plan, parts, goTo, keptSummary, staleMoves, kept, pendingChanges, currentBasis, expandedMoves }: Props) {
+export default function PlanTab({ project, update, plan, parts, goTo, keptSummary, staleMoves, kept, pendingChanges, currentBasis, expandedMoves, homes, catalog }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [labels, setLabels] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [moving, setMoving] = useState<MoveRequest | null>(null);
   const [onlyRoomy, setOnlyRoomy] = useState(false);
@@ -116,6 +123,19 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
     download('brick-stash-plan.csv', rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
   };
 
+  if (picking) {
+    const recorded = Object.keys(project.setup.drawers).length > 0;
+    return (
+      <PickListView
+        catalog={catalog}
+        owned={[...parts, ...kept.map((k) => k.part)]}
+        keptOut={new Set(kept.map((k) => k.part.partNum))}
+        fromPlan={planPlaces(located)}
+        fromSetup={recorded ? setupPlaces(project.setup, setupComps(plan.compartments.map((c) => c.comp), project.setup.open)) : null}
+        close={() => setPicking(false)}
+      />
+    );
+  }
   if (labels) return <Labels entries={planLabels(located)} close={() => setLabels(false)} backLabel="Back to plan" note="Section numbers (A3.2) match the divider plan." />;
 
   const target = targetFill(plan.settings);
@@ -134,6 +154,15 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
     setBeforeReplan({ basis: project.basis, moves: project.moves });
     update((p) => ({ basis: currentBasis, moves: [...latestMoves(expandedMoves), ...p.moves.filter((_, i) => staleMoves.includes(i))] }));
   };
+  const lock = project.lock ?? null;
+  const lockPlan = () => update({ lock: lockOf(plan, project.moves, Date.now()), moves: [] });
+  const unlockPlan = () => {
+    if (!confirm('Unlock the plan? It’s worked out afresh for your collection and storage as they are now, so compartments may change, and labels you’ve printed or drawers you’ve sorted may no longer match. Your moves are kept.')) return;
+    update((p) => ({ lock: null, moves: [...(p.lock?.movesBefore ?? []), ...p.moves] }));
+  };
+  const acceptHomes = (list: HomeSuggestion[]) => update((p) => ({ moves: withHomes(p.moves, list, homes) }));
+  const codeOf = (compKey: string) => located.find((c) => c.comp.key === compKey)?.code ?? '?';
+  const tooFull = located.filter((c) => c.fill > plan.settings.practicalFill + 1e-6);
   const foldIds = [...groupsByKind].flatMap(([kind, units]) => [`kind:${kind}`, ...units.map(([id]) => `unit:${id}`)]);
 
   const unitTiles = (comps: Located[]) => (
@@ -187,7 +216,7 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
               </button>
             )}
             {/* Only while nothing has changed since, or undoing would silently drop those later changes */}
-            {beforeReplan && pendingChanges === 0 && (
+            {beforeReplan && !lock && pendingChanges === 0 && (
               <button
                 className="link"
                 onClick={() => {
@@ -198,8 +227,16 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
                 Undo re-plan
               </button>
             )}
+            {!lock && (
+              <button className="ghost" onClick={lockPlan} title="Once your drawers are sorted and labelled: every part stays where it is, whatever you add later. New parts get a suggested home to accept or not. You can unlock it again.">
+                Lock plan
+              </button>
+            )}
             <button className="ghost" onClick={() => setLabels(true)}>
               Print labels
+            </button>
+            <button className="ghost" onClick={() => setPicking(true)} title="Which drawers to open, and how many of each part to take, for a set or any parts list">
+              Pick list for a build
             </button>
             <button className="ghost" onClick={exportCsv}>
               Export plan (CSV)
@@ -219,6 +256,77 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
             </div>
           )}
         </section>
+
+        {lock && (
+          <section className="card lock-card">
+            <div className="lock-head">
+              <div>
+                <b>Plan locked</b> <span className="muted">since {new Date(lock.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <p className="muted small">
+                  Every part stays in its compartment, whatever you add to the collection or storage, and settings no longer rearrange anything. Parts with no home yet wait under <b>Doesn’t fit yet</b>; you can still move things by hand.
+                </p>
+              </div>
+              <button className="ghost" onClick={unlockPlan}>
+                Unlock…
+              </button>
+            </div>
+            {tooFull.length > 0 && (
+              <p className="small">
+                {tooFull.length === 1 ? 'One compartment is' : `${tooFull.length} compartments are`} past {pct(plan.settings.practicalFill)} full now:{' '}
+                {tooFull.slice(0, 20).map((c) => (
+                  <button key={c.code} className="link small" onClick={() => setSelected(c.code)}>
+                    {c.code} ({pct(c.fill)})
+                  </button>
+                ))}
+                {tooFull.length > 20 && ' …'}
+              </p>
+            )}
+            {homes.length > 0 && (
+              <>
+                <div className="lock-head">
+                  <b>
+                    {homes.length} {homes.length === 1 ? 'part has' : 'parts have'} a suggested home
+                  </b>
+                  {homes.length > 1 && (
+                    <button className="small-btn" onClick={() => acceptHomes(homes)}>
+                      Accept all
+                    </button>
+                  )}
+                </div>
+                <ul className="overflow-list">
+                  {homes.slice(0, 100).map((x) => (
+                    <li key={x.part}>
+                      <span className="sec-imgs">
+                        <PartImage partNum={x.part} size={32} title={x.name} />
+                      </span>
+                      <span className="overflow-name">
+                        {x.name}
+                        <small className="muted">
+                          {' '}
+                          {(parts.find((p) => p.partNum === x.part)?.qty ?? 0).toLocaleString()} pcs → <b>{codeOf(x.compKey)}</b>
+                          {x.why === 'empty' ? ', an empty compartment near its family' : x.joins ? `, in with ${x.joins}` : ', in a section of its own'}
+                          {x.why === 'related' ? ' (related parts)' : ''}
+                        </small>
+                      </span>
+                      <button className="link small" onClick={() => setSelected(codeOf(x.compKey))}>
+                        Show
+                      </button>
+                      <button className="link small" onClick={() => acceptHomes([x])}>
+                        Accept
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {homes.length > 100 && <p className="muted small">Showing the first 100.</p>}
+              </>
+            )}
+            {plan.overflow.length > homes.length && (
+              <p className="muted small">
+                {homes.length ? 'The rest of' : 'Parts under'} <b>Doesn’t fit yet</b> {homes.length ? 'has' : 'have'} nowhere among similar parts with room. Use <b>Place…</b> there to choose a spot, or add storage.
+              </p>
+            )}
+          </section>
+        )}
 
         {project.moves.length + picked.length + pendingChanges > 0 && (
           <Fold

@@ -59,6 +59,8 @@ export interface CompartmentSpec extends Dims {
 export interface StorageUnit {
   id: string;
   name: string;
+  /** The letter its compartments are known by: the A in A1. Kept here so it never shifts when storage is added to or reordered. */
+  code?: string;
   /** 3 = eye/hand level, 1 = awkward (floor, top shelf, back of cupboard) */
   accessibility: 1 | 2 | 3;
   compartments: CompartmentSpec[];
@@ -132,6 +134,29 @@ export interface PlanBasis {
 }
 
 export const EMPTY_BASIS: PlanBasis = { out: [], together: {}, pins: {}, calibration: null };
+
+/** One section of a compartment in a locked plan */
+export interface LockedSection {
+  parts: string[];
+  /** what a section of several parts is called */
+  label?: string;
+  /** for a part that runs through several compartments: which of how many this is, and the share of the part held here */
+  span?: [number, number];
+  share?: number;
+}
+
+/**
+ * The plan as it stood when it was locked: where every part lives. While it's there the planner isn't run, so new
+ * parts, storage changes and updates to the planner leave every part where it is.
+ */
+export interface PlanLock {
+  /** when it was locked, ms */
+  at: number;
+  /** compartment key → what's in it. Compartments left out were empty. */
+  comps: Record<string, { sections: LockedSection[]; spareFor?: string }>;
+  /** the moves in force when it was locked. They're part of the locked plan, and come back if it's unlocked. */
+  movesBefore: PartMove[];
+}
 
 /** "This compartment, holding these parts, is really this full" */
 export interface Measurement {
@@ -229,4 +254,5 @@ export interface Project {
   basis: PlanBasis;
   measurements: Measurement[];
   setup: Setup;
+  lock?: PlanLock | null;
 }

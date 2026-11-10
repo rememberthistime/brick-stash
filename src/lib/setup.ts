@@ -2,17 +2,14 @@
 // full each pocket is. It's reviewed as it is, and improved by a short list of moves, rather than being replaced
 // by a fresh plan.
 import { onePieceVolume, partVolume } from './collection';
+import { lettersFor, unitLetter } from './codes';
 import { familyLabel, leaves, targetFill, type Compartment, type TreeNode } from './planner';
 import { stem } from './storageList';
 import { familyFor } from './taxonomy';
 import type { LooseContainer, Measurement, OpenedUnit, Part, Settings, Setup, SetupPocket } from './types';
 import { compartmentVolume, partSizeMm } from './volume';
 
-/** A–Z, then AA, AB… A digit here would make codes ambiguous: unit "A1" section 4 would read as unit A, compartment 14. */
-export function unitLetter(n: number): string {
-  const letter = String.fromCharCode(65 + (n % 26));
-  return n < 26 ? letter : unitLetter(Math.floor(n / 26) - 1) + letter;
-}
+export { unitLetter };
 
 export type SetupComp = Compartment & {
   code: string;
@@ -41,11 +38,10 @@ function wholeBox(sections: Compartment[], code: string, how: OpenedUnit): Setup
 
 /** The same A1, A2… B1 codes the plan uses. An opened-up unit is one space, and just takes its letter. */
 export function setupComps(comps: Compartment[], open: Setup['open'] = {}): SetupComp[] {
-  const letters = new Map<string, string>();
+  const letters = lettersFor(comps);
   const counts = new Map<string, number>();
   const out: SetupComp[] = [];
   for (const c of comps) {
-    if (!letters.has(c.unitId)) letters.set(c.unitId, unitLetter(letters.size));
     const letter = letters.get(c.unitId)!;
     const n = (counts.get(c.unitId) ?? 0) + 1;
     counts.set(c.unitId, n);

@@ -11,6 +11,17 @@ const RATE_LIMIT_WAIT = 10_000;
 
 export class BadKeyError extends Error {}
 
+/** Where the browser keeps the user's own API key, which they enter on the Collection tab */
+export const API_KEY_STORE = 'brick-stash-rb-key';
+
+export function savedApiKey(): string {
+  try {
+    return localStorage.getItem(API_KEY_STORE) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 async function get<T>(path: string, key: string): Promise<T> {
   const url = path.startsWith('http') ? path.replace('https://rebrickable.com/api/v3', BASE) : BASE + path;
   const headers = { Authorization: `key ${key}`, Accept: 'application/json' };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CompartmentSpec, Project, Space, StorageUnit } from '../lib/types';
 import { PRESETS } from '../lib/presets';
+import { setUnitCode, validUnitCode } from '../lib/codes';
 import { compartmentVolume } from '../lib/volume';
 import type { Plan } from '../lib/planner';
 import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPreset, type UnitGroup } from '../lib/storageList';
@@ -42,6 +43,8 @@ export default function StorageTab({ project, update, plan }: Props) {
       const numbers = us.filter((x) => stem(x.name) === g.name).map((x) => Number(x.name.match(/#(\d+)$/)?.[1] ?? 1));
       const copy: StorageUnit = {
         ...last,
+        // A copy is another unit, so it takes a letter of its own
+        code: undefined,
         id: uid(),
         name: `${g.name} #${Math.max(...numbers) + 1}`,
         external: last.external && { ...last.external },
@@ -141,6 +144,7 @@ export default function StorageTab({ project, update, plan }: Props) {
                 patch={(fn) => patchGroup(g, fn)}
                 onAdd={() => addCopy(g)}
                 onRemove={(n) => removeCopies(g, n)}
+                onCode={(unitId, code) => setUnits((us) => setUnitCode(us, unitId, code))}
               />
             ))}
           </div>
@@ -180,6 +184,28 @@ export default function StorageTab({ project, update, plan }: Props) {
   );
 }
 
+/** A unit's letter, changed only once a whole valid one has been typed */
+function CodeInput({ code, title, onChange }: { code: string; title: string; onChange: (code: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    const next = (draft ?? code).trim().toUpperCase();
+    setDraft(null);
+    if (validUnitCode(next) && next !== code) onChange(next);
+  };
+  return (
+    <input
+      className="unit-code"
+      aria-label={`Letter for ${title}`}
+      title={title}
+      maxLength={3}
+      value={draft ?? code}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+    />
+  );
+}
+
 function GroupRow({
   group,
   spaces,
@@ -188,6 +214,7 @@ function GroupRow({
   patch,
   onAdd,
   onRemove,
+  onCode,
 }: {
   group: UnitGroup;
   spaces: Space[];
@@ -196,8 +223,10 @@ function GroupRow({
   patch: (fn: (u: StorageUnit) => StorageUnit) => void;
   onAdd: () => void;
   onRemove: (n: number) => void;
+  onCode: (unitId: string, code: string) => void;
 }) {
   const first = group.units[0];
+  const codes = group.units.flatMap((u) => (u.code ? [u.code] : []));
   const copies = group.units.length;
   const patchComp = (i: number, change: Partial<CompartmentSpec>) => patch((u) => ({ ...u, compartments: u.compartments.map((c, k) => (k === i ? { ...c, ...change } : c)) }));
   return (
@@ -207,7 +236,10 @@ function GroupRow({
           {isOpen ? '▾' : '▸'}
         </button>
         <div className="unit-row-name" onClick={toggle}>
-          <b>{group.name}</b>
+          <b>
+            {group.name}
+            {codes.length > 0 && <span className="unit-codes">{codes.join(' ')}</span>}
+          </b>
           <span className="muted small">
             {describeCompartments(first)} mm · {(unitVolume(first) / 1000).toFixed(1)} L each
           </span>
@@ -269,6 +301,12 @@ function GroupRow({
               Outside W×D×H
               <DimsInput value={first.external} onChange={(external) => patch((u) => ({ ...u, external }))} />
             </label>
+          </div>
+          <div className="unit-meta" title="The letter its drawers are known by, as in A1. Photos, box names and printed labels are filed under it, so it stays put when you add or reorder storage. Change one only to match what's already on the drawers: giving it a letter another unit has swaps the two.">
+            {copies > 1 ? 'Letters' : 'Letter'}
+            {group.units.map((u) => (
+              <CodeInput key={u.id} code={u.code ?? ''} title={u.name} onChange={(code) => onCode(u.id, code)} />
+            ))}
           </div>
           <table className="comps">
             <thead>
