@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApi } from './api.mjs';
+import { createReader } from './reader.mjs';
 
 let dir, server, base;
 const project = (extra = {}) => JSON.stringify({ version: 1, rows: [], units: [], ...extra });
@@ -24,26 +25,99 @@ afterEach(async () => {
 });
 
 describe('reading photos now', () => {
-  it('leaves a request for the development box, once, and passes on how the run went', async () => {
-    expect(await (await fetch(`${base}/api/read-photos`)).json()).toMatchObject({ requested: null, status: null });
-    const asked = await fetch(`${base}/api/read-photos`, { method: 'POST' });
-    expect(asked.status).toBe(202);
-    const { requested } = await asked.json();
-    expect(JSON.parse(fs.readFileSync(path.join(dir, 'data', 'read-request.json'), 'utf8'))).toEqual({ requested });
-    await new Promise((r) => setTimeout(r, 15));
-    expect((await (await fetch(`${base}/api/read-photos`, { method: 'POST' })).json()).requested).toBe(requested);
-    // The box takes the request up and reports back
-    fs.rmSync(path.join(dir, 'data', 'read-request.json'));
-    fs.writeFileSync(path.join(dir, 'data', 'read-status.json'), JSON.stringify({ state: 'done', started: 1, finished: 2, ok: true, summary: 'Read A1.' }));
-    const after = await (await fetch(`${base}/api/read-photos`)).json();
-    expect(after).toMatchObject({ requested: null, status: { state: 'done', ok: true, summary: 'Read A1.' } });
-    expect(after.now).toBeGreaterThan(0);
+  /** A stand-in for Claude that finishes when told to */
+  const fakeRun = () => {
+    const runs = [];
+    const run = (job, onOutput) => new Promise((resolve) => runs.push({ job, finish: (ok, said) => (onOutput(said), resolve(ok)) }));
+    return { runs, run };
+  };
+  const readerFor = (extra = {}) =>
+    createReader({ dataDir: path.join(dir, 'data'), photosDir: path.join(dir, 'photos'), workDir: path.join(dir, 'work'), tool: '/the/tool', promptFile: path.resolve('server/read-photos.md'), available: () => true, log: () => {}, ...extra });
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+
+  it('starts a reading, says how it’s going, and keeps what it said', async () => {
+    const { runs, run } = fakeRun();
+    const reader = readerFor({ run });
+    expect(reader.state()).toMatchObject({ available: true, requested: null, status: null });
+    expect(reader.ask()).toBe(true);
+    await settle();
+    expect(reader.state().status).toMatchObject({ state: 'running' });
+    expect(runs).toHaveLength(1);
+    // It's told where everything is, and nothing is left to fill in
+    const { prompt } = runs[0].job;
+    expect(prompt).toContain(path.join(dir, 'photos', 'identification-notes.md'));
+    expect(prompt).toContain('`/the/tool ...`');
+    expect(prompt).not.toMatch(/\{[A-Z]+\}|\/live\b/);
+    runs[0].finish(true, 'Read A1 and B2.');
+    await settle();
+    expect(reader.state().status).toMatchObject({ state: 'done', ok: true, summary: 'Read A1 and B2.' });
+    expect(fs.readFileSync(path.join(dir, 'work', 'last-run.txt'), 'utf8')).toBe('Read A1 and B2.');
   });
 
-  it('copes with a status file that’s half written', async () => {
+  it('runs one at a time, and once more for anything asked during a run', async () => {
+    const { runs, run } = fakeRun();
+    const reader = readerFor({ run });
+    reader.ask();
+    await settle();
+    reader.ask();
+    reader.ask();
+    expect(runs).toHaveLength(1);
+    expect(reader.state().requested).toBeGreaterThan(0);
+    runs[0].finish(true, 'first');
+    await settle();
+    expect(runs).toHaveLength(2);
+    expect(reader.state()).toMatchObject({ requested: null, status: { state: 'running' } });
+    runs[1].finish(false, 'Invalid API key · Please run /login');
+    await settle();
+    expect(runs).toHaveLength(2);
+    const { status } = reader.state();
+    expect(status.ok).toBe(false);
+    expect(status.summary).toMatch(/isn’t signed in/);
+  });
+
+  it('owns up to a reading cut off by a restart', () => {
     fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'data', 'read-status.json'), '{"state":');
-    expect((await (await fetch(`${base}/api/read-photos`)).json()).status).toBeNull();
+    fs.writeFileSync(path.join(dir, 'data', 'read-status.json'), JSON.stringify({ state: 'running', started: 5 }));
+    expect(readerFor().state().status).toMatchObject({ state: 'done', started: 5, ok: false });
+  });
+
+  it('isn’t offered where Claude or the photo tool is missing', async () => {
+    const reader = readerFor({ available: () => false });
+    expect(reader.ask()).toBe(false);
+    expect(reader.schedule('21:07')).toBeNull();
+    const api = createApi({ dataDir: path.join(dir, 'data'), photosDir: path.join(dir, 'photos'), reader });
+    const s = http.createServer((req, res) => api(req, res));
+    await new Promise((r) => s.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${s.address().port}/api/read-photos`;
+    expect(await (await fetch(url)).json()).toMatchObject({ available: false });
+    expect((await fetch(url, { method: 'POST' })).status).toBe(503);
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  });
+
+  it('answers the app through the API', async () => {
+    const { runs, run } = fakeRun();
+    const api = createApi({ dataDir: path.join(dir, 'data'), photosDir: path.join(dir, 'photos'), reader: readerFor({ run }) });
+    const s = http.createServer((req, res) => api(req, res));
+    await new Promise((r) => s.listen(0, '127.0.0.1', r));
+    const url = `http://127.0.0.1:${s.address().port}/api/read-photos`;
+    const asked = await fetch(url, { method: 'POST' });
+    expect(asked.status).toBe(202);
+    await settle();
+    expect((await (await fetch(url)).json()).status.state).toBe('running');
+    runs[0].finish(true, 'done');
+    await settle();
+    expect((await (await fetch(url)).json()).status).toMatchObject({ state: 'done', ok: true });
+    s.closeAllConnections();
+    await new Promise((r) => s.close(r));
+  });
+
+  it('plans the evening run for the next time that hour comes round', () => {
+    const next = readerFor().schedule('21:07');
+    expect([next.getHours(), next.getMinutes()]).toEqual([21, 7]);
+    expect(next.getTime()).toBeGreaterThan(Date.now());
+    expect(next.getTime() - Date.now()).toBeLessThanOrEqual(24 * 3600_000);
+    expect(readerFor().schedule('off')).toBeNull();
   });
 });
 

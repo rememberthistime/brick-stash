@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createReader, readerDefaults } from './reader.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -59,7 +60,7 @@ function readBody(req, limit) {
   });
 }
 
-export function createApi({ dataDir, photosDir }) {
+export function createApi({ dataDir, photosDir, reader = createReader(readerDefaults({ dataDir, photosDir })) }) {
   const projectFile = path.join(dataDir, 'project.json');
   const revOf = () => (fs.existsSync(projectFile) ? String(fs.statSync(projectFile).mtimeMs) : null);
 
@@ -251,30 +252,6 @@ export function createApi({ dataDir, photosDir }) {
     return send(res, 200, all[code]);
   }
 
-  // Asking for the photos to be read now. The reading is done by the development box, which this server can't start,
-  // so the request is left as a file in the data folder they share. The box looks for it every minute, and writes
-  // back how the run is going. Both files sit beside the project rather than with the photos, where the reading
-  // job itself can't write, so a run can never ask for another.
-  const readRequestFile = path.join(dataDir, 'read-request.json');
-  const readStatusFile = path.join(dataDir, 'read-status.json');
-  const readJson = (file) => {
-    try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      return null;
-    }
-  };
-  const readingState = () => {
-    const status = readJson(readStatusFile);
-    return { requested: readJson(readRequestFile)?.requested ?? null, status: status && typeof status === 'object' ? status : null, now: Date.now() };
-  };
-  function askForReading(res) {
-    fs.mkdirSync(dataDir, { recursive: true });
-    // Asking twice before it's taken up is still one request, and keeps the time of the first
-    if (!fs.existsSync(readRequestFile)) fs.writeFileSync(readRequestFile, JSON.stringify({ requested: Date.now() }));
-    return send(res, 202, readingState());
-  }
-
   async function saveProject(req, res) {
     const body = await readBody(req, MAX_PROJECT);
     let project;
@@ -361,8 +338,11 @@ export function createApi({ dataDir, photosDir }) {
           send(res, 200, project, { 'X-Rev': rev, 'Cache-Control': 'no-store' });
         }
       } else if (p === '/api/project' && req.method === 'PUT') await saveProject(req, res);
-      else if (p === '/api/read-photos' && req.method === 'GET') send(res, 200, readingState(), { 'Cache-Control': 'no-store' });
-      else if (p === '/api/read-photos' && req.method === 'POST') askForReading(res);
+      else if (p === '/api/read-photos' && req.method === 'GET') send(res, 200, reader.state(), { 'Cache-Control': 'no-store' });
+      else if (p === '/api/read-photos' && req.method === 'POST') {
+        if (reader.ask()) send(res, 202, reader.state());
+        else send(res, 503, { error: 'Photos can’t be read here: this needs Claude Code and the photo tool, which the Docker image has.' });
+      }
       else if (p === '/api/versions' && req.method === 'GET') send(res, 200, listVersions(), { 'Cache-Control': 'no-store' });
       else if (p.startsWith('/api/versions/') && req.method === 'GET') {
         // The pattern allows no slashes or dots beyond the extension, so a name can't leave the folder

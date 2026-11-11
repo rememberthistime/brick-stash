@@ -8,16 +8,17 @@ A LEGO storage planner (Vite, React, TypeScript, Vitest, a dependency-free Node 
 - They keep a "Flagged issues" list at the end of README.md. Tick items off there with a short note.
 
 ## Where it runs
-- **On the NAS** (the normal setup), the app runs in the `brick-stash` container on port 5173, built from `main` by `nas/deploy.sh`. Its live data is `/live/project.json` and `/live/photos/` inside the development box (`/mnt/user/data/projects/lego` on the NAS). It's served at https://lego.brindo.de, and the test server at https://lego-dev.brindo.de, through the NAS's reverse proxy.
+- **On the NAS** (the normal setup), one container, `brick-stash`, on port 5173, runs the image GitHub builds from `main` (`ghcr.io/rememberthistime/brick-stash`). The user updates it from Unraid's Docker tab. Its live data is `/mnt/user/data/projects/lego` on the NAS (`/data` in the container): `project.json`, `backups/`, `photos/` and `.brick-stash/` (Claude's sign-in and photo-reading work files). It's served at https://lego.brindo.de through the NAS's reverse proxy, on the home network only. There is no development box and no test server on the NAS any more.
 - **On the PC**, `npm run serve` serves the built `dist/` on 5173 from `data/` and `photos/`.
+- Code is changed in Claude Code sessions on the repository (often in the cloud, with no access to the NAS or its data) or on the PC.
 
 ## Rules
-- Never change the live data while developing. Test with `nas/dev-server.sh` (port 5174, copies of the live data). On the PC, test on another port with `BRICK_DATA_DIR` and `BRICK_PHOTOS_DIR` pointed at scratch folders.
+- Never change the live data while developing. Test on another port with `BRICK_DATA_DIR` and `BRICK_PHOTOS_DIR` pointed at scratch folders.
 - On the PC, never build into `dist/`, as that changes the page the user's running server sends out. Check builds with `npx vite build --outDir <scratch folder>`.
-- After changing server code, the running app needs redeploying (NAS) or restarting `npm run serve` (PC). Say so.
+- A change is live once it's merged to `main`, the image has built, and the user has updated the container. Say when a change needs that. A change to the `Dockerfile` can't be tried without Docker, so say when one is untested.
 - Run `npm test` and `npx tsc --noEmit` before calling work done.
-- Commit and push only when asked. The development box has no access to the NAS's Docker, so it can't deploy: the user runs `nas/deploy.sh` in the Unraid terminal, from `main` with everything committed. Say when a change needs deploying.
-- Never enter the user's Rebrickable key or any other credentials. Don't build Brick Architect's label artwork into the app: it isn't licensed for reuse.
+- Commit and push only when asked.
+- Never enter the user's Rebrickable key, Claude sign-in or any other credentials. Don't build Brick Architect's label artwork into the app: it isn't licensed for reuse.
 
 ## Reading drawer photos
-Before reading photos or changing drafts, read `photos/identification-notes.md` and `photos/reviews.json`, in the live photos folder on the NAS. The user checks drafts on `/review`. The evening job (`nas/read-photos.sh`, run by cron in the development box) does the same reading unattended.
+The app reads photos itself on the NAS (`server/reader.mjs` runs Claude Code with `server/read-photos.md`), each evening and when the user presses **Read new photos now**. The user checks drafts on `/review`. Before reading photos or changing drafts by hand, read `photos/identification-notes.md` and `photos/reviews.json`, in the live photos folder on the NAS; the copies in the repository are only as recent as the last commit.
