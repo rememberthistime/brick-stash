@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createApi, defaultDirs, UPSTREAMS } from './api.mjs';
+import { createReader, readerDefaults } from './reader.mjs';
 
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const PORT = Number(process.env.PORT ?? 5173);
@@ -17,7 +18,13 @@ if (!fs.existsSync(path.join(DIST, 'index.html'))) {
 }
 
 const dirs = defaultDirs();
-const api = createApi(dirs);
+// In Docker, HOME is a folder in the data volume, so Claude's sign-in outlives updates to the image. It has to
+// exist before anyone signs in.
+if (process.env.HOME) fs.mkdirSync(process.env.HOME, { recursive: true });
+const reader = createReader(readerDefaults(dirs));
+const api = createApi({ ...dirs, reader });
+/** When photos are read each day, by this machine's clock: "21:07", or "off" */
+const READ_AT = process.env.BRICK_READ_AT ?? '21:07';
 
 async function proxy(req, res, upstream, rest) {
   const headers = { ...req.headers };
@@ -74,4 +81,9 @@ server.listen(PORT, '0.0.0.0', () => {
     if (a && a.family === 'IPv4' && !a.internal && /^(192\.168|10)\./.test(a.address)) console.log(`  On your phone:    http://${a.address}:${PORT}/snap`);
   }
   console.log(`  Project: ${dirs.dataDir}\n  Photos:  ${dirs.photosDir}`);
+  if (!reader.state().available) console.log('  Photo reading: not available here (it needs Claude Code and the photo tool, which the Docker image has).');
+  else {
+    const next = reader.schedule(READ_AT);
+    console.log(`  Photo reading: on request${next ? `, and daily at ${READ_AT} if there’s anything new (next: ${next.toLocaleString('en-AU')})` : ' only (BRICK_READ_AT is off)'}`);
+  }
 });

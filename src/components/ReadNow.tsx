@@ -1,17 +1,16 @@
-// "Read new photos now": asks the development box to read the photos without waiting for the evening run, and shows
-// how that's going. The server only leaves the request where the box will find it, so it can take up to a minute to start.
+// "Read new photos now": has the server read the photos without waiting for the evening run, and shows how that's going.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Reading {
-  /** when a reading was asked for and not yet started, ms */
+  /** false where the server has no Claude Code or photo tool to read with */
+  available?: boolean;
+  /** when another reading was asked for, to follow the one under way, ms */
   requested: number | null;
   status: { state: 'running' | 'done'; started: number; finished?: number; ok?: boolean; summary?: string } | null;
   /** the server's clock, so ages don't depend on this device's */
   now: number;
 }
 
-/** A request should be taken up within a minute; after this long, something's not running */
-const SLOW_START_MS = 150_000;
 /** A run that's been "running" longer than this was cut off */
 const STUCK_MS = 3 * 3600_000;
 
@@ -52,15 +51,16 @@ export default function ReadNow({ onRead }: { onRead?: () => void }) {
     wasBusy.current = busy;
   }, [busy, reading, onRead]);
 
-  if (!reading) return null;
-  const { status, requested, now } = reading;
+  if (!reading || reading.available === false) return null;
+  const { status, now } = reading;
 
   const ask = async () => {
     setError('');
     try {
       const r = await fetch('/api/read-photos', { method: 'POST' });
-      if (!r.ok) throw new Error(`The server said ${r.status}.`);
-      setReading(await r.json());
+      const body = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(body?.error ?? `The server said ${r.status}.`);
+      setReading(body);
     } catch (e) {
       setError(e instanceof TypeError ? 'Couldn’t reach the server.' : (e as Error).message);
     }
@@ -68,7 +68,7 @@ export default function ReadNow({ onRead }: { onRead?: () => void }) {
 
   return (
     <div className="read-now">
-      <button className="ghost" disabled={busy} onClick={() => void ask()}>
+      <button className="ghost" disabled={asked} onClick={() => void ask()} title={running ? 'Photos are being read now. Press to read again afterwards, for photos added since.' : undefined}>
         Read new photos now
       </button>
       <span className="muted small" aria-live="polite">
@@ -76,14 +76,12 @@ export default function ReadNow({ onRead }: { onRead?: () => void }) {
           (running
             ? `Reading photos… started ${minutes(now - status!.started)}. It can take a while with a lot of photos.${asked ? ' It will run again afterwards for the photos added since.' : ''}`
             : asked
-              ? now - requested! > SLOW_START_MS
-                ? `Asked ${minutes(now - requested!)} but not started. The development box checks every minute: is it running, and rebuilt since this button was added?`
-                : 'Asked. It starts within a minute.'
+              ? 'Starting…'
               : status?.state === 'done' && status.finished
                 ? `Last read ${when(status.finished)}${status.ok === false ? ', which ended with an error' : ''}.`
                 : status
                   ? 'The last reading was cut off before it finished.'
-                  : 'Otherwise they’re read each evening.')}
+                  : 'Otherwise they’re read each evening, if there’s anything new.')}
       </span>
       {!busy && status?.state === 'done' && status.summary && (
         <details className="read-now-summary">

@@ -1,18 +1,16 @@
 #!/usr/bin/python3 -I
-"""The only Python the evening photo reading may run (see nas/read-photos.sh).
+"""The only program the photo reading may run besides ls (see server/reader.mjs).
 
-It reads photos from the live photos folder and writes only to the work folder, and fetches reference
-pictures only from Rebrickable's CDN, so a run can't be talked into doing anything else with Python.
-The development box's image holds its own copy, /usr/local/bin/photo-tools, which the evening job can't
-change. That's the one it runs, so rebuild the box (nas/install.sh --dev-only) after changing this file.
+It reads photos from the photos folder and writes only to the work folder, and fetches reference pictures
+only from Rebrickable's CDN, so a run can't be talked into doing anything else with Python. The Docker
+image installs it as /usr/local/bin/photo-tools, owned by root, so a run can't change it either.
 
   photo-tools info  A1-top.jpg [more...]          size and modified time of photos
   photo-tools shrink A1-top.jpg [--max 1600]       a downsized copy
   photo-tools crop  A1-top.jpg X Y W H [--max 900] a box cut out, in percent of the photo
   photo-tools ref   3001 [COLOUR]                  Rebrickable's picture of a part (colour 71 by default)
 
-By hand, from the repo: python3 nas/photo-tools.py info A1-top.jpg
-Photos are named relative to the photos folder; output paths are printed.
+Photos are named relative to the photos folder (BRICK_PHOTOS); output paths, in BRICK_WORK, are printed.
 """
 import os
 import re
@@ -21,8 +19,8 @@ import time
 import urllib.request
 from pathlib import Path
 
-PHOTOS = Path(os.environ.get("BRICK_PHOTOS", "/live/photos")).resolve()
-WORK = Path(os.environ.get("BRICK_WORK", Path.home() / "work" / "photo-reading")).resolve()
+PHOTOS = Path(os.environ.get("BRICK_PHOTOS", "/data/photos")).resolve()
+WORK = Path(os.environ.get("BRICK_WORK", Path.home() / ".brick-stash" / "work")).resolve()
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\.(jpe?g|png|webp)$", re.I)
 PART = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
 
