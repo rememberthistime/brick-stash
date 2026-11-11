@@ -23,6 +23,30 @@ afterEach(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+describe('reading photos now', () => {
+  it('leaves a request for the development box, once, and passes on how the run went', async () => {
+    expect(await (await fetch(`${base}/api/read-photos`)).json()).toMatchObject({ requested: null, status: null });
+    const asked = await fetch(`${base}/api/read-photos`, { method: 'POST' });
+    expect(asked.status).toBe(202);
+    const { requested } = await asked.json();
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'data', 'read-request.json'), 'utf8'))).toEqual({ requested });
+    await new Promise((r) => setTimeout(r, 15));
+    expect((await (await fetch(`${base}/api/read-photos`, { method: 'POST' })).json()).requested).toBe(requested);
+    // The box takes the request up and reports back
+    fs.rmSync(path.join(dir, 'data', 'read-request.json'));
+    fs.writeFileSync(path.join(dir, 'data', 'read-status.json'), JSON.stringify({ state: 'done', started: 1, finished: 2, ok: true, summary: 'Read A1.' }));
+    const after = await (await fetch(`${base}/api/read-photos`)).json();
+    expect(after).toMatchObject({ requested: null, status: { state: 'done', ok: true, summary: 'Read A1.' } });
+    expect(after.now).toBeGreaterThan(0);
+  });
+
+  it('copes with a status file that’s half written', async () => {
+    fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'data', 'read-status.json'), '{"state":');
+    expect((await (await fetch(`${base}/api/read-photos`)).json()).status).toBeNull();
+  });
+});
+
 describe('versions', () => {
   const save = async (note, rev) => (await (await fetch(`${base}/api/project`, { method: 'PUT', headers: rev ? { 'X-Base-Rev': rev } : {}, body: project({ note }) })).json()).rev;
   const today = () => {

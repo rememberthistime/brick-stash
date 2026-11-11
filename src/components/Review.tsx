@@ -1,6 +1,7 @@
 // The review page (/review): go through each box of a drawer read from photos and say which parts are right, which
 // aren't there and what was missed. Made for the phone, and works on the computer too. It writes only reviews.json
 // beside the photos, never the project, so it can't get in the way of whatever's open on another device.
+import ReadNow from './ReadNow';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mergeToParts } from '../lib/collection';
 import { photoUrl, topPhotoOf, usePhotos, type Photo } from '../lib/photos';
@@ -194,6 +195,7 @@ function DraftPicker({ drafts, reviews, onPick }: { drafts: SetupDraft; reviews:
       <p className="muted small">
         Drawers read from your photos. Go through each box and say what’s right, what isn’t there and what was missed. Your answers are saved as you go, and the checked version is what <b>Load checked drafts</b> on My setup brings in.
       </p>
+      <ReadNow onRead={() => location.reload()} />
       {!drafts.drawers.length && <p className="muted">No drafts yet. They appear here once photos have been read.</p>}
       <div className="review-drafts">
         {drafts.drawers.map((d, i) => {

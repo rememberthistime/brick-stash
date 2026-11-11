@@ -1,5 +1,6 @@
 // The phone page: choose a drawer, take photos, and they're filed under it. It reads the storage list and never
 // writes to the project, so it can't get in the way of whatever's open on another device.
+import ReadNow from './ReadNow';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BOX_NAME_IDEAS,
@@ -331,6 +332,7 @@ export default function Snap() {
       <p className="small snap-status">
         <a href="/review">Check drafts read from your photos →</a>
       </p>
+      <ReadNow />
     </div>
   );
 }

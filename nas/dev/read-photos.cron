@@ -1,4 +1,6 @@
 # Read new drawer photos into drafts each evening, in the NAS's time zone.
-# To pause it without rebuilding, create ~/read-photos.off in the dev container; delete it to start again.
+# To pause the evening run without rebuilding, create ~/read-photos.off in the dev container; delete it to start again.
 SHELL=/bin/bash
 7 21 * * * dev bash /home/dev/brick-stash/nas/read-photos.sh >> /home/dev/logs/read-photos.log 2>&1
+# And within a minute of "Read new photos now" being pressed in the app, which leaves a request in the data folder.
+* * * * * dev bash /home/dev/brick-stash/nas/read-photos.sh --if-asked >> /home/dev/logs/read-photos.log 2>&1
