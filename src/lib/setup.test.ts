@@ -488,3 +488,14 @@ describe('loading drafts', () => {
     expect(start.drawers[first][0].id).toBe('old');
   });
 });
+
+describe('what hasn’t been sorted', () => {
+  it('groups parts with no drawer by family, biggest first', async () => {
+    const { unsortedByFamily } = await import('./setup');
+    const list = [part('3001', 'Brick 2 x 4', 10, 11, 2), part('3023', 'Plate 1 x 2', 500, 14, 1), part('3003', 'Brick 2 x 2', 40, 11, 1), part('3020', 'Plate 2 x 4', 5, 14, 2)];
+    const out = unsortedByFamily(list);
+    expect(out.map((f) => [f.label, f.pieces, f.volume])).toEqual([['Plates', 505, 510], ['Bricks', 50, 60]]);
+    expect(out[1].parts.map((p) => p.partNum)).toEqual(['3003', '3001']);
+    expect(unsortedByFamily([])).toEqual([]);
+  });
+});

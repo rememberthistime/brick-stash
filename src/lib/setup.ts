@@ -742,3 +742,27 @@ export function unplacedNeighbours(tree: TreeNode | null, partNum: string, place
     .sort((a, b) => b.qty - a.qty)
     .slice(0, max);
 }
+
+export interface UnsortedFamily {
+  family: string;
+  label: string;
+  /** biggest by volume first */
+  parts: Part[];
+  pieces: number;
+  volume: number;
+}
+
+/** Parts not in any recorded drawer, by family, with the family holding the most by volume first */
+export function unsortedByFamily(unplaced: Part[], scale = 1): UnsortedFamily[] {
+  const out = new Map<string, UnsortedFamily>();
+  for (const p of unplaced) {
+    const fam = familyFor(p.catId);
+    const f = out.get(fam.key) ?? { family: fam.key, label: fam.label, parts: [], pieces: 0, volume: 0 };
+    f.parts.push(p);
+    f.pieces += p.qty;
+    f.volume += partVolume(p, scale);
+    out.set(fam.key, f);
+  }
+  for (const f of out.values()) f.parts.sort((a, b) => partVolume(b, scale) - partVolume(a, scale));
+  return [...out.values()].sort((a, b) => b.volume - a.volume);
+}

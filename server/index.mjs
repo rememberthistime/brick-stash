@@ -84,6 +84,8 @@ server.listen(PORT, '0.0.0.0', () => {
   if (!reader.state().available) console.log('  Photo reading: not available here (it needs Claude Code and the photo tool, which the Docker image has).');
   else {
     const next = reader.schedule(READ_AT);
+    const using = readerDefaults(dirs);
+    console.log(`  Photo reading uses the ${using.model} model, up to ${using.maxDrawers} drawers at a time (BRICK_READ_MODEL, BRICK_READ_MAX).`);
     console.log(`  Photo reading: on request${next ? `, and daily at ${READ_AT} if there’s anything new (next: ${next.toLocaleString('en-AU')})` : ' only (BRICK_READ_AT is off)'}`);
   }
 });

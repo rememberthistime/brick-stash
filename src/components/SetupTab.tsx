@@ -22,6 +22,7 @@ import {
   setupComps,
   undoLastAccepted,
   unplacedNeighbours,
+  unsortedByFamily,
   wholeKey,
   type ContainerChoice,
   type EstimateRow,
@@ -65,6 +66,8 @@ const FINDINGS: { kind: FindingKind; title: string; hint: string }[] = [
   { kind: 'unsure', title: 'Worth checking', hint: 'No real fill entered, and the estimate can’t be right.' },
 ];
 const SHOWN_FINDINGS = 6;
+/** Parts listed per family under "Not sorted yet" */
+const UNSORTED_SHOWN = 150;
 
 export default function SetupTab({ project, update, plan, parts, categories, goTo }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -125,6 +128,16 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const kinds = new Map<string, SetupComp[]>();
   for (const c of comps) kinds.set(stem(c.unitName), [...(kinds.get(stem(c.unitName)) ?? []), c]);
   const q = filter.trim().toLowerCase();
+  // What's left to do: drawers with nothing recorded, and parts that aren't in any recorded drawer
+  const emptyDrawers = comps.filter((c) => !setup.drawers[c.key]?.length);
+  const unsorted = unsortedByFamily(analysis.unplaced, scale);
+  const unsortedPieces = unsorted.reduce((t, f) => t + f.pieces, 0);
+  const unsortedVolume = unsorted.reduce((t, f) => t + f.volume, 0);
+  const partMatches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
+  const unsortedHit = !!q && analysis.unplaced.some(partMatches);
+  // With more than a few kinds of storage the page runs long, so they start folded to a line each
+  const kindsOpen = kinds.size <= 2;
+  const foldIds = [...[...kinds.keys()].map((k) => `setup:${k}`), 'setup:unsorted', ...unsorted.map((f) => `setup:unsorted:${f.family}`), 'setup:moves', 'setup:estimates', 'setup:review'];
   const matchesFilter = (c: SetupComp) => !q || c.code.toLowerCase() === q || (placed.get(c.key) ?? []).some((p) => p.parts.some((x) => x.part.partNum === q || x.part.name.toLowerCase().includes(q) || x.groupLabel.toLowerCase().includes(q)));
 
   const index = comps.findIndex((c) => c.key === editing);
@@ -187,7 +200,15 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
           <Stat label="Recorded drawers filled" value={analysis.capacity ? pct(analysis.used / analysis.capacity) : '–'} hint={`${L(analysis.used)} of ${L(analysis.capacity)}`} />
           <Stat label="Real size vs estimate" value={check.pockets ? times(check.total) : '–'} hint={check.pockets ? `from ${check.pockets} pockets with a fill entered` : 'enter a fill to compare'} />
         </div>
-        <input className="search" placeholder="Where is…? part, number, group or drawer code" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <div className="row">
+          <input className="search" placeholder="Where is…? part, number, group or drawer code" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <button className="link" onClick={() => folds.setAll(foldIds, true)}>
+            Open all
+          </button>
+          <button className="link" onClick={() => folds.setAll(foldIds, false)}>
+            Close all
+          </button>
+        </div>
         <div className="setup-layout small setup-drafts">
           <button className="ghost small-btn" disabled={!analysis.drawersRecorded} onClick={() => setPrinting(true)}>
             Print labels…
@@ -229,7 +250,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
         const closed = unitIds.filter((id) => !setup.open[id]);
         const each = (ids: string[]) => (ids.length > 1 ? ` of all ${ids.length}` : '');
         return (
-          <Fold key={kind} id={`setup:${kind}`} folds={folds} defaultOpen force={hits} title={`${list[0].code === list[list.length - 1].code ? list[0].code : `${list[0].code}–${list[list.length - 1].code}`} ${kind}`} summary={`${recorded} of ${list.length} recorded`}>
+          <Fold key={kind} id={`setup:${kind}`} folds={folds} defaultOpen={kindsOpen} force={hits} title={`${list[0].code === list[list.length - 1].code ? list[0].code : `${list[0].code}–${list[list.length - 1].code}`} ${kind}`} summary={`${recorded} of ${list.length} recorded`}>
             {unitIds.length > 0 && (
               <div className="setup-layout small">
                 {closed.length > 0 && (
@@ -259,28 +280,72 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
         );
       })}
 
+      <Fold
+        id="setup:unsorted"
+        folds={folds}
+        force={unsortedHit}
+        title="Not sorted yet"
+        summary={
+          analysis.unplaced.length || emptyDrawers.length
+            ? [
+                analysis.unplaced.length ? `${analysis.unplaced.length.toLocaleString()} part types, ${unsortedPieces.toLocaleString()} pieces, ${L(unsortedVolume)} (${pct(1 - analysis.volumePlaced)} of the collection)` : 'every part is in a drawer',
+                emptyDrawers.length ? `${emptyDrawers.length} ${emptyDrawers.length === 1 ? 'drawer' : 'drawers'} not recorded` : '',
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : 'everything is recorded'
+        }
+      >
+        {emptyDrawers.length > 0 && (
+          <>
+            <h4 className="setup-sub">
+              Drawers with nothing recorded <span className="muted small">click one to record it</span>
+            </h4>
+            <div className="setup-chips">
+              {emptyDrawers.slice(0, 120).map((c) => (
+                <button key={c.key} className="ghost small-btn" title={`${c.unitName} › ${c.label}`} onClick={() => setEditing(c.key)}>
+                  {c.code}
+                </button>
+              ))}
+              {emptyDrawers.length > 120 && <span className="muted small">and {emptyDrawers.length - 120} more</span>}
+            </div>
+          </>
+        )}
+        {unsorted.length > 0 && (
+          <h4 className="setup-sub">
+            Parts not in any recorded drawer <span className="muted small">by family, biggest first. Open a drawer and search to add them.</span>
+          </h4>
+        )}
+        {unsorted.map((f) => {
+          const shown = q ? f.parts.filter(partMatches) : f.parts;
+          if (!shown.length) return null;
+          return (
+            <Fold key={f.family} id={`setup:unsorted:${f.family}`} folds={folds} inner force={unsortedHit} title={<><span className={`swatch fam-${f.family}`} /> {f.label}</>} summary={`${f.parts.length} part types, ${f.pieces.toLocaleString()} pieces, ${L(f.volume)}`}>
+              <ul className="setup-unplaced">
+                {shown.slice(0, UNSORTED_SHOWN).map((p) => (
+                  <li key={p.partNum}>
+                    <PartImage partNum={p.partNum} size={26} title={p.name} /> {p.name} <span className="muted small">× {p.qty.toLocaleString()}</span>
+                  </li>
+                ))}
+              </ul>
+              {shown.length > UNSORTED_SHOWN && <p className="muted small">The {UNSORTED_SHOWN} biggest by volume, of {shown.length}. Search above to find a particular part.</p>}
+            </Fold>
+          );
+        })}
+      </Fold>
+
       <Fold id="setup:moves" folds={folds} defaultOpen title="Suggested moves" summary={analysis.suggestions.length ? `${analysis.suggestions.length}${analysis.moreSuggestions ? '+' : ''} to look at` : analysis.drawersRecorded ? 'none right now' : 'record some drawers first'}>
         <Suggestions setup={setup} setSetup={setSetup} analysis={analysis} />
       </Fold>
 
-      <Fold id="setup:estimates" folds={folds} defaultOpen title="Estimates against your drawers" summary={check.pockets ? `real size ${times(check.total)} of the estimate` : 'enter a fill to compare'}>
+      <Fold id="setup:estimates" folds={folds} title="Estimates against your drawers" summary={check.pockets ? `real size ${times(check.total)} of the estimate` : 'enter a fill to compare'}>
         <EstimateCheck setup={setup} setSetup={setSetup} analysis={analysis} />
       </Fold>
 
-      <Fold id="setup:review" folds={folds} defaultOpen title="What the review found" summary={analysis.findings.length ? `${analysis.findings.length} things to look at` : 'nothing yet'}>
+      <Fold id="setup:review" folds={folds} title="What the review found" summary={analysis.findings.length ? `${analysis.findings.length} things to look at` : 'nothing yet'}>
         <Findings findings={analysis.findings} />
       </Fold>
 
-      <Fold id="setup:unplaced" folds={folds} title="Not in a drawer yet" summary={`${analysis.unplaced.length} part types`}>
-        <ul className="setup-unplaced">
-          {analysis.unplaced.slice(0, 60).map((p) => (
-            <li key={p.partNum}>
-              <PartImage partNum={p.partNum} size={26} title={p.name} /> {p.name} <span className="muted small">× {p.qty.toLocaleString()}</span>
-            </li>
-          ))}
-        </ul>
-        {analysis.unplaced.length > 60 && <p className="muted small">The 60 most common by volume, of {analysis.unplaced.length}.</p>}
-      </Fold>
 
       {current && (
         <DrawerEditor
@@ -531,6 +596,8 @@ function DrawerEditor({
   const [active, setActive] = useState(0);
   const [query, setQuery] = useState('');
   const [lastAdded, setLastAdded] = useState<string | null>(null);
+  // The photos take a lot of room, so they start folded away once the drawer has pockets recorded to work on
+  const [showPhotos, setShowPhotos] = useState(() => !pockets || pockets.length < 2);
   const searchRef = useRef<HTMLInputElement>(null);
   const current = pockets ?? [newPocket(first)];
   const activeIndex = Math.min(active, current.length - 1);
@@ -610,7 +677,16 @@ function DrawerEditor({
           </>
         )}
 
-        <DrawerPhotos photos={photos} codes={codes} boxes={boxes} onChanged={onPhotosChanged} />
+        {photos.length > 0 ? (
+          <details className="setup-fold" open={showPhotos} onToggle={(e) => setShowPhotos((e.target as HTMLDetailsElement).open)}>
+            <summary>
+              Photos <span className="muted small">{photos.length}</span>
+            </summary>
+            <DrawerPhotos photos={photos} codes={codes} boxes={boxes} onChanged={onPhotosChanged} />
+          </details>
+        ) : (
+          <DrawerPhotos photos={photos} codes={codes} boxes={boxes} onChanged={onPhotosChanged} />
+        )}
 
         <div className="setup-count">
           <span>Pockets</span>
@@ -813,10 +889,31 @@ function PocketRow({
 }) {
   const fillPercent = pocket.fill === undefined ? '' : String(Math.round(pocket.fill * 100));
   const estimated = placed && placed.parts.length ? placed.estimate / placed.capacity : null;
+  // In a drawer of several pockets only the one being worked on is opened out, so the list stays short enough to
+  // see the search box below it. The rest are a line each: click one to work on it.
+  if (divided && !active) {
+    const names = (placed?.parts ?? []).map((x) => x.part.name);
+    return (
+      <button className="setup-pocket folded" aria-expanded={false} onClick={onActivate}>
+        <span className="fold-caret">▸</span>
+        <b>Pocket {index + 1}</b>
+        {pocket.label && <span>{pocket.label}</span>}
+        {pocket.container && <span className="muted small">{pocket.container.name}</span>}
+        <span className="muted small setup-pocket-summary">
+          {pocket.parts.length ? `${pocket.parts.length} ${pocket.parts.length === 1 ? 'part' : 'parts'}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}` : 'nothing yet'}
+        </span>
+        <span className="muted small nowrap">{pocket.fill === undefined ? '' : `${fillPercent}% full`}</span>
+      </button>
+    );
+  }
   return (
     <div className={`setup-pocket ${active ? 'active' : ''}`} onClick={onActivate}>
       <div className="setup-pocket-head">
-        {divided && <b>Pocket {index + 1}</b>}
+        {divided && (
+          <b>
+            <span className="fold-caret">▾</span> Pocket {index + 1}
+          </b>
+        )}
         {pocket.container && (
           <span className="small">
             {pocket.container.name} <span className="muted">{pocket.container.w}×{pocket.container.d}×{pocket.container.h}</span>
