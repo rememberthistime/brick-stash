@@ -25,59 +25,216 @@ afterEach(async () => {
 });
 
 describe('reading photos now', () => {
-  /** A stand-in for Claude that finishes when told to */
-  const fakeRun = () => {
+  const photos = () => path.join(dir, 'photos');
+  const data = () => path.join(dir, 'data');
+  const settle = () => new Promise((r) => setTimeout(r, 25));
+  /** A stand-in for Claude: each run waits to be finished, and a drawer run can leave a draft behind */
+  const fakeClaude = () => {
     const runs = [];
-    const run = (job, onOutput) => new Promise((resolve) => runs.push({ job, finish: (ok, said) => (onOutput(said), resolve(ok)) }));
+    const run = (job) =>
+      new Promise((resolve) =>
+        runs.push({
+          job,
+          finish: ({ ok = true, text = `read ${job.code ?? 'notes'}`, cost = 0.1, draft } = {}) => {
+            if (draft !== undefined) fs.writeFileSync(path.join(job.cwd, 'draft.json'), typeof draft === 'string' ? draft : JSON.stringify(draft));
+            resolve({ ok, text, cost });
+          },
+        }),
+      );
     return { runs, run };
   };
-  const readerFor = (extra = {}) =>
-    createReader({ dataDir: path.join(dir, 'data'), photosDir: path.join(dir, 'photos'), workDir: path.join(dir, 'work'), tool: '/the/tool', promptFile: path.resolve('server/read-photos.md'), available: () => true, log: () => {}, ...extra });
-  const settle = () => new Promise((r) => setTimeout(r, 20));
+  const readerFor = (extra = {}) => createReader({ dataDir: data(), photosDir: photos(), workDir: path.join(dir, 'work'), tool: '/the/tool', available: () => true, log: () => {}, partsFile: path.join(dir, 'parts.json'), ...extra });
+  const photo = (name, ageMs = 0) => {
+    fs.mkdirSync(photos(), { recursive: true });
+    fs.writeFileSync(path.join(photos(), name), 'pixels');
+    const when = new Date(Date.now() - ageMs);
+    fs.utimesSync(path.join(photos(), name), when, when);
+  };
+  const drafts = () => JSON.parse(fs.readFileSync(path.join(photos(), 'drawer-drafts.json'), 'utf8'));
+  const draftOf = (code, part) => ({ code, pockets: [{ where: 'Left', parts: [part], area: { x: 0, y: 0, w: 50, h: 100 } }] });
 
-  it('starts a reading, says how it’s going, and keeps what it said', async () => {
-    const { runs, run } = fakeRun();
+  it('costs nothing when there’s nothing new', async () => {
+    const { runs, run } = fakeClaude();
     const reader = readerFor({ run });
-    expect(reader.state()).toMatchObject({ available: true, requested: null, status: null });
+    photo('A1-piece-1.jpg'); // no photo from above, so nothing to read it against
     expect(reader.ask()).toBe(true);
     await settle();
-    expect(reader.state().status).toMatchObject({ state: 'running' });
-    expect(runs).toHaveLength(1);
-    // It's told where everything is, and nothing is left to fill in
-    const { prompt } = runs[0].job;
-    expect(prompt).toContain(path.join(dir, 'photos', 'identification-notes.md'));
-    expect(prompt).toContain('`/the/tool ...`');
-    expect(prompt).not.toMatch(/\{[A-Z]+\}|\/live\b/);
-    runs[0].finish(true, 'Read A1 and B2.');
-    await settle();
-    expect(reader.state().status).toMatchObject({ state: 'done', ok: true, summary: 'Read A1 and B2.' });
-    expect(fs.readFileSync(path.join(dir, 'work', 'last-run.txt'), 'utf8')).toBe('Read A1 and B2.');
+    expect(runs).toHaveLength(0);
+    expect(reader.state().status).toMatchObject({ state: 'done', ok: true, summary: 'Nothing new to read.', cost: 0 });
   });
 
-  it('runs one at a time, and once more for anything asked during a run', async () => {
-    const { runs, run } = fakeRun();
+  it('reads each new drawer in a run of its own, and files what comes back', async () => {
+    const { runs, run } = fakeClaude();
     const reader = readerFor({ run });
+    fs.mkdirSync(data(), { recursive: true });
+    fs.writeFileSync(path.join(data(), 'project.json'), JSON.stringify({ rows: [{ partNum: '3069a', qty: 4 }, { partNum: '3069b', qty: 6 }] }));
+    fs.writeFileSync(path.join(dir, 'parts.json'), JSON.stringify({ parts: { '3069b': ['Tile 1 x 2 with Groove', 19] }, aliases: { '3069a': '3069b' } }));
+    photo('B2-top.jpg');
+    photo('B2-piece-1-at-20-30.jpg');
+    photo('A1-top.jpg');
+    fs.writeFileSync(path.join(photos(), 'boxes.json'), JSON.stringify({ B2: [{ x: 20, y: 30, name: 'Fences' }] }));
+    expect(reader.pending(true)).toEqual(['A1', 'B2']);
+    reader.ask();
+    await settle();
+    expect(runs).toHaveLength(1);
+    expect(reader.state().status).toMatchObject({ state: 'running', reading: 'A1', step: 1, steps: 2 });
+    // It runs in a folder of its own, told where everything is, with nothing left to fill in
+    const { job } = runs[0];
+    expect(job).toMatchObject({ kind: 'drawer', code: 'A1', cwd: path.join(dir, 'work', 'A1'), model: 'sonnet' });
+    expect(job.prompt).toContain('`/the/tool ...`');
+    expect(job.prompt).not.toMatch(/\{[A-Z]+\}|\/live\b/);
+    expect(fs.readFileSync(path.join(dir, 'work', 'collection.tsv'), 'utf8')).toContain('3069b\t10\tTile 1 x 2 with Groove');
+    runs[0].finish({ draft: draftOf('A1', '3001') });
+    await settle();
+    expect(runs).toHaveLength(2);
+    const context = JSON.parse(fs.readFileSync(path.join(dir, 'work', 'B2', 'context.json'), 'utf8'));
+    expect(context).toMatchObject({ code: 'B2', latestTopPhoto: 'B2-top.jpg', boxNames: [{ name: 'Fences' }] });
+    expect(context.photos.map((p) => [p.name, p.view, p.at])).toEqual(expect.arrayContaining([['B2-piece-1-at-20-30.jpg', 'piece', { x: 20, y: 30 }]]));
+    runs[1].finish({ draft: draftOf('B2', '3003'), cost: 0.25 });
+    await settle();
+    expect(drafts().drawers.map((d) => [d.code, d.pockets[0].parts])).toEqual([['A1', ['3001']], ['B2', ['3003']]]);
+    expect(reader.state().status).toMatchObject({ state: 'done', ok: true, read: ['A1', 'B2'], failed: [], waiting: 0, cost: 0.35 });
+    // Read once, they aren't read again until there are newer photos
+    expect(reader.pending(true)).toEqual([]);
+    photo('B2-piece-2.jpg', -5000);
+    expect(reader.pending(false)).toEqual(['B2']);
+  });
+
+  it('replaces a drawer’s draft, keeps the others and the code it was filed under, and backs the file up first', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    fs.mkdirSync(photos(), { recursive: true });
+    const before = { note: 'kept', drawers: [draftOf('H1', '1'), { ...draftOf('A3?', '2'), photos: 'A3' }] };
+    fs.writeFileSync(path.join(photos(), 'drawer-drafts.json'), JSON.stringify(before));
+    fs.writeFileSync(path.join(photos(), 'reviews.json'), JSON.stringify({ 'A3?': { pockets: { Left: { parts: { 2: 'no' } } }, updated: 1 } }));
+    photo('H1-top.jpg', 60_000); // older than the drafts, so already read
+    photo('A3-top.jpg', -5000);
+    expect(reader.pending(false)).toEqual(['A3']);
+    reader.ask();
+    await settle();
+    const context = JSON.parse(fs.readFileSync(path.join(dir, 'work', 'A3', 'context.json'), 'utf8'));
+    expect(context.earlierDraft.code).toBe('A3?');
+    expect(context.answers.pockets.Left.parts).toEqual({ 2: 'no' });
+    runs[0].finish({ draft: draftOf('A3', '9') });
+    await settle();
+    expect(drafts()).toMatchObject({ note: 'kept', drawers: [{ code: 'H1' }, { code: 'A3?', photos: 'A3', pockets: [{ parts: ['9'] }] }] });
+    expect(JSON.parse(fs.readFileSync(path.join(photos(), 'drawer-drafts.backup.json'), 'utf8'))).toEqual(before);
+  });
+
+  it('drops sizes and places written as words, which the app couldn’t use', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    photo('A1-top.jpg');
+    reader.ask();
+    await settle();
+    runs[0].finish({ draft: { code: 'A1', note: ' Two boxes. ', pockets: [{ where: 'Left', share: 'half of drawer', fill: 'sparse', parts: ['3001'], area: { x: 'left' } }, { where: 'Right', share: 40, fill: 0.5, parts: [], maybe: ['3003'], ask: '', area: { x: 50, y: 0, w: 50, h: 100 } }] } });
+    await settle();
+    expect(drafts().drawers[0]).toEqual({ code: 'A1', note: 'Two boxes.', pockets: [{ where: 'Left', parts: ['3001'] }, { where: 'Right', share: 0.4, fill: 0.5, parts: [], maybe: ['3003'], area: { x: 50, y: 0, w: 50, h: 100 } }] });
+  });
+
+  it('reads only so many drawers at a time, and says how many are waiting', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run, maxDrawers: 2 });
+    for (const code of ['A1', 'A2', 'A10', 'B1']) photo(`${code}-top.jpg`);
+    reader.ask();
+    await settle();
+    runs[0].finish({ draft: draftOf('A1', '1') });
+    await settle();
+    runs[1].finish({ draft: draftOf('A2', '1') });
+    await settle();
+    expect(runs.map((r) => r.job.code)).toEqual(['A1', 'A2']);
+    expect(reader.state().status).toMatchObject({ read: ['A1', 'A2'], waiting: 2 });
+    expect(reader.state().status.summary).toMatch(/2 more drawers are waiting/);
+    expect(reader.pending(false)).toEqual(['A10', 'B1']);
+  });
+
+  it('leaves the drafts alone when a draft is no good, and only tries that drawer again when asked', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    photo('A1-top.jpg');
+    photo('A2-top.jpg');
+    reader.ask();
+    await settle();
+    runs[0].finish({ draft: '{"code": "A1", "pockets": [' });
+    await settle();
+    runs[1].finish({});
+    await settle();
+    const { status } = reader.state();
+    expect(status).toMatchObject({ ok: false, read: [], failed: ['A1', 'A2'] });
+    expect(status.summary).toMatch(/A1 \(not read: the draft isn’t valid JSON/);
+    expect(status.summary).toMatch(/A2 \(not read: no draft was written/);
+    expect(fs.existsSync(path.join(photos(), 'drawer-drafts.json'))).toBe(false);
+    expect(reader.pending(false)).toEqual([]);
+    expect(reader.pending(true)).toEqual(['A1', 'A2']);
+  });
+
+  it('stops at once if Claude isn’t signed in', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    photo('A1-top.jpg');
+    photo('A2-top.jpg');
+    reader.ask();
+    await settle();
+    runs[0].finish({ ok: false, text: 'Invalid API key · Please run /login' });
+    await settle();
+    expect(runs).toHaveLength(1);
+    expect(reader.state().status.summary).toMatch(/isn’t signed in/);
+  });
+
+  it('learns from new answers on a copy of the notes, and won’t take back notes that were gutted', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    fs.mkdirSync(photos(), { recursive: true });
+    const notes = path.join(photos(), 'identification-notes.md');
+    fs.writeFileSync(notes, '# Notes\n\nA long list of lessons learnt so far.\n');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(notes, old, old);
+    fs.writeFileSync(path.join(photos(), 'reviews.json'), JSON.stringify({ H1: { pockets: {}, updated: Date.now() }, H2: { pockets: {}, updated: 5 } }));
+    reader.ask();
+    await settle();
+    expect(runs[0].job).toMatchObject({ kind: 'lessons', cwd: path.join(dir, 'work', 'lessons') });
+    expect(runs[0].job.prompt).toContain('newer than the last update: H1.');
+    fs.appendFileSync(path.join(dir, 'work', 'lessons', 'identification-notes.md'), 'H1 taught something.\n');
+    runs[0].finish({});
+    await settle();
+    expect(fs.readFileSync(notes, 'utf8')).toMatch(/lessons learnt so far.\nH1 taught something/);
+    // Nothing more to learn until there are newer answers
+    reader.ask();
+    await settle();
+    expect(runs).toHaveLength(1);
+    fs.writeFileSync(path.join(photos(), 'reviews.json'), JSON.stringify({ H1: { pockets: {}, updated: Date.now() + 1000 } }));
+    const later = new Date(Date.now() + 2000);
+    fs.utimesSync(path.join(photos(), 'reviews.json'), later, later);
+    reader.ask();
+    await settle();
+    fs.writeFileSync(path.join(dir, 'work', 'lessons', 'identification-notes.md'), 'All gone.');
+    runs[1].finish({});
+    await settle();
+    expect(fs.readFileSync(notes, 'utf8')).toMatch(/H1 taught something/);
+  });
+
+  it('runs one reading at a time, and once more for anything asked during it', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    photo('A1-top.jpg');
     reader.ask();
     await settle();
     reader.ask();
     reader.ask();
     expect(runs).toHaveLength(1);
     expect(reader.state().requested).toBeGreaterThan(0);
-    runs[0].finish(true, 'first');
+    photo('B1-top.jpg', -5000);
+    runs[0].finish({ draft: draftOf('A1', '1') });
     await settle();
-    expect(runs).toHaveLength(2);
-    expect(reader.state()).toMatchObject({ requested: null, status: { state: 'running' } });
-    runs[1].finish(false, 'Invalid API key · Please run /login');
+    expect(runs.map((r) => r.job.code)).toEqual(['A1', 'B1']);
+    expect(reader.state().requested).toBeNull();
+    runs[1].finish({ draft: draftOf('B1', '1') });
     await settle();
-    expect(runs).toHaveLength(2);
-    const { status } = reader.state();
-    expect(status.ok).toBe(false);
-    expect(status.summary).toMatch(/isn’t signed in/);
   });
 
   it('owns up to a reading cut off by a restart', () => {
-    fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'data', 'read-status.json'), JSON.stringify({ state: 'running', started: 5 }));
+    fs.mkdirSync(data(), { recursive: true });
+    fs.writeFileSync(path.join(data(), 'read-status.json'), JSON.stringify({ state: 'running', started: 5 }));
     expect(readerFor().state().status).toMatchObject({ state: 'done', started: 5, ok: false });
   });
 
@@ -85,7 +242,7 @@ describe('reading photos now', () => {
     const reader = readerFor({ available: () => false });
     expect(reader.ask()).toBe(false);
     expect(reader.schedule('21:07')).toBeNull();
-    const api = createApi({ dataDir: path.join(dir, 'data'), photosDir: path.join(dir, 'photos'), reader });
+    const api = createApi({ dataDir: data(), photosDir: photos(), reader });
     const s = http.createServer((req, res) => api(req, res));
     await new Promise((r) => s.listen(0, '127.0.0.1', r));
     const url = `http://127.0.0.1:${s.address().port}/api/read-photos`;
@@ -96,18 +253,18 @@ describe('reading photos now', () => {
   });
 
   it('answers the app through the API', async () => {
-    const { runs, run } = fakeRun();
-    const api = createApi({ dataDir: path.join(dir, 'data'), photosDir: path.join(dir, 'photos'), reader: readerFor({ run }) });
+    const { runs, run } = fakeClaude();
+    const api = createApi({ dataDir: data(), photosDir: photos(), reader: readerFor({ run }) });
     const s = http.createServer((req, res) => api(req, res));
     await new Promise((r) => s.listen(0, '127.0.0.1', r));
     const url = `http://127.0.0.1:${s.address().port}/api/read-photos`;
-    const asked = await fetch(url, { method: 'POST' });
-    expect(asked.status).toBe(202);
+    photo('A1-top.jpg');
+    expect((await fetch(url, { method: 'POST' })).status).toBe(202);
     await settle();
-    expect((await (await fetch(url)).json()).status.state).toBe('running');
-    runs[0].finish(true, 'done');
+    expect((await (await fetch(url)).json()).status).toMatchObject({ state: 'running', reading: 'A1' });
+    runs[0].finish({ draft: draftOf('A1', '1') });
     await settle();
-    expect((await (await fetch(url)).json()).status).toMatchObject({ state: 'done', ok: true });
+    expect((await (await fetch(url)).json()).status).toMatchObject({ state: 'done', ok: true, read: ['A1'] });
     s.closeAllConnections();
     await new Promise((r) => s.close(r));
   });

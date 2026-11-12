@@ -23,13 +23,17 @@ One container does everything: it serves the app, with `/snap` and `/review`, fo
 **The container's settings** (the Unraid template):
 - **Port** 5173.
 - **Path** `/data` → `/mnt/user/data/projects/lego`. Everything of yours is in there: `project.json`, `backups/` (a version for each day the project changed, for 30 days), `photos/`, and `.brick-stash/` (Claude's sign-in and the photo reading's work files). It isn't in the appdata backup, so back that folder up separately. Updating or rebuilding the container never touches it.
-- **Variables**, all optional: `TZ` (Unraid normally sets it; the evening reading goes by it), and `BRICK_READ_AT` for when photos are read each day (`21:07` if unset, `off` for never).
+- **Variables**, all optional: `TZ` (Unraid normally sets it; the evening reading goes by it), `BRICK_READ_AT` for when photos are read each day (`21:07` if unset, `off` for never), `BRICK_READ_MODEL` for the Claude model that reads them (`sonnet` if unset; `opus` looks harder and costs about five times as much), and `BRICK_READ_MAX` for the most drawers read in one go (`5` if unset).
 
 HTTPS comes from the reverse proxy (SWAG, on your network only) at `https://lego.brindo.de`, which also lets the phone use its camera. There's no password on the app, so keep it on your home network; Tailscale is fine for reaching it while you're out.
 
 **Signing in to Claude (once)**, so photos can be read: in the Docker tab, click the container, choose **Console**, run `claude`, sign in with your Claude account, then `/exit`. The sign-in is kept in `/data/.brick-stash`, so it lasts through updates. Until then, **Read new photos now** says Claude isn't signed in.
 
-**Reading photos** happens in the container, with nobody watching. It runs when you press **Read new photos now** (on `/review` and on the phone's drawer list), and each evening if there are photos, box names or answers newer than the last reading. Only one reading runs at a time, and one asked for during a run follows straight after. The page shows when it started and finished and what it said; the container's log has a line for each run. It follows `server/read-photos.md`. It can read anything, but write only in the photos folder and its work folder, so not your project or the app's code, and the only program it can run is the image's own photo tool (crops and Rebrickable reference pictures), which it can't change.
+**Reading photos** happens in the container, with nobody watching. It runs when you press **Read new photos now** (on `/review` and on the phone's drawer list), and each evening if there's anything new. Only one reading runs at a time, and one asked for during a run follows straight after. The page shows which drawer is being read, then which were read, how many are waiting, roughly what it cost in Claude use, and what it said; the container's log has a line for each run.
+
+It's built to use as little of Claude as it can, since every picture and every line Claude reads or writes is paid for. The server, not Claude, works out which drawers have photos newer than their last reading, so when nothing is new nothing is spent. Each drawer is read in a run of its own (`server/read-drawer.md`), which writes only that drawer's draft; the server backs up `drawer-drafts.json` and files the draft in it. At most `BRICK_READ_MAX` drawers are read in one go, and the rest wait for the next press or evening. When you've answered drafts on `/review` since the notes were last updated, one more short run (`server/read-lessons.md`) scores them and adds what they teach to `identification-notes.md`. A drawer that couldn't be read is only tried again when you press the button, not every evening.
+
+A run can read anything, but write only in its own work folder, so not your photos, drafts, project or the app's code, and the only program it can run is the image's own photo tool (crops and Rebrickable reference pictures), which it can't change.
 
 **Changing the code** is done away from the NAS: in a Claude Code session on the repository, or on the PC. Changes go live when they're merged to `main` and the container is updated.
 
@@ -55,6 +59,8 @@ HTTPS comes from the reverse proxy (SWAG, on your network only) at `https://lego
    - **Suggested moves**: a short list, each to **Accept** or **Skip**: ease an overfull pocket, bring a split part together, move a part in with its own family, or combine two pockets of similar parts that fit in one. Accepting updates the record and adds it to **Moves to make**. No pocket appears twice in a list, so the figures stay right, and more appear as you go.
    - **Estimates against your drawers**: real volume against the estimate, by family and for the drawers furthest off. Tick **Use these fills** and those corrections reach the Plan tab at the next **Re-plan**. It's best left until most of the collection is recorded, because a part with some still in an unrecorded drawer looks smaller than it is.
    - **What the review found**: what's too full, split, spread out, mixed or half empty.
+   - **Not sorted yet**: what's left to do. Drawers with nothing recorded (click one to record it), and the parts that aren't in any recorded drawer, by family with the biggest first, with how many pieces and litres that is.
+   - **Keeping the page short**: each kind of storage and each section folds to one line with its summary, **Open all** and **Close all** are at the top, and searching opens whatever holds a match. In a drawer with several pockets, only the pocket you're adding to is opened out; the others are a line each, and clicking one switches to it. A drawer's photos fold away too.
 
 Your project is kept on the server, with a copy in your browser. If the server's off, edits wait in the browser and are sent when it's back. If two devices change it at once, the second is told rather than overwriting the first. **Save project** writes a JSON file you can reopen later.
 
@@ -96,7 +102,7 @@ There's also a reality check. Plain bricks, plates and tiles can't pack loose an
 - `src/lib/recommend.ts`, `src/lib/presets.ts` — advice and storage catalogue (preset sizes are approximate)
 - `src/lib/rebrickable.ts` — Rebrickable API (proxied at `/rb-api`)
 - `server/api.mjs` — the shared project and photos, used by both servers; `server/index.mjs` — runs the built app for the network
-- `server/reader.mjs`, `server/read-photos.md`, `server/photo-tools.py` — reading drawer photos into drafts: when it runs, what it's told, and the only program it may run
+- `server/reader.mjs`, `server/read-drawer.md`, `server/read-lessons.md`, `server/photo-tools.py` — reading drawer photos into drafts: which drawers and when, what Claude is told for a drawer and for learning from answers, and the only program it may run
 - `Dockerfile`, `.github/workflows/docker.yml` — the image Unraid runs, built and published from `main`
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `src/components/Snap.tsx`, `src/lib/photos.ts` — the phone page and photos

@@ -6,7 +6,23 @@ interface Reading {
   available?: boolean;
   /** when another reading was asked for, to follow the one under way, ms */
   requested: number | null;
-  status: { state: 'running' | 'done'; started: number; finished?: number; ok?: boolean; summary?: string } | null;
+  status: {
+    state: 'running' | 'done';
+    started: number;
+    finished?: number;
+    ok?: boolean;
+    summary?: string;
+    /** while running: the drawer being read, and which of how many it is */
+    reading?: string;
+    step?: number;
+    steps?: number;
+    /** drawers read, drawers that couldn't be, and how many are left for next time */
+    read?: string[];
+    failed?: string[];
+    waiting?: number;
+    /** what Claude Code reckons the run cost, US$ */
+    cost?: number;
+  } | null;
   /** the server's clock, so ages don't depend on this device's */
   now: number;
 }
@@ -74,11 +90,19 @@ export default function ReadNow({ onRead }: { onRead?: () => void }) {
       <span className="muted small" aria-live="polite">
         {error ||
           (running
-            ? `Reading photos… started ${minutes(now - status!.started)}. It can take a while with a lot of photos.${asked ? ' It will run again afterwards for the photos added since.' : ''}`
+            ? `Reading ${status!.reading ?? 'photos'}${status!.steps ? ` (${status!.step} of ${status!.steps})` : ''}… started ${minutes(now - status!.started)}.${asked ? ' It will run again afterwards for the photos added since.' : ''}`
             : asked
               ? 'Starting…'
               : status?.state === 'done' && status.finished
-                ? `Last read ${when(status.finished)}${status.ok === false ? ', which ended with an error' : ''}.`
+                ? [
+                    `Last read ${when(status.finished)}:`,
+                    status.read?.length ? status.read.join(', ') : status.failed?.length ? 'nothing' : 'nothing new',
+                    status.failed?.length ? `(couldn’t read ${status.failed.join(', ')})` : status.ok === false && !status.read?.length ? '(it ended with an error)' : '',
+                    status.waiting ? `· ${status.waiting} more waiting` : '',
+                    status.cost ? `· about US$${status.cost.toFixed(2)} of Claude use` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
                 : status
                   ? 'The last reading was cut off before it finished.'
                   : 'Otherwise they’re read each evening, if there’s anything new.')}

@@ -420,6 +420,14 @@ td.nowrap button.link.small + button.link.small { margin-left: 2px; }
 .setup-count { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
 .setup-pocket { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; cursor: pointer; }
 .setup-pocket.active { border-color: var(--accent); }
+button.setup-pocket.folded { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: var(--soft); color: var(--ink); font: inherit; padding: 6px 10px; margin: 4px 0; }
+button.setup-pocket.folded:hover { border-color: var(--accent); }
+.setup-pocket-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setup-fold { margin: 8px 0; }
+.setup-fold > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.setup-sub { margin: 10px 0 6px; font-size: 0.92rem; }
+.setup-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 10px; }
+.setup .row .search { flex: 1; }
 .setup-pocket p { margin: 6px 0 0; }
 .setup-pocket-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .setup-pocket-head input { width: 62px; }
