@@ -212,8 +212,11 @@ export function createApi({ dataDir, photosDir, reader = createReader(readerDefa
     if (r.code !== undefined && !(typeof r.code === 'string' && DRAWER_CODE.test(r.code.toUpperCase()))) return null;
     const pockets = r.pockets ?? {};
     if (typeof pockets !== 'object' || Array.isArray(pockets) || Object.keys(pockets).length > 100) return null;
+    if (!(r.closed === undefined || typeof r.closed === 'boolean')) return null;
     const out = { pockets: {} };
     if (r.code) out.code = r.code.toUpperCase();
+    // Finished with, whatever's been answered: nothing more to check, load or learn from
+    if (r.closed) out.closed = true;
     for (const [where, p] of Object.entries(pockets)) {
       if (where.length > 120 || !p || typeof p !== 'object') return null;
       const parts = p.parts ?? {};

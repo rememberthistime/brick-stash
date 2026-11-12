@@ -105,7 +105,7 @@ export default function ReadNow({ onRead }: { onRead?: () => void }) {
                     .join(' ')
                 : status
                   ? 'The last reading was cut off before it finished.'
-                  : 'Otherwise they’re read each evening, if there’s anything new.')}
+                  : 'Photos are only read when you press this.')}
       </span>
       {!busy && status?.state === 'done' && status.summary && (
         <details className="read-now-summary">

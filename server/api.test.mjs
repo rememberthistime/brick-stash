@@ -213,6 +213,28 @@ describe('reading photos now', () => {
     expect(fs.readFileSync(notes, 'utf8')).toMatch(/H1 taught something/);
   });
 
+  it('doesn’t learn from a draft marked as finished, and reopens it when the drawer is read again', async () => {
+    const { runs, run } = fakeClaude();
+    const reader = readerFor({ run });
+    fs.mkdirSync(photos(), { recursive: true });
+    const notes = path.join(photos(), 'identification-notes.md');
+    fs.writeFileSync(notes, '# Notes\n');
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(notes, old, old);
+    fs.writeFileSync(path.join(photos(), 'drawer-drafts.json'), JSON.stringify({ drawers: [draftOf('H1', '1')] }));
+    fs.writeFileSync(path.join(photos(), 'reviews.json'), JSON.stringify({ H1: { pockets: {}, closed: true, updated: Date.now() } }));
+    reader.ask();
+    await settle();
+    expect(runs).toHaveLength(0);
+    expect(reader.state().status.summary).toBe('Nothing new to read.');
+    photo('H1-top.jpg', -5000);
+    reader.ask();
+    await settle();
+    runs[0].finish({ draft: draftOf('H1', '2') });
+    await settle();
+    expect(JSON.parse(fs.readFileSync(path.join(photos(), 'reviews.json'), 'utf8')).H1.closed).toBeUndefined();
+  });
+
   it('runs one reading at a time, and once more for anything asked during it', async () => {
     const { runs, run } = fakeClaude();
     const reader = readerFor({ run });
@@ -457,6 +479,8 @@ describe('photos', () => {
     const saved = await (await put('h2', { pockets: { 'Front left': { parts: { 33243: 'yes', 6191: 'no' }, added: ['3001', '3001'], label: ' Curves ', note: '', done: true } } })).json();
     expect(saved.pockets['Front left']).toEqual({ parts: { 33243: 'yes', 6191: 'no' }, added: ['3001'], label: 'Curves', done: true });
     expect(saved.updated).toBeGreaterThan(0);
+    expect((await (await put('h2', { pockets: {}, closed: true })).json()).closed).toBe(true);
+    expect((await put('h2', { pockets: {}, closed: 'yes' })).status).toBe(400);
     await put('A3?', { code: 'c4', pockets: {} });
     const all = await (await fetch(`${base}/api/reviews`)).json();
     expect(Object.keys(all)).toEqual(['H2', 'A3?']);

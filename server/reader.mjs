@@ -172,7 +172,8 @@ export function createReader({ dataDir, photosDir, workDir, tool, model = 'sonne
     const since = readLog().lessonsAt ?? mtimeOf(notesFile);
     if (!fs.existsSync(notesFile) || mtimeOf(reviewsFile) <= since) return [];
     return Object.entries(readJson(reviewsFile) ?? {})
-      .filter(([, r]) => r && typeof r === 'object' && (r.updated ?? 0) > since)
+      // A draft the user has marked as finished with has nothing more to teach
+      .filter(([, r]) => r && typeof r === 'object' && !r.closed && (r.updated ?? 0) > since)
       .map(([code]) => code)
       .sort(natural);
   }
@@ -223,6 +224,13 @@ export function createReader({ dataDir, photosDir, workDir, tool, model = 'sonne
     if (old) drafts.drawers[at] = entry;
     else drafts.drawers.push(entry);
     writeJson(draftsFile, drafts, 1);
+    // A draft marked as finished with is worth checking again once it's been read afresh
+    const reviews = readJson(reviewsFile);
+    const key = String(entry.code).toUpperCase();
+    if (reviews?.[key]?.closed) {
+      delete reviews[key].closed;
+      writeJson(reviewsFile, reviews, 1);
+    }
   }
 
   async function readDrawer(code, photos, collection) {
