@@ -23,8 +23,8 @@ const dirs = defaultDirs();
 if (process.env.HOME) fs.mkdirSync(process.env.HOME, { recursive: true });
 const reader = createReader(readerDefaults(dirs));
 const api = createApi({ ...dirs, reader });
-/** When photos are read each day, by this machine's clock: "21:07", or "off" */
-const READ_AT = process.env.BRICK_READ_AT ?? '21:07';
+/** Photos are read when the user asks. Set a time like "21:07" to also read them each day, by this machine's clock. */
+const READ_AT = process.env.BRICK_READ_AT ?? 'off';
 
 async function proxy(req, res, upstream, rest) {
   const headers = { ...req.headers };
@@ -86,6 +86,6 @@ server.listen(PORT, '0.0.0.0', () => {
     const next = reader.schedule(READ_AT);
     const using = readerDefaults(dirs);
     console.log(`  Photo reading uses the ${using.model} model, up to ${using.maxDrawers} drawers at a time (BRICK_READ_MODEL, BRICK_READ_MAX).`);
-    console.log(`  Photo reading: on request${next ? `, and daily at ${READ_AT} if there’s anything new (next: ${next.toLocaleString('en-AU')})` : ' only (BRICK_READ_AT is off)'}`);
+    console.log(`  Photo reading: on request${next ? `, and daily at ${READ_AT} if there’s anything new (next: ${next.toLocaleString('en-AU')})` : ' only (set BRICK_READ_AT to a time like 21:07 to read daily as well)'}`);
   }
 });

@@ -23,6 +23,8 @@ export interface DrawerReview {
   code?: string;
   pockets: Record<string, PocketReview>;
   updated?: number;
+  /** finished with, whatever has or hasn't been answered: it isn't loaded into My setup or learnt from */
+  closed?: boolean;
 }
 
 export type Reviews = Record<string, DrawerReview>;

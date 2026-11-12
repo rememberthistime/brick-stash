@@ -75,6 +75,9 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const [draftNote, setDraftNote] = useState('');
   const [printing, setPrinting] = useState(false);
   const [perBox, setPerBox] = useState(false);
+  /** the box that parts under "Not sorted yet" are put into */
+  const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
+  const [lastPut, setLastPut] = useState<{ partNum: string; name: string; key: string; pocket: number; code: string } | null>(null);
   const draftRef = useRef<HTMLInputElement>(null);
   const folds = useFolds();
   const { photos, refresh: refreshPhotos } = usePhotos();
@@ -135,6 +138,30 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const unsortedVolume = unsorted.reduce((t, f) => t + f.volume, 0);
   const partMatches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
   const unsortedHit = !!q && analysis.unplaced.some(partMatches);
+  // Putting unsorted parts straight into a box: choose the box once, then each part is one click
+  const targetComp = comps.find((c) => c.key === target?.key);
+  const targetPockets = targetComp ? setup.drawers[targetComp.key] ?? [] : [];
+  const targetIndex = Math.min(target?.pocket ?? 0, Math.max(0, targetPockets.length - 1));
+  const targetCode = targetComp ? (targetPockets.length > 1 ? `${targetComp.code}.${targetIndex + 1}` : targetComp.code) : '';
+  const pocketName = (key: string, i: number) => {
+    const p = (setup.drawers[key] ?? [])[i];
+    const names = (placed.get(key) ?? []).find((x) => x.id === p?.id)?.parts.map((x) => x.part.name) ?? [];
+    return `Pocket ${i + 1}${p?.label ? ` · ${p.label}` : names.length ? ` · ${names.slice(0, 2).join(', ')}${names.length > 2 ? '…' : ''}` : ' · empty'}`;
+  };
+  const putInTarget = (p: Part) => {
+    if (!targetComp) return;
+    const key = targetComp.key;
+    setSetup((s) => {
+      const pockets = s.drawers[key] ?? [newPocket(uid())];
+      return { ...s, drawers: { ...s.drawers, [key]: addToPocket(pockets, Math.min(targetIndex, pockets.length - 1), [p.partNum]) } };
+    });
+    setLastPut({ partNum: p.partNum, name: p.name, key, pocket: targetIndex, code: targetCode });
+  };
+  const undoPut = () => {
+    if (!lastPut) return;
+    setSetup((s) => (s.drawers[lastPut.key] ? { ...s, drawers: { ...s.drawers, [lastPut.key]: removeFromPocket(s.drawers[lastPut.key], lastPut.pocket, lastPut.partNum) } } : s));
+    setLastPut(null);
+  };
   // With more than a few kinds of storage the page runs long, so they start folded to a line each
   const kindsOpen = kinds.size <= 2;
   const foldIds = [...[...kinds.keys()].map((k) => `setup:${k}`), 'setup:unsorted', ...unsorted.map((f) => `setup:unsorted:${f.family}`), 'setup:moves', 'setup:estimates', 'setup:review'];
@@ -174,11 +201,13 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const loadChecked = async () => {
     try {
       const { drafts, reviews } = await fetchDrafts();
-      const finished = drafts.drawers.filter((d) => {
+      // Drafts marked as finished on the review page are done with, so they're neither loaded nor waited for
+      const open = drafts.drawers.filter((d) => !reviews[d.code]?.closed);
+      const finished = open.filter((d) => {
         const s = scoreOf(d, reviews[d.code]);
         return s.boxes > 0 && s.checked === s.boxes;
       });
-      const waiting = drafts.drawers.filter((d) => !finished.includes(d)).map((d) => reviews[d.code]?.code ?? d.code);
+      const waiting = open.filter((d) => !finished.includes(d)).map((d) => reviews[d.code]?.code ?? d.code);
       applyDraft(reviewedDrafts({ drawers: finished }, reviews), waiting.length ? [`Still to finish checking: ${waiting.join(', ')}.`] : []);
     } catch (e) {
       setDraftNote(`Couldn't load the drafts: ${e instanceof TypeError ? 'the server can’t be reached' : (e as Error).message}`);
@@ -312,9 +341,54 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
           </>
         )}
         {unsorted.length > 0 && (
-          <h4 className="setup-sub">
-            Parts not in any recorded drawer <span className="muted small">by family, biggest first. Open a drawer and search to add them.</span>
-          </h4>
+          <>
+            <h4 className="setup-sub">
+              Parts not in any recorded drawer <span className="muted small">by family, biggest first</span>
+            </h4>
+            <div className="unsorted-target">
+              <label>
+                Put parts straight into{' '}
+                <select value={target?.key ?? ''} onChange={(e) => setTarget(e.target.value ? { key: e.target.value, pocket: 0 } : null)}>
+                  <option value="">choose a drawer…</option>
+                  {comps.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.code} · {c.unitName} › {c.label}
+                      {setup.drawers[c.key]?.length ? '' : ' (nothing recorded)'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {targetComp && targetPockets.length > 1 && (
+                <select aria-label="Which pocket" value={targetIndex} onChange={(e) => setTarget({ key: targetComp.key, pocket: Number(e.target.value) })}>
+                  {targetPockets.map((p, i) => (
+                    <option key={p.id} value={i}>
+                      {pocketName(targetComp.key, i)}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {targetComp ? (
+                <>
+                  <span className="muted">
+                    then click <b>+ {targetCode}</b> beside a part.
+                  </span>
+                  <button className="link small" onClick={() => setEditing(targetComp.key)}>
+                    Open {targetComp.code}
+                  </button>
+                </>
+              ) : (
+                <span className="muted">and each part below gets a button to add it there.</span>
+              )}
+              {lastPut && (
+                <span aria-live="polite">
+                  Added {lastPut.name} to {lastPut.code}.{' '}
+                  <button className="link small" onClick={undoPut}>
+                    Undo
+                  </button>
+                </span>
+              )}
+            </div>
+          </>
         )}
         {unsorted.map((f) => {
           const shown = q ? f.parts.filter(partMatches) : f.parts;
@@ -325,6 +399,11 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
                 {shown.slice(0, UNSORTED_SHOWN).map((p) => (
                   <li key={p.partNum}>
                     <PartImage partNum={p.partNum} size={26} title={p.name} /> {p.name} <span className="muted small">× {p.qty.toLocaleString()}</span>
+                    {targetComp && (
+                      <button className="ghost small-btn put" title={`Put ${p.name} in ${targetCode}`} onClick={() => putInTarget(p)}>
+                        + {targetCode}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

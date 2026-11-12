@@ -151,7 +151,8 @@ export default function Review() {
   if (!drafts) return <div className="snap muted">Loading drafts…</div>;
 
   const index = drafts.drawers.findIndex((d) => d.code === code);
-  if (index < 0) return <DraftPicker drafts={drafts} reviews={reviews} onPick={setCode} />;
+  const setClosed = (c: string, closed: boolean) => change(c, (r) => ({ ...r, closed: closed || undefined }));
+  if (index < 0) return <DraftPicker drafts={drafts} reviews={reviews} onPick={setCode} onClosed={setClosed} />;
   const drawer = drafts.drawers[index];
   const step = (d: number) => setCode(drafts.drawers[(index + d + drafts.drawers.length) % drafts.drawers.length].code);
 
@@ -186,9 +187,10 @@ export default function Review() {
   );
 }
 
-function DraftPicker({ drafts, reviews, onPick }: { drafts: SetupDraft; reviews: Reviews; onPick: (code: string) => void }) {
+function DraftPicker({ drafts, reviews, onPick, onClosed }: { drafts: SetupDraft; reviews: Reviews; onPick: (code: string) => void; onClosed: (code: string, closed: boolean) => void }) {
   const scores = drafts.drawers.map((d) => scoreOf(d, reviews[d.code]));
   const total = scores.reduce(addScores, emptyScore());
+  const finished = drafts.drawers.filter((d) => reviews[d.code]?.closed);
   return (
     <div className="snap review">
       <h1 className="snap-title">Check drafts</h1>
@@ -201,18 +203,43 @@ function DraftPicker({ drafts, reviews, onPick }: { drafts: SetupDraft; reviews:
         {drafts.drawers.map((d, i) => {
           const s = scores[i];
           const real = reviews[d.code]?.code;
+          if (reviews[d.code]?.closed) return null;
           return (
-            <button key={d.code} className="ghost review-draft" aria-label={`${real ?? d.code}: ${s.checked} of ${s.boxes} boxes done`} onClick={() => onPick(d.code)}>
-              <span className="code">{real ?? d.code}</span>
-              {real && <span className="muted small">filed as {d.code}</span>}
-              <span className="small">
-                {s.checked} of {s.boxes} boxes done
-              </span>
-              <span className={`review-bar ${s.checked === s.boxes ? 'full' : ''}`} style={{ ['--done' as string]: `${(s.checked / Math.max(1, s.boxes)) * 100}%` }} />
-            </button>
+            <div key={d.code} className="review-draft-row">
+              <button className="ghost review-draft" aria-label={`${real ?? d.code}: ${s.checked} of ${s.boxes} boxes done`} onClick={() => onPick(d.code)}>
+                <span className="code">{real ?? d.code}</span>
+                {real && <span className="muted small">filed as {d.code}</span>}
+                <span className="small">
+                  {s.checked} of {s.boxes} boxes done
+                </span>
+                <span className={`review-bar ${s.checked === s.boxes ? 'full' : ''}`} style={{ ['--done' as string]: `${(s.checked / Math.max(1, s.boxes)) * 100}%` }} />
+              </button>
+              <button className="link small" title="Finished with this draft: nothing more to check, load or learn from. It can be reopened." onClick={() => onClosed(d.code, true)}>
+                Finished
+              </button>
+            </div>
           );
         })}
       </div>
+      {finished.length > 0 && (
+        <details className="review-finished">
+          <summary className="small">
+            Finished with <span className="muted">{finished.length}</span>
+          </summary>
+          <p className="muted small">Nothing more to do on these. They aren’t loaded into My setup or learnt from.</p>
+          {finished.map((d) => (
+            <div key={d.code} className="review-draft-row">
+              <button className="ghost review-draft" onClick={() => onPick(d.code)}>
+                <span className="code">{reviews[d.code]?.code ?? d.code}</span>
+                <span className="muted small">finished</span>
+              </button>
+              <button className="link small" onClick={() => onClosed(d.code, false)}>
+                Reopen
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
       {total.right + total.wrong > 0 && <p className="muted small">So far: {scoreText(total)}.</p>}
       <p className="small review-links">
         <a href="/snap">Take photos</a> · <a href="/">Open Brick Stash</a>
@@ -266,7 +293,19 @@ function DrawerReviewView({
         <b>
           {score.checked} of {score.boxes} boxes done.
         </b>{' '}
-        {scoreText(score)}
+        {scoreText(score)}{' '}
+        {review?.closed ? (
+          <>
+            <b>Marked as finished:</b> nothing more to do.{' '}
+            <button className="link small" onClick={() => onChange((r) => ({ ...r, closed: undefined }))}>
+              Reopen
+            </button>
+          </>
+        ) : (
+          <button className="link small" title="Finished with this draft, whatever’s been answered: nothing more to check, load or learn from. It can be reopened." onClick={() => onChange((r) => ({ ...r, closed: true }))}>
+            Mark as finished, nothing more to do
+          </button>
+        )}
       </p>
       {top && areas.some(Boolean) && <Overview top={top} areas={areas} done={drawer.pockets.map((p, i) => !!review?.pockets[pocketKey(p, i)]?.done)} />}
       {top && !areas.some(Boolean) && <img className="review-top" src={photoUrl(top)} alt={`${top.name}, the whole drawer`} />}
