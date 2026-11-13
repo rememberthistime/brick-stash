@@ -2,6 +2,7 @@
 // take, in the order the drawers come, plus what there isn't enough of. Storage is by type, so a part is found by
 // its mould whatever its colour; the colours wanted are listed beside it for picking them out.
 import { baseMould } from './collection';
+import { placeName } from './codes';
 import { leaves, sectionLabel, type PlannedCompartment } from './planner';
 import type { SetupComp } from './setup';
 import type { Catalog, InventoryRow, Part, Setup } from './types';
@@ -13,6 +14,8 @@ export interface Place {
   drawer: string;
   /** where that is, in words */
   where: string;
+  /** the user's own name for the drawer, if it has one */
+  name?: string;
   /** what the section or box is called, when the part shares it */
   section?: string;
   /** drawers come in this order */
@@ -27,7 +30,7 @@ export function planPlaces(located: (PlannedCompartment & { code: string })[]): 
   located.forEach((c, order) => {
     c.sections.forEach((sec, i) => {
       const parts = leaves(sec.node).flatMap((l) => (l.part ? [l.part.partNum] : []));
-      const place: Place = { code: c.sections.length > 1 ? `${c.code}.${i + 1}` : c.code, drawer: c.code, where: `${c.comp.unitName} › ${c.comp.label}`, order, ...(parts.length > 1 ? { section: sectionLabel(sec) } : {}) };
+      const place: Place = { code: c.sections.length > 1 ? `${c.code}.${i + 1}` : c.code, drawer: c.code, where: `${c.comp.unitName} › ${c.comp.label}`, order, ...(placeName(c.comp) ? { name: placeName(c.comp) } : {}), ...(parts.length > 1 ? { section: sectionLabel(sec) } : {}) };
       for (const n of parts) out.set(n, [...(out.get(n) ?? []), place]);
     });
   });
@@ -40,7 +43,7 @@ export function setupPlaces(setup: Setup, comps: SetupComp[]): Places {
   comps.forEach((comp, order) => {
     const pockets = setup.drawers[comp.key] ?? [];
     pockets.forEach((p, i) => {
-      const place: Place = { code: pockets.length > 1 ? `${comp.code}.${i + 1}` : comp.code, drawer: comp.code, where: `${comp.unitName} › ${comp.label}`, order, ...(p.label?.trim() ? { section: p.label.trim() } : {}) };
+      const place: Place = { code: pockets.length > 1 ? `${comp.code}.${i + 1}` : comp.code, drawer: comp.code, where: `${comp.unitName} › ${comp.label}`, order, ...(placeName(comp) ? { name: placeName(comp) } : {}), ...(p.label?.trim() ? { section: p.label.trim() } : {}) };
       for (const n of p.parts) out.set(n, [...(out.get(n) ?? []), place]);
     });
   });
@@ -64,7 +67,7 @@ export interface PickLine {
 }
 
 export interface PickList {
-  drawers: { code: string; where: string; lines: PickLine[] }[];
+  drawers: { code: string; where: string; name?: string; lines: PickLine[] }[];
   /** owned, but with no drawer to send you to: no home in the plan yet, or not recorded */
   unplaced: PickLine[];
   /** owned, but kept out of the plan, so stored somewhere else */
@@ -107,7 +110,7 @@ export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned:
   });
 
   const list: PickList = { drawers: [], unplaced: [], elsewhere: [], missing: [], short: [], pieces: 0, types: lines.length, piecesShort: 0 };
-  const drawers = new Map<string, { code: string; where: string; order: number; lines: PickLine[] }>();
+  const drawers = new Map<string, { code: string; where: string; name?: string; order: number; lines: PickLine[] }>();
   for (const line of lines) {
     list.pieces += line.want;
     if (line.have < line.want) {
@@ -119,14 +122,14 @@ export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned:
     else if (!line.places.length) list.unplaced.push(line);
     else {
       const at = line.places[0];
-      const d = drawers.get(at.drawer) ?? { code: at.drawer, where: at.where, order: at.order, lines: [] };
+      const d = drawers.get(at.drawer) ?? { code: at.drawer, where: at.where, ...(at.name ? { name: at.name } : {}), order: at.order, lines: [] };
       d.lines.push(line);
       drawers.set(at.drawer, d);
     }
   }
   const byName = (a: PickLine, b: PickLine) => a.name.localeCompare(b.name, undefined, { numeric: true });
   const bySection = (a: PickLine, b: PickLine) => a.places[0].code.localeCompare(b.places[0].code, undefined, { numeric: true }) || byName(a, b);
-  list.drawers = [...drawers.values()].sort((a, b) => a.order - b.order).map(({ code, where, lines }) => ({ code, where, lines: lines.sort(bySection) }));
+  list.drawers = [...drawers.values()].sort((a, b) => a.order - b.order).map(({ code, where, name, lines }) => ({ code, where, ...(name ? { name } : {}), lines: lines.sort(bySection) }));
   for (const group of [list.unplaced, list.elsewhere, list.missing, list.short]) group.sort(byName);
   return list;
 }

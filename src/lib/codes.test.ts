@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setUnitCode, withUnitCodes } from './codes';
+import { codeWithName, drawerKeyOf, setPlaceName, setUnitCode, withUnitCodes } from './codes';
 import { expandCompartments } from './planner';
 import { setupComps } from './setup';
 import { DEFAULT_SETTINGS, type StorageUnit } from './types';
@@ -41,5 +41,30 @@ describe('unit letters', () => {
     expect(letters(setUnitCode(units, 'a', 'C'))).toEqual({ a: 'C', b: 'B', c: 'A' });
     expect(letters(setUnitCode(units, 'a', 'Q'))).toEqual({ a: 'Q', b: 'B', c: 'C' });
     expect(letters(setUnitCode(units, 'a', '7'))).toEqual({ a: 'A', b: 'B', c: 'C' });
+  });
+});
+
+describe('names for units and drawers', () => {
+  it('shows a drawer’s own name beside its code, else its unit’s, and works through to the drawer codes', () => {
+    let units = withUnitCodes([unit('a', 2, 3), unit('b', 2, 1)]);
+    units = setPlaceName(units, 'a', null, '  Technic cabinet ');
+    units = setPlaceName(units, 'a', drawerKeyOf('a:ac:1'), 'Gears');
+    const named = Object.fromEntries(setupComps(expandCompartments(units, DEFAULT_SETTINGS)).map((c) => [c.code, codeWithName(c.code, c)]));
+    expect(named).toMatchObject({ A1: 'A1: Technic cabinet', A2: 'A2: Gears', A3: 'A3: Technic cabinet', B1: 'B1' });
+  });
+
+  it('takes a name off when it’s cleared, leaving nothing behind', () => {
+    let units = withUnitCodes([unit('a', 2, 3)]);
+    units = setPlaceName(setPlaceName(units, 'a', 'ac:0', 'Plates'), 'a', null, 'Cabinet');
+    expect(units[0]).toMatchObject({ title: 'Cabinet', drawerNames: { 'ac:0': 'Plates' } });
+    units = setPlaceName(setPlaceName(units, 'a', 'ac:0', ' '), 'a', null, '');
+    expect(units[0]).not.toHaveProperty('title');
+    expect(units[0]).not.toHaveProperty('drawerNames');
+  });
+
+  it('names an opened-up box after its unit, not its first drawer', () => {
+    const units = setPlaceName(setPlaceName(withUnitCodes([unit('a', 2, 3)]), 'a', 'ac:0', 'First'), 'a', null, 'Tub');
+    const [whole] = setupComps(expandCompartments(units, DEFAULT_SETTINGS), { a: { how: 'dividers' } });
+    expect(codeWithName(whole.code, whole)).toBe('A: Tub');
   });
 });

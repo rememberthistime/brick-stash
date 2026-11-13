@@ -1,5 +1,6 @@
 // The phone page: choose a drawer, take photos, and they're filed under it. It reads the storage list and never
 // writes to the project, so it can't get in the way of whatever's open on another device.
+import { codeWithName, placeName } from '../lib/codes';
 import ReadNow from './ReadNow';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -211,6 +212,7 @@ export default function Snap() {
         <button className="ghost snap-drawer" onClick={() => setCode(null)}>
           <span className="code">{comp.code}</span>
           <span className="snap-drawer-name">
+            {placeName(comp) && <b>{placeName(comp)} · </b>}
             {comp.unitName} › {comp.label}
           </span>
           <span className="muted small">Change drawer</span>
@@ -352,8 +354,9 @@ function DrawerPicker({ comps, counts, onPick }: { comps: SetupComp[]; counts: M
           <h2 className="snap-kind">{kind}</h2>
           <div className="snap-codes">
             {list.map((c) => (
-              <button key={c.key} className="ghost snap-code" aria-label={`${c.code}, ${c.unitName}, ${c.label}`} onClick={() => onPick(c.code)}>
+              <button key={c.key} className="ghost snap-code" aria-label={`${codeWithName(c.code, c)}, ${c.unitName}, ${c.label}`} title={placeName(c) || undefined} onClick={() => onPick(c.code)}>
                 {c.code}
+                {placeName(c) && <span className="snap-code-name">{placeName(c)}</span>}
                 {!!counts.get(c.code) && <span className="snap-count">{counts.get(c.code)}</span>}
               </button>
             ))}

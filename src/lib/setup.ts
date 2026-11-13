@@ -33,7 +33,8 @@ function wholeBox(sections: Compartment[], code: string, how: OpenedUnit): Setup
   const volume = (how.litres ?? litresInName(sections[0].unitName) ?? sections.reduce((t, c) => t + c.volume, 0) / 1000) * 1000;
   const h = Math.max(...sections.map((c) => c.h));
   const side = Math.sqrt((volume * 1000) / h);
-  return { ...sections[0], key: wholeKey(sections[0].unitId), code, label: 'Whole box', w: side, d: side, h, volume, cap: volume, sections: sections.length };
+  // One space now, so it goes by the unit's name rather than its first drawer's
+  return { ...sections[0], name: undefined, key: wholeKey(sections[0].unitId), code, label: 'Whole box', w: side, d: side, h, volume, cap: volume, sections: sections.length };
 }
 
 /** The same A1, A2… B1 codes the plan uses. An opened-up unit is one space, and just takes its letter. */

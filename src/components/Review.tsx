@@ -1,6 +1,8 @@
 // The review page (/review): go through each box of a drawer read from photos and say which parts are right, which
 // aren't there and what was missed. Made for the phone, and works on the computer too. It writes only reviews.json
 // beside the photos, never the project, so it can't get in the way of whatever's open on another device.
+import { placeName } from '../lib/codes';
+import { expandCompartments } from '../lib/planner';
 import ReadNow from './ReadNow';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { mergeToParts } from '../lib/collection';
@@ -25,8 +27,8 @@ import {
   type Score,
   type Verdict,
 } from '../lib/review';
-import type { DraftDrawer, DraftPocket, PhotoArea, SetupDraft } from '../lib/setup';
-import type { InventoryRow, Part } from '../lib/types';
+import { setupComps, type DraftDrawer, type DraftPocket, type PhotoArea, type SetupDraft } from '../lib/setup';
+import type { InventoryRow, Part, Settings, Setup, StorageUnit } from '../lib/types';
 import { useCatalog } from '../state';
 import PartImage from './PartImage';
 
@@ -66,6 +68,7 @@ export default function Review() {
   const { photos } = usePhotos(30000);
   const { catalog } = useCatalog();
   const [rows, setRows] = useState<InventoryRow[]>([]);
+  const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
   const latest = useRef<Reviews>({});
   const pending = useRef<Set<string>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -79,9 +82,13 @@ export default function Review() {
       })
       .catch((e) => setError(e instanceof TypeError ? 'Couldn’t reach the server.' : e.message));
     // Only for how many of each part there are, and searching; the review works without it
-    fetch('/api/project?only=rows')
+    fetch('/api/project?only=rows,units,settings,setup')
       .then((r) => (r.ok ? r.json() : { rows: [] }))
-      .then((p: { rows?: InventoryRow[] }) => setRows(p.rows ?? []))
+      .then((p: { rows?: InventoryRow[]; units?: StorageUnit[]; settings?: Settings; setup?: Setup }) => {
+        setRows(p.rows ?? []);
+        // The names the user has given drawers, to show beside their codes
+        if (p.units && p.settings) setNames(new Map(setupComps(expandCompartments(p.units, p.settings), p.setup?.open).flatMap((c) => (placeName(c) ? [[c.code, placeName(c)] as const] : []))));
+      })
       .catch(() => {
         /* no collection to search, but answers can still be given */
       });
@@ -152,7 +159,7 @@ export default function Review() {
 
   const index = drafts.drawers.findIndex((d) => d.code === code);
   const setClosed = (c: string, closed: boolean) => change(c, (r) => ({ ...r, closed: closed || undefined }));
-  if (index < 0) return <DraftPicker drafts={drafts} reviews={reviews} onPick={setCode} onClosed={setClosed} />;
+  if (index < 0) return <DraftPicker drafts={drafts} reviews={reviews} names={names} onPick={setCode} onClosed={setClosed} />;
   const drawer = drafts.drawers[index];
   const step = (d: number) => setCode(drafts.drawers[(index + d + drafts.drawers.length) % drafts.drawers.length].code);
 
@@ -164,7 +171,10 @@ export default function Review() {
         </button>
         <button className="ghost snap-drawer" onClick={() => setCode(null)}>
           <span className="code">{reviews[drawer.code]?.code ?? drawer.code}</span>
-          <span className="snap-drawer-name">Checking the draft</span>
+          <span className="snap-drawer-name">
+            {names.get(reviews[drawer.code]?.code ?? photoCode(drawer)) && <b>{names.get(reviews[drawer.code]?.code ?? photoCode(drawer))} · </b>}
+            Checking the draft
+          </span>
           <span className="muted small">All drafts</span>
         </button>
         <button className="ghost snap-step" aria-label="Next draft" onClick={() => step(1)}>
@@ -187,7 +197,7 @@ export default function Review() {
   );
 }
 
-function DraftPicker({ drafts, reviews, onPick, onClosed }: { drafts: SetupDraft; reviews: Reviews; onPick: (code: string) => void; onClosed: (code: string, closed: boolean) => void }) {
+function DraftPicker({ drafts, reviews, names, onPick, onClosed }: { drafts: SetupDraft; reviews: Reviews; names: ReadonlyMap<string, string>; onPick: (code: string) => void; onClosed: (code: string, closed: boolean) => void }) {
   const scores = drafts.drawers.map((d) => scoreOf(d, reviews[d.code]));
   const total = scores.reduce(addScores, emptyScore());
   const finished = drafts.drawers.filter((d) => reviews[d.code]?.closed);
@@ -208,6 +218,7 @@ function DraftPicker({ drafts, reviews, onPick, onClosed }: { drafts: SetupDraft
             <div key={d.code} className="review-draft-row">
               <button className="ghost review-draft" aria-label={`${real ?? d.code}: ${s.checked} of ${s.boxes} boxes done`} onClick={() => onPick(d.code)}>
                 <span className="code">{real ?? d.code}</span>
+                {names.get(real ?? photoCode(d)) && <span className="small place-name">{names.get(real ?? photoCode(d))}</span>}
                 {real && <span className="muted small">filed as {d.code}</span>}
                 <span className="small">
                   {s.checked} of {s.boxes} boxes done
@@ -231,6 +242,7 @@ function DraftPicker({ drafts, reviews, onPick, onClosed }: { drafts: SetupDraft
             <div key={d.code} className="review-draft-row">
               <button className="ghost review-draft" onClick={() => onPick(d.code)}>
                 <span className="code">{reviews[d.code]?.code ?? d.code}</span>
+                {names.get(reviews[d.code]?.code ?? photoCode(d)) && <span className="small place-name">{names.get(reviews[d.code]?.code ?? photoCode(d))}</span>}
                 <span className="muted small">finished</span>
               </button>
               <button className="link small" onClick={() => onClosed(d.code, false)}>
