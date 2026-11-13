@@ -1,5 +1,6 @@
 // What goes on each label, from the plan or from the user's own setup, in one shape that both the tape labels and
 // the printed sheet draw from.
+import { placeName } from './codes';
 import { leaves, sectionLabel, type PlannedCompartment } from './planner';
 import type { PlacedPocket, SetupComp } from './setup';
 import { stem } from './storageList';
@@ -19,6 +20,8 @@ export interface LabelEntry {
   code: string;
   /** where it goes, in words */
   where: string;
+  /** the user's own name for the drawer, printed on sheet labels beside the code */
+  name?: string;
   /** storage kind, to print one kind at a time */
   kind: string;
   cells: SheetCell[];
@@ -36,6 +39,7 @@ export function planLabels(located: (PlannedCompartment & { code: string })[]): 
       return {
         code: c.code,
         where: `${c.comp.unitName} › ${c.comp.label}`,
+        ...(placeName(c.comp) ? { name: placeName(c.comp) } : {}),
         kind: stem(c.comp.unitName),
         cells: spec.cells.map((cell, i) => ({ ...cell, family: c.sections[i].node.familyKey, parts: sectionParts[i].map((p) => p.partNum), sheetTitle: sectionLabel(c.sections[i]) })),
         links: sectionParts.flat().map((p) => ({ partNum: p.partNum, name: p.name })),
@@ -66,13 +70,14 @@ export function setupLabels(pockets: PlacedPocket[], comps: SetupComp[], perBox:
     });
     const where = `${comp.unitName} › ${comp.label}`;
     const kind = stem(comp.unitName);
+    const named = placeName(comp) ? { name: placeName(comp) } : {};
     if (perBox) {
       cells.forEach((c, i) => {
-        if (c.show) out.push({ code: inDrawer.length > 1 ? `${comp.code}.${i + 1}` : comp.code, where: inDrawer.length > 1 ? `${where}, box ${i + 1}` : where, kind, cells: [c.cell], links: c.links });
+        if (c.show) out.push({ code: inDrawer.length > 1 ? `${comp.code}.${i + 1}` : comp.code, where: inDrawer.length > 1 ? `${where}, box ${i + 1}` : where, kind, ...named, cells: [c.cell], links: c.links });
       });
     } else if (cells.some((c) => c.show)) {
       const shown = cells.filter((c) => c.show);
-      out.push({ code: comp.code, where, kind, cells: shown.map((c) => c.cell), links: shown.flatMap((c) => c.links) });
+      out.push({ code: comp.code, where, kind, ...named, cells: shown.map((c) => c.cell), links: shown.flatMap((c) => c.links) });
     }
   }
   return out;

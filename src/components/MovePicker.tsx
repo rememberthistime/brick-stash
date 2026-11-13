@@ -1,3 +1,4 @@
+import { placeName } from '../lib/codes';
 import { useState } from 'react';
 import type { PartMove } from '../lib/types';
 import { leaves, sectionLabel, type PlannedCompartment, type Section } from '../lib/planner';
@@ -32,7 +33,7 @@ export default function MovePicker({ request, located, onChoose, onClose }: { re
 
   const q = query.trim().toLowerCase();
   const matches = q
-    ? located.filter((c) => c.code.toLowerCase() === q || c.comp.unitName.toLowerCase().includes(q) || c.sections.some((s) => sectionLabel(s).toLowerCase().includes(q) || leaves(s.node).some((l) => l.part?.partNum === q)))
+    ? located.filter((c) => c.code.toLowerCase() === q || c.comp.unitName.toLowerCase().includes(q) || placeName(c.comp).toLowerCase().includes(q) || c.sections.some((s) => sectionLabel(s).toLowerCase().includes(q) || leaves(s.node).some((l) => l.part?.partNum === q)))
     : located;
 
   const joinButton = (c: Located, s: Section) => {
@@ -41,7 +42,10 @@ export default function MovePicker({ request, located, onChoose, onClose }: { re
       <button key={`${c.code}-${s.node.id}-${s.span?.[0] ?? 0}`} className="move-choice" onClick={() => onChoose({ part: anchor.partNum })}>
         <PartImage partNum={anchor.partNum} size={26} title={anchor.name} />
         <span className="code">{c.code}</span>
-        <span className="move-name">{sectionLabel(s)}</span>
+        <span className="move-name">
+          {placeName(c.comp) && <span className="place-name">{placeName(c.comp)} · </span>}
+          {sectionLabel(s)}
+        </span>
         <span className={`muted small nowrap ${c.fill > 0.95 ? 'warn-text' : ''}`}>{pct(c.fill)} full</span>
       </button>
     );
@@ -66,6 +70,7 @@ export default function MovePicker({ request, located, onChoose, onClose }: { re
               <div className="move-comp-head">
                 <span className="code">{c.code}</span>
                 <span className="muted small move-name">
+                  {placeName(c.comp) && <span className="place-name">{placeName(c.comp)} · </span>}
                   {c.comp.unitName} › {c.comp.label} · {pct(c.fill)} full
                 </span>
                 {c.sections.length < c.comp.maxSections || !c.sections.length ? (

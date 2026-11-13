@@ -23,6 +23,7 @@ import {
   undoLastAccepted,
   unplacedNeighbours,
   unsortedByFamily,
+  type UnsortedOrder,
   wholeKey,
   type ContainerChoice,
   type EstimateRow,
@@ -36,6 +37,9 @@ import {
 import { setupLabels } from '../lib/labels';
 import { fetchDrafts, reviewedDrafts, scoreOf } from '../lib/review';
 import { stem } from '../lib/storageList';
+import { familyFor, familyGroup } from '../lib/taxonomy';
+import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../lib/codes';
+import NameInput from './NameInput';
 import type { LooseContainer, OpenedUnit, Part, Project, Setup, SetupPocket } from '../lib/types';
 import { uid } from '../state';
 import { Stat } from './CollectionTab';
@@ -68,6 +72,15 @@ const FINDINGS: { kind: FindingKind; title: string; hint: string }[] = [
 const SHOWN_FINDINGS = 6;
 /** Parts listed per family under "Not sorted yet" */
 const UNSORTED_SHOWN = 150;
+/** How this browser last ordered "Not sorted yet" */
+const ORDER_STORE = 'brick-stash-unsorted-order';
+const rememberedOrder = (): UnsortedOrder => {
+  try {
+    return localStorage.getItem(ORDER_STORE) === 'pieces' ? 'pieces' : 'volume';
+  } catch {
+    return 'volume';
+  }
+};
 
 export default function SetupTab({ project, update, plan, parts, categories, goTo }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -75,6 +88,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const [draftNote, setDraftNote] = useState('');
   const [printing, setPrinting] = useState(false);
   const [perBox, setPerBox] = useState(false);
+  const [unsortedOrder, setUnsortedOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** the box that parts under "Not sorted yet" are put into */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
   const [lastPut, setLastPut] = useState<{ partNum: string; name: string; key: string; pocket: number; code: string } | null>(null);
@@ -133,7 +147,15 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const q = filter.trim().toLowerCase();
   // What's left to do: drawers with nothing recorded, and parts that aren't in any recorded drawer
   const emptyDrawers = comps.filter((c) => !setup.drawers[c.key]?.length);
-  const unsorted = unsortedByFamily(analysis.unplaced, scale);
+  const unsorted = unsortedByFamily(analysis.unplaced, scale, unsortedOrder);
+  const chooseOrder = (order: UnsortedOrder) => {
+    setUnsortedOrder(order);
+    try {
+      localStorage.setItem(ORDER_STORE, order);
+    } catch {
+      /* only a convenience */
+    }
+  };
   const unsortedPieces = unsorted.reduce((t, f) => t + f.pieces, 0);
   const unsortedVolume = unsorted.reduce((t, f) => t + f.volume, 0);
   const partMatches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
@@ -148,14 +170,39 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
     const names = (placed.get(key) ?? []).find((x) => x.id === p?.id)?.parts.map((x) => x.part.name) ?? [];
     return `Pocket ${i + 1}${p?.label ? ` · ${p.label}` : names.length ? ` · ${names.slice(0, 2).join(', ')}${names.length > 2 ? '…' : ''}` : ' · empty'}`;
   };
-  const putInTarget = (p: Part) => {
-    if (!targetComp) return;
-    const key = targetComp.key;
+  /** "A1.2: Technic", the code of one pocket of a drawer, with the drawer's name */
+  const pocketCode = (c: SetupComp, i: number) => {
+    const count = setup.drawers[c.key]?.length ?? 0;
+    return codeWithName(count > 1 ? `${c.code}.${i + 1}` : c.code, c);
+  };
+  const putIn = (p: Part, key: string, pocket: number) => {
+    const comp = comps.find((c) => c.key === key);
+    if (!comp) return;
+    const index = Math.max(0, Math.min(pocket, (setup.drawers[key]?.length ?? 1) - 1));
     setSetup((s) => {
       const pockets = s.drawers[key] ?? [newPocket(uid())];
-      return { ...s, drawers: { ...s.drawers, [key]: addToPocket(pockets, Math.min(targetIndex, pockets.length - 1), [p.partNum]) } };
+      return { ...s, drawers: { ...s.drawers, [key]: addToPocket(pockets, Math.min(index, pockets.length - 1), [p.partNum]) } };
     });
-    setLastPut({ partNum: p.partNum, name: p.name, key, pocket: targetIndex, code: targetCode });
+    setLastPut({ partNum: p.partNum, name: p.name, key, pocket: index, code: pocketCode(comp, index) });
+  };
+  const putInTarget = (p: Part) => targetComp && putIn(p, targetComp.key, targetIndex);
+  /** Where a part could go: pockets already holding its family or group first, roomiest first, then every drawer */
+  const placesFor = (p: Part) => {
+    const fam = familyFor(p.catId).key;
+    const grp = familyGroup(fam);
+    const indexOf = (pp: PlacedPocket) => Math.max(0, (setup.drawers[pp.comp.key] ?? []).findIndex((x) => x.id === pp.id));
+    const free = (pp: PlacedPocket) => (pp.capacity ? 1 - pp.used / pp.capacity : 0);
+    const similar = analysis.pockets
+      .filter((pp) => pp.parts.length && (pp.family === fam || familyGroup(pp.family) === grp))
+      .sort((a, b) => Number(b.family === fam) - Number(a.family === fam) || free(b) - free(a))
+      .slice(0, 12)
+      .map((pp) => ({ value: `${pp.comp.key}|${indexOf(pp)}`, text: `${pocketCode(pp.comp, indexOf(pp))} — ${pp.label || pp.groupLabel}, ${pct(pp.used / Math.max(1, pp.capacity))} full` }));
+    const every = comps.flatMap((c) => {
+      const pockets = setup.drawers[c.key] ?? [];
+      if (pockets.length < 2) return [{ value: `${c.key}|0`, text: `${codeWithName(c.code, c)}${pockets.length ? '' : ' (nothing recorded)'}` }];
+      return pockets.map((_, i) => ({ value: `${c.key}|${i}`, text: pocketName(c.key, i).replace(/^Pocket \d+/, pocketCode(c, i)) }));
+    });
+    return { similar, every };
   };
   const undoPut = () => {
     if (!lastPut) return;
@@ -165,7 +212,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   // With more than a few kinds of storage the page runs long, so they start folded to a line each
   const kindsOpen = kinds.size <= 2;
   const foldIds = [...[...kinds.keys()].map((k) => `setup:${k}`), 'setup:unsorted', ...unsorted.map((f) => `setup:unsorted:${f.family}`), 'setup:moves', 'setup:estimates', 'setup:review'];
-  const matchesFilter = (c: SetupComp) => !q || c.code.toLowerCase() === q || (placed.get(c.key) ?? []).some((p) => p.parts.some((x) => x.part.partNum === q || x.part.name.toLowerCase().includes(q) || x.groupLabel.toLowerCase().includes(q)));
+  const matchesFilter = (c: SetupComp) => !q || c.code.toLowerCase() === q || placeName(c).toLowerCase().includes(q) || (placed.get(c.key) ?? []).some((p) => p.parts.some((x) => x.part.partNum === q || x.part.name.toLowerCase().includes(q) || x.groupLabel.toLowerCase().includes(q)));
 
   const index = comps.findIndex((c) => c.key === editing);
   const current = index >= 0 ? comps[index] : null;
@@ -333,7 +380,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
             <div className="setup-chips">
               {emptyDrawers.slice(0, 120).map((c) => (
                 <button key={c.key} className="ghost small-btn" title={`${c.unitName} › ${c.label}`} onClick={() => setEditing(c.key)}>
-                  {c.code}
+                  {codeWithName(c.code, c)}
                 </button>
               ))}
               {emptyDrawers.length > 120 && <span className="muted small">and {emptyDrawers.length - 120} more</span>}
@@ -342,8 +389,17 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
         )}
         {unsorted.length > 0 && (
           <>
-            <h4 className="setup-sub">
-              Parts not in any recorded drawer <span className="muted small">by family, biggest first</span>
+            <h4 className="setup-sub setup-sub-row">
+              <span>
+                Parts not in any recorded drawer <span className="muted small">by family</span>
+              </span>
+              <label className="small">
+                Biggest first by{' '}
+                <select value={unsortedOrder} onChange={(e) => chooseOrder(e.target.value as UnsortedOrder)}>
+                  <option value="volume">room they take</option>
+                  <option value="pieces">number of pieces</option>
+                </select>
+              </label>
             </h4>
             <div className="unsorted-target">
               <label>
@@ -352,7 +408,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
                   <option value="">choose a drawer…</option>
                   {comps.map((c) => (
                     <option key={c.key} value={c.key}>
-                      {c.code} · {c.unitName} › {c.label}
+                      {codeWithName(c.code, c)} · {c.unitName} › {c.label}
                       {setup.drawers[c.key]?.length ? '' : ' (nothing recorded)'}
                     </option>
                   ))}
@@ -370,14 +426,14 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
               {targetComp ? (
                 <>
                   <span className="muted">
-                    then click <b>+ {targetCode}</b> beside a part.
+                    then click <b>+ {targetCode}</b> beside a part. Or choose a drawer for any part with <b>Put in…</b>
                   </span>
                   <button className="link small" onClick={() => setEditing(targetComp.key)}>
-                    Open {targetComp.code}
+                    Open {codeWithName(targetComp.code, targetComp)}
                   </button>
                 </>
               ) : (
-                <span className="muted">and each part below gets a button to add it there.</span>
+                <span className="muted">and each part below gets a button to add it there, or use <b>Put in…</b> beside a part to choose where that one goes.</span>
               )}
               {lastPut && (
                 <span aria-live="polite">
@@ -398,16 +454,25 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
               <ul className="setup-unplaced">
                 {shown.slice(0, UNSORTED_SHOWN).map((p) => (
                   <li key={p.partNum}>
-                    <PartImage partNum={p.partNum} size={26} title={p.name} /> {p.name} <span className="muted small">× {p.qty.toLocaleString()}</span>
-                    {targetComp && (
-                      <button className="ghost small-btn put" title={`Put ${p.name} in ${targetCode}`} onClick={() => putInTarget(p)}>
-                        + {targetCode}
-                      </button>
-                    )}
+                    <PartImage partNum={p.partNum} size={26} title={p.name} />{' '}
+                    <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
+                      {p.name}
+                    </a>{' '}
+                    <span className="muted small">
+                      {p.partNum} · × {p.qty.toLocaleString()}
+                    </span>
+                    <span className="put">
+                      {targetComp && (
+                        <button className="ghost small-btn" title={`Put ${p.name} in ${codeWithName(targetCode, targetComp)}`} onClick={() => putInTarget(p)}>
+                          + {targetCode}
+                        </button>
+                      )}
+                      <PutIn part={p} places={() => placesFor(p)} onPut={(key, pocket) => putIn(p, key, pocket)} />
+                    </span>
                   </li>
                 ))}
               </ul>
-              {shown.length > UNSORTED_SHOWN && <p className="muted small">The {UNSORTED_SHOWN} biggest by volume, of {shown.length}. Search above to find a particular part.</p>}
+              {shown.length > UNSORTED_SHOWN && <p className="muted small">The {UNSORTED_SHOWN} {unsortedOrder === 'pieces' ? 'with the most pieces' : 'biggest by volume'}, of {shown.length}. Search above to find a particular part.</p>}
             </Fold>
           );
         })}
@@ -464,6 +529,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
           onPrev={() => stepTo(-1)}
           onNext={() => stepTo(1)}
           onClose={() => setEditing(null)}
+          onName={(name) => update((p) => ({ units: setPlaceName(p.units, current.unitId, current.sections ? null : drawerKeyOf(current.key), name) }))}
         />
       )}
     </div>
@@ -613,6 +679,7 @@ function DrawerTile({ comp, recorded, pockets, photos, dim, onClick }: { comp: S
     <button className={`setup-tile ${recorded ? '' : 'todo'} ${dim ? 'dim' : ''} ${family ? `fam-border-${family}` : ''}`} onClick={onClick} title={comp.sections ? `${comp.unitName}, whole box` : `${comp.unitName} › ${comp.label} — ${comp.w}×${comp.d}×${comp.h} mm`}>
       <span className="setup-tile-head">
         <span className="code">{comp.code}</span>
+        {placeName(comp) && <span className="small place-name setup-tile-title">{placeName(comp)}</span>}
         {pockets.length > 1 && <span className="muted small">{pockets.length} pockets</span>}
         {photos > 0 && <span className="muted small">{photos} {photos === 1 ? 'photo' : 'photos'}</span>}
         {inUse.length > 0 && (
@@ -648,6 +715,7 @@ function DrawerEditor({
   onPrev,
   onNext,
   onClose,
+  onName,
 }: {
   comp: SetupComp;
   pockets: SetupPocket[] | null;
@@ -670,6 +738,7 @@ function DrawerEditor({
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
+  onName: (name: string) => void;
 }) {
   const [first] = useState(uid);
   const [active, setActive] = useState(0);
@@ -715,6 +784,16 @@ function DrawerEditor({
             ✕
           </button>
         </div>
+        <label className="setup-editor-name small">
+          Name
+          <NameInput
+            className="setup-editor-name-input"
+            value={(comp.sections ? comp.unitTitle : comp.name) ?? ''}
+            placeholder={comp.sections ? 'Name this box' : comp.unitTitle ? `Name this drawer (or it shows “${comp.unitTitle}”)` : 'Name this drawer, e.g. Technic'}
+            label={`Name for ${comp.code}`}
+            onChange={onName}
+          />
+        </label>
         {comp.sections ? (
           <div className="setup-layout small">
             <label>
@@ -919,6 +998,51 @@ function ContainerAdder({ comp, current, choices, onAdd, onNew }: { comp: SetupC
         </span>
       )}
     </div>
+  );
+}
+
+/** "Put in…": choose the drawer one part goes in. The list is only made when it's opened, as there's one per part. */
+function PutIn({ part, places, onPut }: { part: Part; places: () => { similar: { value: string; text: string }[]; every: { value: string; text: string }[] }; onPut: (key: string, pocket: number) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <button className="link small" title={`Choose where ${part.name} goes`} onClick={() => setOpen(true)}>
+        Put in…
+      </button>
+    );
+  const { similar, every } = places();
+  return (
+    <select
+      autoFocus
+      className="put-select"
+      aria-label={`Drawer for ${part.name}`}
+      value=""
+      onBlur={() => setOpen(false)}
+      onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+      onChange={(e) => {
+        const [key, pocket] = e.target.value.split('|');
+        setOpen(false);
+        if (key) onPut(key, Number(pocket));
+      }}
+    >
+      <option value="">Put {part.name} in…</option>
+      {similar.length > 0 && (
+        <optgroup label="Beside similar parts">
+          {similar.map((o) => (
+            <option key={`s-${o.value}`} value={o.value}>
+              {o.text}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      <optgroup label="Any drawer">
+        {every.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.text}
+          </option>
+        ))}
+      </optgroup>
+    </select>
   );
 }
 

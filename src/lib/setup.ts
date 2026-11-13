@@ -33,7 +33,8 @@ function wholeBox(sections: Compartment[], code: string, how: OpenedUnit): Setup
   const volume = (how.litres ?? litresInName(sections[0].unitName) ?? sections.reduce((t, c) => t + c.volume, 0) / 1000) * 1000;
   const h = Math.max(...sections.map((c) => c.h));
   const side = Math.sqrt((volume * 1000) / h);
-  return { ...sections[0], key: wholeKey(sections[0].unitId), code, label: 'Whole box', w: side, d: side, h, volume, cap: volume, sections: sections.length };
+  // One space now, so it goes by the unit's name rather than its first drawer's
+  return { ...sections[0], name: undefined, key: wholeKey(sections[0].unitId), code, label: 'Whole box', w: side, d: side, h, volume, cap: volume, sections: sections.length };
 }
 
 /** The same A1, A2… B1 codes the plan uses. An opened-up unit is one space, and just takes its letter. */
@@ -752,8 +753,14 @@ export interface UnsortedFamily {
   volume: number;
 }
 
-/** Parts not in any recorded drawer, by family, with the family holding the most by volume first */
-export function unsortedByFamily(unplaced: Part[], scale = 1): UnsortedFamily[] {
+/** How "Not sorted yet" is ordered: by the room parts take, or by how many pieces there are */
+export type UnsortedOrder = 'volume' | 'pieces';
+
+/**
+ * Parts not in any recorded drawer, by family. Families and the parts in each come biggest first: by volume, or
+ * with `order` 'pieces', by how many pieces there are.
+ */
+export function unsortedByFamily(unplaced: Part[], scale = 1, order: UnsortedOrder = 'volume'): UnsortedFamily[] {
   const out = new Map<string, UnsortedFamily>();
   for (const p of unplaced) {
     const fam = familyFor(p.catId);
@@ -763,6 +770,8 @@ export function unsortedByFamily(unplaced: Part[], scale = 1): UnsortedFamily[] 
     f.volume += partVolume(p, scale);
     out.set(fam.key, f);
   }
-  for (const f of out.values()) f.parts.sort((a, b) => partVolume(b, scale) - partVolume(a, scale));
-  return [...out.values()].sort((a, b) => b.volume - a.volume);
+  const byName = (a: Part, b: Part) => a.name.localeCompare(b.name, undefined, { numeric: true });
+  const partOrder = order === 'pieces' ? (a: Part, b: Part) => b.qty - a.qty || byName(a, b) : (a: Part, b: Part) => partVolume(b, scale) - partVolume(a, scale) || byName(a, b);
+  for (const f of out.values()) f.parts.sort(partOrder);
+  return [...out.values()].sort(order === 'pieces' ? (a, b) => b.pieces - a.pieces || b.volume - a.volume : (a, b) => b.volume - a.volume);
 }

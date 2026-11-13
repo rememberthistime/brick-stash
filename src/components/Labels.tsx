@@ -34,6 +34,7 @@ export default function Labels({ entries, close, backLabel, note, options }: { e
               <div className="label-code">
                 {e.code}
                 {e.cells.length > 1 ? `.${i + 1}` : ''}
+                {e.name && <span className="label-name"> {e.name}</span>}
               </div>
               <div className="label-main">
                 {pictures && cell.images.length > 0 && (

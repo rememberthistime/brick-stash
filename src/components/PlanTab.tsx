@@ -12,7 +12,7 @@ import { Stat } from './CollectionTab';
 import { calibratedVolume, isCurrent, measureCompartment, measuredFactor, withMeasurement } from '../lib/measure';
 import { latestMoves, withMove } from '../lib/moves';
 import { lockOf, withHomes, type HomeSuggestion } from '../lib/lock';
-import { lettersFor, unitLetter } from '../lib/codes';
+import { codeWithName, lettersFor, placeName, unitLetter } from '../lib/codes';
 import { stem } from '../lib/storageList';
 import Fold, { useFolds, type Folds } from './Fold';
 import MovePicker, { type MoveRequest } from './MovePicker';
@@ -117,9 +117,9 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
   const sel = located.find((c) => c.code === selected);
 
   const exportCsv = () => {
-    const rows = [['Location', 'Unit', 'Compartment', 'Group', 'Part', 'Name', 'Quantity']];
+    const rows = [['Location', 'Your name for it', 'Unit', 'Compartment', 'Group', 'Part', 'Name', 'Quantity']];
     for (const c of located)
-      for (const sec of c.sections) for (const p of sectionParts(sec)) rows.push([c.code, c.comp.unitName, c.comp.label, sectionLabel(sec), p.partNum, p.name, String(sec.span ? sec.pieces : p.qty)]);
+      for (const sec of c.sections) for (const p of sectionParts(sec)) rows.push([c.code, placeName(c.comp), c.comp.unitName, c.comp.label, sectionLabel(sec), p.partNum, p.name, String(sec.span ? sec.pieces : p.qty)]);
     download('brick-stash-plan.csv', rows.map((r) => r.map((v) => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv');
   };
 
@@ -162,6 +162,10 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
   };
   const acceptHomes = (list: HomeSuggestion[]) => update((p) => ({ moves: withHomes(p.moves, list, homes) }));
   const codeOf = (compKey: string) => located.find((c) => c.comp.key === compKey)?.code ?? '?';
+  const codeNameOf = (compKey: string) => {
+    const c = located.find((x) => x.comp.key === compKey);
+    return c ? codeWithName(c.code, c.comp) : '?';
+  };
   const tooFull = located.filter((c) => c.fill > plan.settings.practicalFill + 1e-6);
   const foldIds = [...groupsByKind].flatMap(([kind, units]) => [`kind:${kind}`, ...units.map(([id]) => `unit:${id}`)]);
 
@@ -249,7 +253,7 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
               ) : (
                 hits.slice(0, 12).map((h, i) => (
                   <button key={i} className="hit" onClick={() => setSelected(h.c.code)}>
-                    <b>{h.c.code}</b> {h.p.name} <span className="muted">({h.p.partNum}) — {h.c.comp.unitName}</span>
+                    <b>{codeWithName(h.c.code, h.c.comp)}</b> {h.p.name} <span className="muted">({h.p.partNum}) — {h.c.comp.unitName}</span>
                   </button>
                 ))
               )}
@@ -275,7 +279,7 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
                 {tooFull.length === 1 ? 'One compartment is' : `${tooFull.length} compartments are`} past {pct(plan.settings.practicalFill)} full now:{' '}
                 {tooFull.slice(0, 20).map((c) => (
                   <button key={c.code} className="link small" onClick={() => setSelected(c.code)}>
-                    {c.code} ({pct(c.fill)})
+                    {codeWithName(c.code, c.comp)} ({pct(c.fill)})
                   </button>
                 ))}
                 {tooFull.length > 20 && ' …'}
@@ -303,7 +307,7 @@ export default function PlanTab({ project, update, plan, parts, goTo, keptSummar
                         {x.name}
                         <small className="muted">
                           {' '}
-                          {(parts.find((p) => p.partNum === x.part)?.qty ?? 0).toLocaleString()} pcs → <b>{codeOf(x.compKey)}</b>
+                          {(parts.find((p) => p.partNum === x.part)?.qty ?? 0).toLocaleString()} pcs → <b>{codeNameOf(x.compKey)}</b>
                           {x.why === 'empty' ? ', an empty compartment near its family' : x.joins ? `, in with ${x.joins}` : ', in a section of its own'}
                           {x.why === 'related' ? ' (related parts)' : ''}
                         </small>
@@ -514,6 +518,7 @@ function Tile({ c, target, active, hit, dim, roomy, onClick }: { c: Located; tar
     <button className={`tile ${c.status} ${active ? 'active' : ''} ${hit ? 'hit' : ''} ${dim ? 'dim' : ''} ${roomy ? 'roomy' : ''} fam-border-${fam}`} onClick={onClick} title={`${c.comp.label} — ${c.comp.w}×${c.comp.d}×${c.comp.h} mm`}>
       <div className="tile-head">
         <span className="code">{c.code}</span>
+        {placeName(c.comp) && <span className="tile-name">{placeName(c.comp)}</span>}
         {c.sections.length > 1 && <span className="divs" title={`${c.sections.length} sections — add dividers`}>⊞{c.sections.length}</span>}
       </div>
       <div className="tile-body">
@@ -602,7 +607,8 @@ function Detail({
     <aside className="detail card">
       <div className="detail-head">
         <h3>
-          <span className="code">{c.code}</span> {c.comp.unitName} › {c.comp.label}
+          <span className="code">{c.code}</span> {placeName(c.comp) && <span className="place-name">{placeName(c.comp)} · </span>}
+          {c.comp.unitName} › {c.comp.label}
         </h3>
         <button className="icon" onClick={close}>
           ✕
@@ -981,7 +987,7 @@ function MeasuredDrawers({
           const here = isCurrent(m, plan) ? located.find((c) => c.comp.key === m.compKey) : null;
           return (
             <li key={m.id}>
-              {here ? <span className="code">{here.code}</span> : <span className="muted small">was in {m.where}:</span>} {pct(m.fill)} full, {Object.keys(m.parts).length} part type{Object.keys(m.parts).length === 1 ? '' : 's'}, really {scale(m)} of the estimate{' '}
+              {here ? <span className="code">{codeWithName(here.code, here.comp)}</span> : <span className="muted small">was in {m.where}:</span>} {pct(m.fill)} full, {Object.keys(m.parts).length} part type{Object.keys(m.parts).length === 1 ? '' : 's'}, really {scale(m)} of the estimate{' '}
               <button className="link small" onClick={() => onRemove(m.id)}>
                 Remove
               </button>
@@ -1026,7 +1032,7 @@ function YourChanges({
       </p>
       <ul className="change-list">
         {moves.map((m, i) => {
-          const dest = 'part' in m.to ? `with ${name(m.to.part)}` : `to ${codeOfComp(m.to.comp)?.code ?? 'a compartment that no longer exists'}`;
+          const dest = 'part' in m.to ? `with ${name(m.to.part)}` : `to ${codeOfComp(m.to.comp) ? codeWithName(codeOfComp(m.to.comp)!.code, codeOfComp(m.to.comp)!.comp) : 'a compartment that no longer exists'}`;
           const at = stale.includes(i) ? null : whereIs(m.part);
           return (
             <li key={i} className={stale.includes(i) ? 'stale' : ''}>

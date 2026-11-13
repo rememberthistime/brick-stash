@@ -114,6 +114,7 @@ export default function TapeLabels({ entries, close, backLabel, showSheet, optio
             <div key={e.code} className="tape-row">
               <div className="tape-head">
                 <span className="code">{e.code}</span>
+                {e.name && <span className="small place-name">{e.name}</span>}
                 <span className="muted small tape-where">{e.where}</span>
                 {label && (
                   <>

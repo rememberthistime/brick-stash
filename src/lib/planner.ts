@@ -2,7 +2,7 @@ import type { Granularity, Part, Settings, StorageUnit } from './types';
 import { FAMILIES, bucketOrder, catOrder, familyFor, familyGroup, familyOrder, parseSize, sizeBucket } from './taxonomy';
 import { compartmentVolume } from './volume';
 import { partVolume } from './collection';
-import { inReachOrder, withUnitCodes } from './codes';
+import { drawerKey, inReachOrder, withUnitCodes } from './codes';
 
 // ─── Tree ────────────────────────────────────────────────────────────────────
 
@@ -161,6 +161,9 @@ export interface Compartment {
   unitName: string;
   /** the unit's letter: the A in A1 */
   unitCode?: string;
+  /** the user's own names for the unit and for this drawer */
+  unitTitle?: string;
+  name?: string;
   label: string;
   w: number;
   d: number;
@@ -190,6 +193,8 @@ export function expandCompartments(units: StorageUnit[], s: Settings): Compartme
           unitId: u.id,
           unitName: u.name,
           unitCode: u.code,
+          ...(u.title?.trim() ? { unitTitle: u.title.trim() } : {}),
+          ...(u.drawerNames?.[drawerKey(spec.id, i)]?.trim() ? { name: u.drawerNames[drawerKey(spec.id, i)].trim() } : {}),
           label: spec.qty > 1 ? `${spec.label} ${i + 1}` : spec.label,
           w: spec.w,
           d: spec.d,

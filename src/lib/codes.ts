@@ -70,3 +70,37 @@ export function lettersFor(comps: { unitId: string; unitCode?: string }[]): Map<
   }
   return letters;
 }
+
+/** Where a drawer's own name is kept on its unit: its compartment spec and number within that spec, from 0 */
+export const drawerKey = (specId: string, index: number) => `${specId}:${index}`;
+
+/** What a drawer is called by the user: its own name, or failing that its unit's. Empty if neither is named. */
+export const placeName = (c: { name?: string; unitTitle?: string }) => c.name?.trim() || c.unitTitle?.trim() || '';
+
+/** "A1: Technic" where the drawer or its unit has a name, otherwise just "A1" */
+export const codeWithName = (code: string, c: { name?: string; unitTitle?: string } | null | undefined) => {
+  const name = c ? placeName(c) : '';
+  return name ? `${code}: ${name}` : code;
+};
+
+/** Name, or with an empty name un-name, one drawer of a unit, or with no drawer the unit itself */
+export function setPlaceName(units: StorageUnit[], unitId: string, drawer: string | null, name: string): StorageUnit[] {
+  const clean = name.trim().slice(0, 60);
+  return units.map((u) => {
+    if (u.id !== unitId) return u;
+    if (drawer === null) {
+      const { title: _old, ...rest } = u;
+      return clean ? { ...rest, title: clean } : rest;
+    }
+    const { [drawer]: _gone, ...others } = u.drawerNames ?? {};
+    const drawerNames = clean ? { ...others, [drawer]: clean } : others;
+    const { drawerNames: _was, ...rest } = u;
+    return Object.keys(drawerNames).length ? { ...rest, drawerNames } : rest;
+  });
+}
+
+/** The compartment spec and number a compartment key ("unit:spec:2") stands for, as a drawerKey */
+export const drawerKeyOf = (compKey: string) => {
+  const [, spec, n] = compKey.split(':');
+  return spec !== undefined && n !== undefined ? drawerKey(spec, Number(n)) : null;
+};

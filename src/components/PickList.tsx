@@ -87,6 +87,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
           {showPlace && l.places.length > 0 && (
             <b>
               {l.places[0].code}
+              {l.places[0].name ? `: ${l.places[0].name}` : ''}
               {l.places[0].section ? ` · ${l.places[0].section}` : ''}
             </b>
           )}
@@ -196,7 +197,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
           {list.drawers.map((d) => (
             <section key={d.code} className="card pick-drawer">
               <h3>
-                <span className="code">{d.code}</span> <small className="muted">{d.where}</small>
+                <span className="code">{d.code}</span> {d.name && <span className="place-name">{d.name}</span>} <small className="muted">{d.where}</small>
               </h3>
               <ul className="pick-lines">{d.lines.map((l) => row(l, true))}</ul>
             </section>

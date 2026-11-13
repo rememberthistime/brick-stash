@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { CompartmentSpec, Project, Space, StorageUnit } from '../lib/types';
 import { PRESETS } from '../lib/presets';
-import { setUnitCode, validUnitCode } from '../lib/codes';
+import { drawerKey, setPlaceName, setUnitCode, validUnitCode } from '../lib/codes';
+import NameInput from './NameInput';
 import { compartmentVolume } from '../lib/volume';
 import type { Plan } from '../lib/planner';
 import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPreset, type UnitGroup } from '../lib/storageList';
@@ -45,6 +46,9 @@ export default function StorageTab({ project, update, plan }: Props) {
         ...last,
         // A copy is another unit, so it takes a letter of its own
         code: undefined,
+        // Its own name and drawer names are for the user to give it
+        title: undefined,
+        drawerNames: undefined,
         id: uid(),
         name: `${g.name} #${Math.max(...numbers) + 1}`,
         external: last.external && { ...last.external },
@@ -145,6 +149,7 @@ export default function StorageTab({ project, update, plan }: Props) {
                 onAdd={() => addCopy(g)}
                 onRemove={(n) => removeCopies(g, n)}
                 onCode={(unitId, code) => setUnits((us) => setUnitCode(us, unitId, code))}
+                onName={(unitId, drawer, name) => setUnits((us) => setPlaceName(us, unitId, drawer, name))}
               />
             ))}
           </div>
@@ -215,6 +220,7 @@ function GroupRow({
   onAdd,
   onRemove,
   onCode,
+  onName,
 }: {
   group: UnitGroup;
   spaces: Space[];
@@ -224,9 +230,10 @@ function GroupRow({
   onAdd: () => void;
   onRemove: (n: number) => void;
   onCode: (unitId: string, code: string) => void;
+  onName: (unitId: string, drawer: string | null, name: string) => void;
 }) {
   const first = group.units[0];
-  const codes = group.units.flatMap((u) => (u.code ? [u.code] : []));
+  const codes = group.units.flatMap((u) => (u.code ? [u.title ? `${u.code}: ${u.title}` : u.code] : []));
   const copies = group.units.length;
   const patchComp = (i: number, change: Partial<CompartmentSpec>) => patch((u) => ({ ...u, compartments: u.compartments.map((c, k) => (k === i ? { ...c, ...change } : c)) }));
   return (
@@ -238,7 +245,7 @@ function GroupRow({
         <div className="unit-row-name" onClick={toggle}>
           <b>
             {group.name}
-            {codes.length > 0 && <span className="unit-codes">{codes.join(' ')}</span>}
+            {codes.length > 0 && <span className="unit-codes">{codes.join(codes.some((c) => c.includes(':')) ? ' · ' : ' ')}</span>}
           </b>
           <span className="muted small">
             {describeCompartments(first)} mm · {(unitVolume(first) / 1000).toFixed(1)} L each
@@ -302,11 +309,36 @@ function GroupRow({
               <DimsInput value={first.external} onChange={(external) => patch((u) => ({ ...u, external }))} />
             </label>
           </div>
-          <div className="unit-meta" title="The letter its drawers are known by, as in A1. Photos, box names and printed labels are filed under it, so it stays put when you add or reorder storage. Change one only to match what's already on the drawers: giving it a letter another unit has swaps the two.">
-            {copies > 1 ? 'Letters' : 'Letter'}
-            {group.units.map((u) => (
-              <CodeInput key={u.id} code={u.code ?? ''} title={u.name} onChange={(code) => onCode(u.id, code)} />
-            ))}
+          <div className="unit-names">
+            <p className="muted small">
+              The letter is what its drawers are known by, as in A1, and stays put when you add or reorder storage; change one only to match what’s already on the drawers (giving it a letter another unit has swaps the two). A name is your own, and shows beside the code everywhere, as in “A1: Technic”. A drawer without a name of its own shows its unit’s.
+            </p>
+            {group.units.map((u) => {
+              const drawers = u.compartments.flatMap((c) => Array.from({ length: c.qty }, (_, i) => ({ key: drawerKey(c.id, i), label: c.qty > 1 ? `${c.label} ${i + 1}` : c.label })));
+              const named = drawers.filter((d) => u.drawerNames?.[d.key]).length;
+              return (
+                <div key={u.id} className="unit-name-row">
+                  <CodeInput code={u.code ?? ''} title={u.name} onChange={(code) => onCode(u.id, code)} />
+                  <NameInput value={u.title ?? ''} placeholder={copies > 1 ? `Name for ${u.name}` : 'Name, e.g. Technic cabinet'} label={`Name for ${u.name}`} onChange={(name) => onName(u.id, null, name)} />
+                  {drawers.length > 1 && (
+                    <details className="unit-drawer-names">
+                      <summary className="small">
+                        Name its {drawers.length} {first.compartments[0]?.label.toLowerCase().startsWith('drawer') ? 'drawers' : 'compartments'}
+                        {named ? ` (${named} named)` : ''}
+                      </summary>
+                      <div className="unit-drawer-grid">
+                        {drawers.map((d, n) => (
+                          <label key={d.key} className="small">
+                            <span className="code">{`${u.code ?? ''}${n + 1}`}</span>
+                            <NameInput value={u.drawerNames?.[d.key] ?? ''} placeholder={u.title || d.label} label={`Name for ${u.code ?? ''}${n + 1}, ${d.label}`} onChange={(name) => onName(u.id, d.key, name)} />
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <table className="comps">
             <thead>

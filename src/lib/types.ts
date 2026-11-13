@@ -61,6 +61,10 @@ export interface StorageUnit {
   name: string;
   /** The letter its compartments are known by: the A in A1. Kept here so it never shifts when storage is added to or reordered. */
   code?: string;
+  /** The user's own name for it, such as "Technic cabinet", shown beside its code */
+  title?: string;
+  /** The user's own names for its drawers, by drawerKey (compartment spec id and number, from 0) */
+  drawerNames?: Record<string, string>;
   /** 3 = eye/hand level, 1 = awkward (floor, top shelf, back of cupboard) */
   accessibility: 1 | 2 | 3;
   compartments: CompartmentSpec[];
