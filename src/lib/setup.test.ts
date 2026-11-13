@@ -497,5 +497,10 @@ describe('what hasn’t been sorted', () => {
     expect(out.map((f) => [f.label, f.pieces, f.volume])).toEqual([['Plates', 505, 510], ['Bricks', 50, 60]]);
     expect(out[1].parts.map((p) => p.partNum)).toEqual(['3003', '3001']);
     expect(unsortedByFamily([])).toEqual([]);
+    // By pieces, the families and the parts in them follow how many there are, not how much room they take
+    const byPieces = unsortedByFamily([...list, part('3005', 'Brick 1 x 1', 900, 11, 0.1)], 1, 'pieces');
+    expect(byPieces.map((f) => [f.label, f.pieces])).toEqual([['Bricks', 950], ['Plates', 505]]);
+    expect(byPieces[0].parts.map((p) => p.partNum)).toEqual(['3005', '3003', '3001']);
+    expect(byPieces[1].parts.map((p) => p.partNum)).toEqual(['3023', '3020']);
   });
 });

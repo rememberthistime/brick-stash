@@ -752,8 +752,14 @@ export interface UnsortedFamily {
   volume: number;
 }
 
-/** Parts not in any recorded drawer, by family, with the family holding the most by volume first */
-export function unsortedByFamily(unplaced: Part[], scale = 1): UnsortedFamily[] {
+/** How "Not sorted yet" is ordered: by the room parts take, or by how many pieces there are */
+export type UnsortedOrder = 'volume' | 'pieces';
+
+/**
+ * Parts not in any recorded drawer, by family. Families and the parts in each come biggest first: by volume, or
+ * with `order` 'pieces', by how many pieces there are.
+ */
+export function unsortedByFamily(unplaced: Part[], scale = 1, order: UnsortedOrder = 'volume'): UnsortedFamily[] {
   const out = new Map<string, UnsortedFamily>();
   for (const p of unplaced) {
     const fam = familyFor(p.catId);
@@ -763,6 +769,8 @@ export function unsortedByFamily(unplaced: Part[], scale = 1): UnsortedFamily[] 
     f.volume += partVolume(p, scale);
     out.set(fam.key, f);
   }
-  for (const f of out.values()) f.parts.sort((a, b) => partVolume(b, scale) - partVolume(a, scale));
-  return [...out.values()].sort((a, b) => b.volume - a.volume);
+  const byName = (a: Part, b: Part) => a.name.localeCompare(b.name, undefined, { numeric: true });
+  const partOrder = order === 'pieces' ? (a: Part, b: Part) => b.qty - a.qty || byName(a, b) : (a: Part, b: Part) => partVolume(b, scale) - partVolume(a, scale) || byName(a, b);
+  for (const f of out.values()) f.parts.sort(partOrder);
+  return [...out.values()].sort(order === 'pieces' ? (a, b) => b.pieces - a.pieces || b.volume - a.volume : (a, b) => b.volume - a.volume);
 }

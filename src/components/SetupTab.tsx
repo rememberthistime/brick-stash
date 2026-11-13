@@ -23,6 +23,7 @@ import {
   undoLastAccepted,
   unplacedNeighbours,
   unsortedByFamily,
+  type UnsortedOrder,
   wholeKey,
   type ContainerChoice,
   type EstimateRow,
@@ -68,6 +69,15 @@ const FINDINGS: { kind: FindingKind; title: string; hint: string }[] = [
 const SHOWN_FINDINGS = 6;
 /** Parts listed per family under "Not sorted yet" */
 const UNSORTED_SHOWN = 150;
+/** How this browser last ordered "Not sorted yet" */
+const ORDER_STORE = 'brick-stash-unsorted-order';
+const rememberedOrder = (): UnsortedOrder => {
+  try {
+    return localStorage.getItem(ORDER_STORE) === 'pieces' ? 'pieces' : 'volume';
+  } catch {
+    return 'volume';
+  }
+};
 
 export default function SetupTab({ project, update, plan, parts, categories, goTo }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -75,6 +85,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const [draftNote, setDraftNote] = useState('');
   const [printing, setPrinting] = useState(false);
   const [perBox, setPerBox] = useState(false);
+  const [unsortedOrder, setUnsortedOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** the box that parts under "Not sorted yet" are put into */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
   const [lastPut, setLastPut] = useState<{ partNum: string; name: string; key: string; pocket: number; code: string } | null>(null);
@@ -133,7 +144,15 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const q = filter.trim().toLowerCase();
   // What's left to do: drawers with nothing recorded, and parts that aren't in any recorded drawer
   const emptyDrawers = comps.filter((c) => !setup.drawers[c.key]?.length);
-  const unsorted = unsortedByFamily(analysis.unplaced, scale);
+  const unsorted = unsortedByFamily(analysis.unplaced, scale, unsortedOrder);
+  const chooseOrder = (order: UnsortedOrder) => {
+    setUnsortedOrder(order);
+    try {
+      localStorage.setItem(ORDER_STORE, order);
+    } catch {
+      /* only a convenience */
+    }
+  };
   const unsortedPieces = unsorted.reduce((t, f) => t + f.pieces, 0);
   const unsortedVolume = unsorted.reduce((t, f) => t + f.volume, 0);
   const partMatches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
@@ -342,8 +361,17 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
         )}
         {unsorted.length > 0 && (
           <>
-            <h4 className="setup-sub">
-              Parts not in any recorded drawer <span className="muted small">by family, biggest first</span>
+            <h4 className="setup-sub setup-sub-row">
+              <span>
+                Parts not in any recorded drawer <span className="muted small">by family</span>
+              </span>
+              <label className="small">
+                Biggest first by{' '}
+                <select value={unsortedOrder} onChange={(e) => chooseOrder(e.target.value as UnsortedOrder)}>
+                  <option value="volume">room they take</option>
+                  <option value="pieces">number of pieces</option>
+                </select>
+              </label>
             </h4>
             <div className="unsorted-target">
               <label>
@@ -398,7 +426,13 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
               <ul className="setup-unplaced">
                 {shown.slice(0, UNSORTED_SHOWN).map((p) => (
                   <li key={p.partNum}>
-                    <PartImage partNum={p.partNum} size={26} title={p.name} /> {p.name} <span className="muted small">× {p.qty.toLocaleString()}</span>
+                    <PartImage partNum={p.partNum} size={26} title={p.name} />{' '}
+                    <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
+                      {p.name}
+                    </a>{' '}
+                    <span className="muted small">
+                      {p.partNum} · × {p.qty.toLocaleString()}
+                    </span>
                     {targetComp && (
                       <button className="ghost small-btn put" title={`Put ${p.name} in ${targetCode}`} onClick={() => putInTarget(p)}>
                         + {targetCode}
@@ -407,7 +441,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
                   </li>
                 ))}
               </ul>
-              {shown.length > UNSORTED_SHOWN && <p className="muted small">The {UNSORTED_SHOWN} biggest by volume, of {shown.length}. Search above to find a particular part.</p>}
+              {shown.length > UNSORTED_SHOWN && <p className="muted small">The {UNSORTED_SHOWN} {unsortedOrder === 'pieces' ? 'with the most pieces' : 'biggest by volume'}, of {shown.length}. Search above to find a particular part.</p>}
             </Fold>
           );
         })}
