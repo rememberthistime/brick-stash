@@ -220,6 +220,9 @@ describe('suggested moves', () => {
     expect(done.drawers[key('A2')][0].parts).toEqual(['p2', 'p1']);
     expect(done.drawers[key('A2')][0].fill).toBeCloseTo(0.6);
     expect(done.accepted[0].text).toBe('Combine A1 into A2');
+    // The parts it moves go with it, so the list can show what they are
+    expect(a.suggestions[0].moves.map((m) => m.part)).toEqual(['p1']);
+    expect(done.accepted[0].parts).toEqual(['p1']);
     const back = undoLastAccepted(done);
     expect(back.drawers).toEqual(s.drawers);
     expect(back.accepted).toEqual([]);

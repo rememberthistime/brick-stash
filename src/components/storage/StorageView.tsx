@@ -266,7 +266,7 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
       </Fold>
 
       <Fold id="storage:review" folds={folds} title="What the review found" summary={analysis.findings.length ? `${analysis.findings.length} things to look at` : 'nothing yet'}>
-        <Findings findings={analysis.findings} />
+        <Findings findings={analysis.findings} analysis={analysis} />
       </Fold>
 
       <ColourKey counts={familyCounts} highlight={highlight} setHighlight={setHighlight} folds={folds} />

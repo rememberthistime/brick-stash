@@ -314,6 +314,8 @@ export type FindingKind = 'overfull' | 'tooBig' | 'unsure' | 'split' | 'scattere
 export interface Finding {
   kind: FindingKind;
   text: string;
+  /** the parts it's about, to show with it */
+  parts?: string[];
 }
 
 export interface EstimateRow {
@@ -403,13 +405,13 @@ function findingsFor(pockets: PlacedPocket[], settings: Settings): Finding[] {
   const inUse = pockets.filter((p) => p.parts.length);
   for (const p of inUse) {
     const fill = p.used / p.capacity;
-    if (p.fill !== undefined && p.fill > settings.practicalFill) out.push({ kind: 'overfull', text: `${p.name} is ${pct(p.fill)} full: ${p.parts.length === 1 ? p.parts[0].part.name : `${p.parts.length} part types`}` });
+    if (p.fill !== undefined && p.fill > settings.practicalFill) out.push({ kind: 'overfull', text: `${p.name} is ${pct(p.fill)} full: ${p.parts.length === 1 ? p.parts[0].part.name : `${p.parts.length} part types`}`, parts: p.parts.map((x) => x.part.partNum) });
     if (p.fill === undefined && fill > 1) out.push({ kind: 'unsure', text: `${p.name} would be ${pct(fill)} full by the estimates. Enter its real fill to settle it.` });
     if (fill <= 1 - ROOMY_FREE) out.push({ kind: 'roomy', text: `${p.name} is ${p.fill === undefined ? 'estimated at ' : ''}${pct(fill)} full: ${p.groupLabel}` });
     const byFamily = new Map<string, number>();
     for (const x of p.parts) byFamily.set(x.family, (byFamily.get(x.family) ?? 0) + x.used);
     const major = [...byFamily].filter(([, v]) => p.used > 0 && v / p.used >= MIXED_MINORITY);
-    for (const x of p.parts) if (x.tooBig) out.push({ kind: 'tooBig', text: `${x.part.name} looks too big for ${p.name}` });
+    for (const x of p.parts) if (x.tooBig) out.push({ kind: 'tooBig', text: `${x.part.name} looks too big for ${p.name}`, parts: [x.part.partNum] });
     if (major.length > 1 && !p.mixed) out.push({ kind: 'mixed', text: `${p.name} mixes ${major.sort((a, b) => b[1] - a[1]).map(([k]) => familyLabel(k)).join(', ')}` });
   }
 
@@ -432,7 +434,7 @@ function findingsFor(pockets: PlacedPocket[], settings: Settings): Finding[] {
       .map((e) => ({ e, runs: runsOf(e.pockets.map((p) => p.comp)), codes: [...new Set(e.pockets.map((p) => p.comp.code))] }))
       .filter((x) => x.runs > 1)
       .sort((a, b) => b.runs - a.runs);
-  for (const { e, codes } of spread([...placesOfPart.values()])) out.push({ kind: 'split', text: `${e.part.name} is split between ${listCodes(codes)}` });
+  for (const { e, codes } of spread([...placesOfPart.values()])) out.push({ kind: 'split', text: `${e.part.name} is split between ${listCodes(codes)}`, parts: [e.part.partNum] });
   for (const { e, codes } of spread([...placesOfGroup.values()].filter((g) => g.parts.size > 1))) out.push({ kind: 'scattered', text: `${e.label} is spread across ${listCodes(codes)}` });
   return out;
 }
@@ -594,7 +596,7 @@ export function acceptSuggestion(setup: Setup, s: Suggestion, pockets: PlacedPoc
     });
     changed(m.to, (p, capacity) => ({ ...p, parts: [...new Set([...p.parts, m.part])], fill: p.fill === undefined ? undefined : roundFill(p.fill + m.volume / capacity) }));
   }
-  return { ...setup, drawers, accepted: [...setup.accepted, { id: s.id, text: s.title, before }] };
+  return { ...setup, drawers, accepted: [...setup.accepted, { id: s.id, text: s.title, before, parts: [...new Set(s.moves.map((m) => m.part))] }] };
 }
 
 /** Put back the drawers the most recent accepted suggestion changed */

@@ -1,6 +1,7 @@
 // What My storage makes of the drawers as recorded: moves worth making, how the estimates compare, and what to look at.
 import { acceptSuggestion, undoLastAccepted, type EstimateRow, type Finding, type FindingKind, type SetupAnalysis } from '../../lib/setup';
-import type { Setup } from '../../lib/types';
+import type { Part, Setup } from '../../lib/types';
+import PartImage from '../PartImage';
 import { useState } from 'react';
 import { L, pct } from './format';
 
@@ -17,7 +18,37 @@ const FINDINGS: { kind: FindingKind; title: string; hint: string }[] = [
 ];
 const SHOWN_FINDINGS = 6;
 
+/** Every part recorded in a drawer, by number, so a move or finding can show the parts it's about */
+const partsOf = (analysis: SetupAnalysis) => new Map(analysis.pockets.flatMap((p) => p.parts.map((x) => [x.part.partNum, x.part] as const)));
+
+/** The parts something is about: a picture, the name linking to Rebrickable, the part number and how many you have */
+function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map<string, Part>; max?: number }) {
+  const parts = [...new Set(nums)].map((n) => byNum.get(n) ?? ({ partNum: n, name: n, qty: 0 } as Part));
+  if (!parts.length) return null;
+  return (
+    <ul className="part-strip">
+      {parts.slice(0, max).map((p) => (
+        <li key={p.partNum}>
+          <PartImage partNum={p.partNum} size={40} title={p.name} />
+          <span>
+            <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
+              {p.name}
+            </a>
+            <span className="muted small">
+              {' '}
+              {p.partNum}
+              {p.qty ? ` · × ${p.qty.toLocaleString()}` : ''}
+            </span>
+          </span>
+        </li>
+      ))}
+      {parts.length > max && <li className="muted small">and {parts.length - max} more</li>}
+    </ul>
+  );
+}
+
 export function Suggestions({ setup, setSetup, analysis }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis }) {
+  const byNum = partsOf(analysis);
   return (
     <>
       {setup.accepted.length > 0 && (
@@ -35,6 +66,7 @@ export function Suggestions({ setup, setSetup, analysis }: { setup: Setup; setSe
                     Undo
                   </button>
                 )}
+                {a.parts && <PartStrip nums={a.parts} byNum={byNum} max={4} />}
               </li>
             ))}
           </ul>
@@ -50,6 +82,7 @@ export function Suggestions({ setup, setSetup, analysis }: { setup: Setup; setSe
                 {s.why}
                 {s.estimated && <span className="warn-text"> Based on an estimated fill, so check it fits.</span>}
               </p>
+              <PartStrip nums={s.moves.map((m) => m.part)} byNum={byNum} />
             </div>
             <div className="setup-suggestion-actions">
               <button className="small-btn" onClick={() => setSetup((x) => acceptSuggestion(x, s, analysis.pockets))}>
@@ -122,8 +155,9 @@ export function EstimateCheck({ setup, setSetup, analysis }: { setup: Setup; set
   );
 }
 
-export function Findings({ findings }: { findings: Finding[] }) {
+export function Findings({ findings, analysis }: { findings: Finding[]; analysis: SetupAnalysis }) {
   const [all, setAll] = useState<FindingKind | null>(null);
+  const byNum = partsOf(analysis);
   if (!findings.length) return <p className="muted small">Nothing to report yet.</p>;
   return (
     <div className="setup-findings">
@@ -138,7 +172,10 @@ export function Findings({ findings }: { findings: Finding[] }) {
             <p className="muted small">{hint}</p>
             <ul className="change-list">
               {(all === kind ? list : list.slice(0, SHOWN_FINDINGS)).map((f) => (
-                <li key={f.text}>{f.text}</li>
+                <li key={f.text}>
+                  {f.text}
+                  {f.parts && <PartStrip nums={f.parts} byNum={byNum} max={3} />}
+                </li>
               ))}
             </ul>
             {list.length > SHOWN_FINDINGS && (
