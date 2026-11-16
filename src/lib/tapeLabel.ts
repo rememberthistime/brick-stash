@@ -1,7 +1,6 @@
-// Labels for Brother P-touch printers on 12 mm tape: one per compartment, listing each section in it.
+// Labels for Brother P-touch printers on 12 mm tape: one per drawer, listing each pocket in it.
 // Each is drawn at the printer's own resolution in pure black and white, then saved as a PNG or wrapped
 // in an .lbx file that P-touch Editor opens directly.
-import { leaves, sectionLabel, type PlannedCompartment } from './planner';
 import { makeZip } from './zip';
 
 /** Printable height of 12 mm tape: 25.6 pt, or 64 dots at the 180 dpi these printers use */
@@ -35,23 +34,10 @@ export interface LabelCell {
   images: string[];
 }
 
+/** One tape label: a drawer's code and a cell for each pocket in it */
 export interface LabelSpec {
   code: string;
   cells: LabelCell[];
-}
-
-export function labelSpec(c: PlannedCompartment & { code: string }): LabelSpec {
-  return {
-    code: c.code,
-    cells: c.sections.map((s) => {
-      const parts = leaves(s.node).flatMap((l) => (l.part ? [l.part] : [])).sort((a, b) => b.qty - a.qty);
-      return {
-        title: shortName(sectionLabel(s)),
-        detail: parts.length === 1 ? parts[0].partNum : `${parts.length} types`,
-        images: parts.slice(0, parts.length === 1 ? 1 : 2).map((p) => p.partNum),
-      };
-    }),
-  };
 }
 
 /** Floyd–Steinberg error diffusion: greys (0 black to 255 white) down to pure black and white */

@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { inflateRawSync } from 'node:zlib';
-import { errorDiffuse, labelSpec, lbxLabelXml, makeLbx, shortName, TAPE_DOTS, wrapTitle } from './tapeLabel';
+import { errorDiffuse, lbxLabelXml, makeLbx, shortName, TAPE_DOTS, wrapTitle } from './tapeLabel';
 import { crc32, makeZip } from './zip';
-import type { PlannedCompartment, Section, TreeNode } from './planner';
-import type { Part } from './types';
-
-const part = (partNum: string, name: string, qty: number): Part => ({ partNum, name, catId: 11, qty, colours: 1, unitVolume: 5, known: true });
-const leaf = (p: Part): TreeNode => ({ id: p.partNum, label: p.name, familyKey: 'bricks', children: [], part: p, pieces: p.qty, volume: 5, seq: 0 });
-const section = (node: TreeNode, span?: [number, number]): Section => ({ node, volume: 5, pieces: node.pieces, span });
 
 /** Read a zip back, checking its structure as a stranger would */
 function unzip(bytes: Uint8Array) {
@@ -67,21 +61,6 @@ describe('.lbx files', () => {
       else if (!m[3]) open.push(m[2]);
     }
     expect(open).toEqual([]);
-  });
-});
-
-describe('labelSpec', () => {
-  const c = (sections: Section[]) => ({ code: 'A3', sections }) as unknown as PlannedCompartment & { code: string };
-
-  it('lists each section, with the part number for a single part', () => {
-    const spec = labelSpec(c([section(leaf(part('3001', 'Brick 2 x 4', 10)))]));
-    expect(spec).toEqual({ code: 'A3', cells: [{ title: 'Brick 2 x 4', detail: '3001', images: ['3001'] }] });
-  });
-
-  it('shows the commonest parts for a mixed section', () => {
-    const lump: TreeNode = { id: 'm', label: 'Bricks Special 1 × 1–2 (mixed)', familyKey: 'bricks', children: [leaf(part('a', 'A', 1)), leaf(part('b', 'B', 9)), leaf(part('d', 'D', 5))], pieces: 15, volume: 15, seq: 0 };
-    const spec = labelSpec(c([section(lump)]));
-    expect(spec.cells[0]).toEqual({ title: 'Bricks Special 1 × 1–2', detail: '3 types', images: ['b', 'd'] });
   });
 });
 

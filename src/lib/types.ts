@@ -118,50 +118,6 @@ export interface KeepOut {
 
 export const DEFAULT_KEEP_OUT: KeepOut = { families: [], bulky: false, bulkyOver: 50, bulkyMaxQty: 5, parts: {} };
 
-/** A manual change to the plan: a part, or the whole section it's in, goes with another part or to a compartment */
-export interface PartMove {
-  part: string;
-  whole: boolean;
-  to: { part: string } | { comp: string };
-}
-
-/** Manual changes the plan was last built around. Changes made since sit on top until the next re-plan. */
-export interface PlanBasis {
-  /** parts left out of planning */
-  out: string[];
-  /** part → the part it's stored with */
-  together: Record<string, string>;
-  /** part → the compartment it was placed in, which is then left for parts placed there */
-  pins: Record<string, string>;
-  /** volume corrections from real measurements */
-  calibration?: Calibration | null;
-}
-
-export const EMPTY_BASIS: PlanBasis = { out: [], together: {}, pins: {}, calibration: null };
-
-/** One section of a compartment in a locked plan */
-export interface LockedSection {
-  parts: string[];
-  /** what a section of several parts is called */
-  label?: string;
-  /** for a part that runs through several compartments: which of how many this is, and the share of the part held here */
-  span?: [number, number];
-  share?: number;
-}
-
-/**
- * The plan as it stood when it was locked: where every part lives. While it's there the planner isn't run, so new
- * parts, storage changes and updates to the planner leave every part where it is.
- */
-export interface PlanLock {
-  /** when it was locked, ms */
-  at: number;
-  /** compartment key → what's in it. Compartments left out were empty. */
-  comps: Record<string, { sections: LockedSection[]; spareFor?: string }>;
-  /** the moves in force when it was locked. They're part of the locked plan, and come back if it's unlocked. */
-  movesBefore: PartMove[];
-}
-
 /** "This compartment, holding these parts, is really this full" */
 export interface Measurement {
   id: string;
@@ -254,9 +210,5 @@ export interface Project {
   /** Kept separate from rows so a fresh full export can be re-imported and the same sets still come off */
   excluded: Exclusion[];
   keepOut: KeepOut;
-  moves: PartMove[];
-  basis: PlanBasis;
-  measurements: Measurement[];
   setup: Setup;
-  lock?: PlanLock | null;
 }

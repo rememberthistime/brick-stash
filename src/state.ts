@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { withUnitCodes } from './lib/codes';
 import { startupAction } from './lib/sync';
 import type { Catalog, Project } from './lib/types';
-import { DEFAULT_KEEP_OUT, DEFAULT_SETTINGS, EMPTY_BASIS, EMPTY_SETUP } from './lib/types';
+import { DEFAULT_KEEP_OUT, DEFAULT_SETTINGS, EMPTY_SETUP } from './lib/types';
 
 const KEY = 'brick-stash-project';
 /** The server version this browser last agreed with */
@@ -13,7 +13,7 @@ const KEY_REV = 'brick-stash-rev';
  */
 const KEY_DIRTY = 'brick-stash-dirty';
 
-export const emptyProject = (): Project => ({ version: 1, rows: [], units: [], spaces: [], settings: DEFAULT_SETTINGS, volumeOverrides: {}, excluded: [], keepOut: DEFAULT_KEEP_OUT, moves: [], basis: EMPTY_BASIS, measurements: [], setup: EMPTY_SETUP, lock: null });
+export const emptyProject = (): Project => ({ version: 1, rows: [], units: [], spaces: [], settings: DEFAULT_SETTINGS, volumeOverrides: {}, excluded: [], keepOut: DEFAULT_KEEP_OUT, setup: EMPTY_SETUP });
 
 /** A project as saved by any version, with anything added since filled in */
 export const withDefaults = (p: Project): Project => settled({ ...emptyProject(), ...p, settings: { ...DEFAULT_SETTINGS, ...p.settings }, setup: { ...EMPTY_SETUP, ...p.setup } });

@@ -4,7 +4,7 @@ import { PRESETS } from '../lib/presets';
 import { drawerKey, setPlaceName, setUnitCode, validUnitCode } from '../lib/codes';
 import NameInput from './NameInput';
 import { compartmentVolume } from '../lib/volume';
-import type { Plan } from '../lib/planner';
+import { expandCompartments } from '../lib/planner';
 import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPreset, type UnitGroup } from '../lib/storageList';
 import { uid } from '../state';
 import { Stat } from './CollectionTab';
@@ -12,12 +12,12 @@ import { Stat } from './CollectionTab';
 interface Props {
   project: Project;
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
-  plan: Plan;
 }
 
 const unitVolume = (u: StorageUnit) => u.compartments.reduce((t, c) => t + compartmentVolume(c) * c.qty, 0);
 
-export default function StorageTab({ project, update, plan }: Props) {
+export default function StorageTab({ project, update }: Props) {
+  const comps = expandCompartments(project.units, project.settings);
   const [preset, setPreset] = useState(PRESETS[0].id);
   const [count, setCount] = useState(1);
   const [paste, setPaste] = useState('');
@@ -91,9 +91,9 @@ export default function StorageTab({ project, update, plan }: Props) {
         <p className="muted">Pick each product you own and how many. The most-used parts go in the units marked easiest to reach.</p>
         <div className="stats">
           <Stat label="Units" value={String(units.length)} hint={`${groups.length} kinds`} />
-          <Stat label="Compartments" value={String(plan.compartments.length)} />
-          <Stat label="Total volume" value={`${(plan.stats.physicalCapacity / 1000).toFixed(1)} L`} />
-          <Stat label="Planned capacity" value={`${(plan.stats.plannedCapacity / 1000).toFixed(1)} L`} hint="after growth headroom" />
+          <Stat label="Compartments" value={String(comps.length)} />
+          <Stat label="Total volume" value={`${(comps.reduce((t, c) => t + c.volume, 0) / 1000).toFixed(1)} L`} />
+          <Stat label="Planned capacity" value={`${(comps.reduce((t, c) => t + c.cap, 0) / 1000).toFixed(1)} L`} hint="after growth headroom" />
         </div>
 
         <div className="add-unit">

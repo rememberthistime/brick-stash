@@ -205,24 +205,3 @@ function computeLayout(c: PlannedCompartment, fill: number): DividerLayout | nul
   return a && { height: h, pockets: a.pockets, dividers: a.dividers, free: null, optional: false };
 }
 
-export interface CutListLine {
-  length: number;
-  height: number;
-  count: number;
-}
-
-/** Dividers needed across the whole plan, grouped by size */
-export function cuttingList(compartments: PlannedCompartment[], fill: number): CutListLine[] {
-  const lines = new Map<string, CutListLine>();
-  for (const c of compartments) {
-    const l = dividerLayout(c, fill);
-    if (!l || l.optional) continue;
-    for (const v of l.dividers) {
-      const key = `${v.length}x${l.height}`;
-      const line = lines.get(key) ?? { length: v.length, height: l.height, count: 0 };
-      line.count++;
-      lines.set(key, line);
-    }
-  }
-  return [...lines.values()].sort((a, b) => b.count - a.count || b.length - a.length);
-}

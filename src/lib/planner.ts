@@ -784,9 +784,12 @@ const reliefSplit = (n: TreeNode, g: Granularity) => {
   return kids.length > 1 ? kids : n.children;
 };
 
-/** `reserved` compartments stay out of planning: parts were placed in them by hand */
-export function plan(tree: TreeNode, units: StorageUnit[], s: Settings, reserved: ReadonlySet<string> = new Set()): Plan {
-  const comps = expandCompartments(units, s);
+/**
+ * `reserved` compartments stay out of planning, as they're already in use. `compartments` replaces the ones the units
+ * would give, for storage laid out differently from the Storage tab (units opened up into one space).
+ */
+export function plan(tree: TreeNode, units: StorageUnit[], s: Settings, reserved: ReadonlySet<string> = new Set(), compartments?: Compartment[]): Plan {
+  const comps = compartments ?? expandCompartments(units, s);
   const zones = buildZones(comps.filter((c) => !reserved.has(c.key)));
   const g = s.granularity;
   const maxCap = Math.max(0, ...comps.map((c) => c.volume * s.practicalFill));

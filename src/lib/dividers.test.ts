@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cuttingList, dividerLayout, type DividerLayout, type Rect } from './dividers';
+import { dividerLayout, type DividerLayout, type Rect } from './dividers';
 import type { Compartment, PlannedCompartment, Section, TreeNode } from './planner';
 
 const FILL = 0.7;
@@ -105,20 +105,5 @@ describe('dividerLayout', () => {
   it('copes with wide compartments', () => {
     const c = comp(400, 150, 60);
     expectSound(layout(c, [800, 800, 400])!, c);
-  });
-});
-
-describe('cuttingList', () => {
-  it('groups dividers by size and counts each one', () => {
-    const c = comp(220, 290, 70);
-    const compartments = [planned(c, [2200, 2200]), planned(c, [2200, 2200]), planned(comp(310, 310, 60), [3000, 3000])];
-    expect(cuttingList(compartments, FILL)).toEqual([
-      { length: 220, height: 70, count: 2 },
-      { length: 310, height: 60, count: 1 },
-    ]);
-  });
-
-  it('leaves optional pockets off the list', () => {
-    expect(cuttingList([planned(comp(220, 290, 70), [245])], FILL)).toEqual([]);
   });
 });
