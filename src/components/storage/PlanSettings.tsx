@@ -27,6 +27,23 @@ export function PlanSettings({ settings, onChange }: { settings: Settings; onCha
           </label>
         ))}
       </fieldset>
+      <fieldset>
+        <legend>Free drawers</legend>
+        <label className="radio">
+          <input type="radio" checked={!settings.spread} onChange={() => set('spread', false)} />
+          <span>
+            <b>Fill them in turn</b>
+            <small>Each drawer is filled to its planned fill before the next is used, and any left over stay empty at the end</small>
+          </span>
+        </label>
+        <label className="radio">
+          <input type="radio" checked={!!settings.spread} onChange={() => set('spread', true)} />
+          <span>
+            <b>Spread across all of them</b>
+            <small>Every free drawer gets something, each less full</small>
+          </span>
+        </label>
+      </fieldset>
       <Slider label="Expected growth" value={settings.growth} min={0} max={1} step={0.05} fmt={(v) => `+${pct(v)}`} hint="Room left in every compartment so new parts slot in" onChange={(v) => set('growth', v)} />
       <Slider label="Practical max fill" value={settings.practicalFill} min={0.5} max={0.95} step={0.05} fmt={pct} hint="Fuller than this and rummaging gets hard" onChange={(v) => set('practicalFill', v)} />
       <Slider label="Spare compartments" value={settings.spareFraction} min={0} max={0.3} step={0.05} fmt={pct} hint="Left empty next to the largest families, for new categories" onChange={(v) => set('spareFraction', v)} />

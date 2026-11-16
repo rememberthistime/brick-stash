@@ -93,6 +93,8 @@ export interface Settings {
   maxSections: number;
   /** Multiplier on all volume estimates — calibrate against a container you know */
   volumeScale: number;
+  /** Spread parts across every free compartment, rather than filling them in turn and leaving the rest empty */
+  spread?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -183,6 +185,8 @@ export interface AcceptedMove {
   before: Record<string, SetupPocket[]>;
   /** the parts it moves, to show with it */
   parts?: string[];
+  /** for drawers moved to other slots: each drawer's own name before, by compartment key ('' for none) */
+  namesBefore?: Record<string, string>;
 }
 
 /** The user's storage as it stands today, separate from anything the planner suggests */

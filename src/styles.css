@@ -460,6 +460,13 @@ button.setup-pocket.folded:hover { border-color: var(--accent); }
 .setup-editor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .setup-editor-foot .link { margin-left: auto; }
 .setup-suggestions { list-style: none; margin: 0; padding: 0; }
+.rearrange { border-top: 1px solid var(--line); padding: 8px 0; }
+.rearrange h4 { margin: 0 0 6px; }
+.rearrange-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 3px 0; }
+.rearrange-strip > .muted { width: 3.5em; }
+.rearrange-slot { font-size: 11px; font-weight: 700; min-width: 30px; text-align: center; padding: 2px 4px; border-radius: 4px; color: #fff; background: var(--fam, #999); }
+.rearrange-slot.empty { background: var(--soft); color: var(--muted); border: 1px dashed var(--line); }
+.rearrange-list { margin: 4px 0; padding-left: 22px; }
 .part-strip { list-style: none; margin: 6px 0 2px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .part-strip li { display: flex; align-items: center; gap: 8px; font-size: 13px; max-width: 360px; }
 .change-list .part-strip { margin: 4px 0 6px; }

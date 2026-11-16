@@ -3,11 +3,12 @@
 // with nothing recorded.
 import { useMemo, useState } from 'react';
 import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../../lib/codes';
-import { planGaps, pocketsFromSuggestion } from '../../lib/gaps';
+import { homesInRecorded, planGaps, pocketsFromSuggestion } from '../../lib/gaps';
+import { applyCycle, rearrangements, undoLast } from '../../lib/rearrange';
 import { setupLabels } from '../../lib/labels';
 import { planPlaces, setupPlaces } from '../../lib/pickList';
 import { buildTree, expandCompartments, leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner';
-import { analyseSetup, closeUnit, containerChoices, howManyFit, openableUnits, openUnit, setupComps, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
+import { analyseSetup, closeUnit, containerChoices, groupsOf, howManyFit, openableUnits, openUnit, setupComps, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { stem } from '../../lib/storageList';
 import { shortName } from '../../lib/tapeLabel';
 import type { Catalog, OpenedUnit, Part, Project, Setup } from '../../lib/types';
@@ -19,6 +20,7 @@ import PickListView from '../PickList';
 import DrawerEditor from './DrawerEditor';
 import { EstimateCheck, Findings, Suggestions, times } from './Improvements';
 import NotSorted from './NotSorted';
+import Rearrange from './Rearrange';
 import { ColourKey, PlanSettings } from './PlanSettings';
 import SuggestedDrawer from './Suggested';
 import { L, pct } from './format';
@@ -57,11 +59,18 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
   const base = useMemo(() => expandCompartments(project.units, project.settings), [project.units, project.settings]);
   const spaces = useMemo(() => setupComps(base, setup.open), [base, setup.open]);
   const analysis = useMemo(() => analyseSetup(setup, spaces, parts, project.settings, tree), [setup, spaces, parts, project.settings, tree]);
-  const gaps = useMemo(() => planGaps(project.units, setup, analysis.unplaced, categories, project.settings), [project.units, setup, analysis.unplaced, categories, project.settings]);
+  // Room beside the same sort of parts in recorded drawers comes first; only what's left is planned into empty drawers
+  const recordedHomes = useMemo(() => {
+    const groups = groupsOf(tree);
+    return homesInRecorded(analysis.unplaced, analysis.pockets, setup, (n) => groups.get(n)?.key, project.settings);
+  }, [analysis, setup, tree, project.settings]);
+  const forGaps = useMemo(() => analysis.unplaced.filter((p) => !recordedHomes.has(p.partNum)), [analysis.unplaced, recordedHomes]);
+  const gaps = useMemo(() => planGaps(project.units, setup, forGaps, categories, project.settings), [project.units, setup, forGaps, categories, project.settings]);
   const comps = gaps.comps;
   const openable = useMemo(() => openableUnits(base), [base]);
   const choices = useMemo(() => containerChoices(setup, base), [setup, base]);
   const placed = useMemo(() => new Map(comps.map((c) => [c.key, analysis.pockets.filter((p) => p.comp.key === c.key)])), [comps, analysis.pockets]);
+  const layoutMoves = useMemo(() => rearrangements(comps, placed), [comps, placed]);
   const whereIs = useMemo(() => {
     const out = new Map<string, string[]>();
     for (const p of analysis.pockets) for (const x of p.parts) out.set(x.part.partNum, [...(out.get(x.part.partNum) ?? []), p.comp.code]);
@@ -129,7 +138,7 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
   for (const c of comps) for (const f of new Set(familiesIn(c))) familyCounts.set(f, (familyCounts.get(f) ?? 0) + 1);
 
   const kindsOpen = kinds.size <= 2;
-  const foldIds = [...[...kinds.keys()].map((k) => `storage:${k}`), 'storage:unsorted', 'storage:moves', 'storage:estimates', 'storage:review', 'storage:key', 'storage:settings'];
+  const foldIds = [...[...kinds.keys()].map((k) => `storage:${k}`), 'storage:unsorted', 'storage:moves', 'storage:layout', 'storage:estimates', 'storage:review', 'storage:key', 'storage:settings'];
   const index = comps.findIndex((c) => c.key === editing);
   const current = index >= 0 ? comps[index] : null;
   const shown = showing ? gaps.suggested.get(showing) : undefined;
@@ -251,6 +260,7 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
         setSetup={setSetup}
         pockets={analysis.pockets}
         homeOf={gaps.homeOf}
+        recordedHomes={recordedHomes}
         scale={scale}
         query={filter}
         folds={folds}
@@ -258,7 +268,11 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
       />
 
       <Fold id="storage:moves" folds={folds} title="Suggested moves" summary={analysis.suggestions.length ? `${analysis.suggestions.length}${analysis.moreSuggestions ? '+' : ''} to look at` : analysis.drawersRecorded ? 'none right now' : 'record some drawers first'}>
-        <Suggestions setup={setup} setSetup={setSetup} analysis={analysis} />
+        <Suggestions setup={setup} setSetup={setSetup} analysis={analysis} onUndo={() => update(undoLast)} />
+      </Fold>
+
+      <Fold id="storage:layout" folds={folds} title="Tidy the layout" summary={layoutMoves.length ? layoutMoves.map((r) => `${r.kind}: ${r.cycles.length} ${r.cycles.length === 1 ? 'swap' : 'swaps'}`).join(', ') : 'each family is together'}>
+        <Rearrange plans={layoutMoves} comps={comps} onSwap={(swaps) => update((p) => swaps.reduce<Partial<Project>>((acc, { cycle, text }) => applyCycle({ ...p, ...acc } as Project, cycle, text), {}))} />
       </Fold>
 
       <Fold id="storage:estimates" folds={folds} title="Estimates against your drawers" summary={check.pockets ? `real size ${times(check.total)} of the estimate` : 'enter a fill to compare'}>

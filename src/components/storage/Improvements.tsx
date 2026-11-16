@@ -1,5 +1,5 @@
 // What My storage makes of the drawers as recorded: moves worth making, how the estimates compare, and what to look at.
-import { acceptSuggestion, undoLastAccepted, type EstimateRow, type Finding, type FindingKind, type SetupAnalysis } from '../../lib/setup';
+import { acceptSuggestion, type EstimateRow, type Finding, type FindingKind, type SetupAnalysis } from '../../lib/setup';
 import type { Part, Setup } from '../../lib/types';
 import PartImage from '../PartImage';
 import { useState } from 'react';
@@ -47,7 +47,7 @@ function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map<string
   );
 }
 
-export function Suggestions({ setup, setSetup, analysis }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis }) {
+export function Suggestions({ setup, setSetup, analysis, onUndo }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis; onUndo: () => void }) {
   const byNum = partsOf(analysis);
   return (
     <>
@@ -62,7 +62,7 @@ export function Suggestions({ setup, setSetup, analysis }: { setup: Setup; setSe
                   Done
                 </button>{' '}
                 {i === setup.accepted.length - 1 && (
-                  <button className="link small" onClick={() => setSetup(undoLastAccepted)}>
+                  <button className="link small" onClick={onUndo}>
                     Undo
                   </button>
                 )}
