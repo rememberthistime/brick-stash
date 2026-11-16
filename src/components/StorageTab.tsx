@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { CompartmentSpec, Project, Space, StorageUnit } from '../lib/types';
 import { PRESETS } from '../lib/presets';
 import { drawerKey, setPlaceName, setUnitCode, validUnitCode } from '../lib/codes';
+import { spaceUse } from '../lib/spaces';
 import NameInput from './NameInput';
 import { compartmentVolume } from '../lib/volume';
 import { expandCompartments } from '../lib/planner';
@@ -159,18 +160,38 @@ export default function StorageTab({ project, update }: Props) {
       <section className="card">
         <h2>Spaces (optional)</h2>
         <p className="muted">
-          Cupboards, shelves or alcoves your units live in — internal mm. With outside sizes on your units, the planner can tell you how much room is left and what would fit.
+          Cupboards, shelves or the space under them, inside size in mm. Put units in a space (expand a unit, then <b>In</b>), and with their outside sizes it shows how much of the space they take and roughly what else would fit.
         </p>
-        {spaces.map((s) => (
-          <div key={s.id} className="space-row">
-            <input value={s.name} onChange={(e) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))} />
-            <DimsInput value={s} onChange={(d) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, ...d } : x)))} />
-            <span className="muted small">{(compartmentVolume(s) / 1000).toFixed(0)} L</span>
-            <button className="icon danger" onClick={() => setSpaces((ss) => ss.filter((x) => x.id !== s.id))}>
-              ✕
-            </button>
-          </div>
-        ))}
+        {spaces.map((s) => {
+          const use = spaceUse(s, units);
+          return (
+            <div key={s.id} className="space-block">
+              <div className="space-row">
+                <input value={s.name} onChange={(e) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))} />
+                <DimsInput value={s} onChange={(d) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, ...d } : x)))} />
+                <span className="muted small">{(compartmentVolume(s) / 1000).toFixed(0)} L</span>
+                <button className="icon danger" aria-label={`Remove ${s.name}`} onClick={() => setSpaces((ss) => ss.filter((x) => x.id !== s.id))}>
+                  ✕
+                </button>
+              </div>
+              <p className="small space-use">
+                {use.units.length ? (
+                  <>
+                    <b>{Math.round(use.used * 100)}% taken</b> by {use.units.length} {use.units.length === 1 ? 'unit' : 'units'} ({[...new Set(use.units.map((u) => u.code ?? '?'))].join(', ')})
+                    {use.unsized > 0 && <span className="muted">, {use.unsized} without an outside size, so not counted</span>}.{' '}
+                  </>
+                ) : (
+                  <span className="muted">Nothing in it yet. </span>
+                )}
+                {use.more.length > 0 ? (
+                  <span className="muted">Room for about {use.more.slice(0, 3).map((m) => `${m.count} more ${m.name}`).join(', or ')}.</span>
+                ) : (
+                  use.units.length > 0 && <span className="muted">No room for another of your units.</span>
+                )}
+              </p>
+            </div>
+          );
+        })}
         <button className="ghost" onClick={() => setSpaces((ss) => [...ss, { id: uid(), name: `Cupboard ${ss.length + 1}`, w: 800, d: 450, h: 1800 }])}>
           + Add space
         </button>

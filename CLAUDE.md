@@ -4,7 +4,7 @@ A LEGO storage planner (Vite, React, TypeScript, Vitest, a dependency-free Node 
 
 ## The user
 - Australian. Use AUD and Australian shops (Officeworks, Spotlight, Howards Storage World).
-- Design rules: store by type, not colour; keeping similar parts together beats saving space; leave headroom. Changes to a plan are always optional and never automatic.
+- Design rules: store by type, not colour; keeping similar parts together beats saving space; leave headroom. Changes to a plan are always optional and never automatic. Drawers recorded on My storage are never changed by the planner: it only suggests for the parts and drawers not yet recorded.
 - They keep a "Flagged issues" list at the end of README.md. Tick items off there with a short note.
 
 ## Where it runs

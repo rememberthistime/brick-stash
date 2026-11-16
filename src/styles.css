@@ -153,6 +153,8 @@ input.vol.overridden { border-color: var(--accent); }
 .unit-meta label { display: flex; align-items: center; gap: 6px; }
 .unit-meta { align-items: center; }
 .unit-row-body .unit-meta input.unit-code { width: 44px; text-align: center; text-transform: uppercase; font-weight: 600; }
+.space-block { border-top: 1px solid var(--line); padding: 6px 0; }
+.space-use { margin: 2px 0 4px; }
 .unit-names { margin: 8px 0; }
 .unit-names > p { margin: 0 0 6px; }
 .unit-name-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 0; }

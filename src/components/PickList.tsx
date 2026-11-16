@@ -118,15 +118,15 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
     <div className="pick-view">
       <div className="row no-print">
         <button className="ghost" onClick={close}>
-          Back to plan
+          Back to My storage
         </button>
         {list && <button onClick={() => window.print()}>Print</button>}
         {fromSetup && fromSetup.size > 0 && (
           <label>
             Look in{' '}
             <select value={look} onChange={(e) => setLook(e.target.value as 'real' | 'plan')}>
-              <option value="real">my drawers as recorded, then the plan</option>
-              <option value="plan">the plan only</option>
+              <option value="real">my drawers as recorded, then the suggestions</option>
+              <option value="plan">the suggestions only</option>
             </select>
           </label>
         )}
@@ -202,8 +202,8 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
               <ul className="pick-lines">{d.lines.map((l) => row(l, true))}</ul>
             </section>
           ))}
-          {group('Stored elsewhere', 'kept out of the plan', list.elsewhere)}
-          {group('No drawer yet', look === 'real' ? 'in your collection, but not in a recorded drawer or the plan' : 'in your collection, but with no home in the plan', list.unplaced)}
+          {group('Stored elsewhere', 'kept out on the Collection tab', list.elsewhere)}
+          {group('No drawer yet', look === 'real' ? 'in your collection, but not in a recorded or suggested drawer' : 'in your collection, but with no drawer yet', list.unplaced)}
           {group('Not in your collection', `${plural(list.missing.reduce((t, l) => t + l.want, 0), 'piece')} to find`, list.missing)}
         </>
       )}
