@@ -181,6 +181,8 @@ export interface AcceptedMove {
   id: string;
   text: string;
   before: Record<string, SetupPocket[]>;
+  /** the parts it moves, to show with it */
+  parts?: string[];
 }
 
 /** The user's storage as it stands today, separate from anything the planner suggests */
