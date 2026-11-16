@@ -1,6 +1,7 @@
 // Parts that aren't in any recorded drawer, by family: where the plan would put each, and ways to put them away now.
 import { useState } from 'react';
 import { codeWithName } from '../../lib/codes';
+import type { RecordedHome } from '../../lib/gaps';
 import { addToPocket, newPocket, removeFromPocket, unsortedByFamily, type PlacedPocket, type SetupComp, type UnsortedOrder } from '../../lib/setup';
 import { familyFor, familyGroup } from '../../lib/taxonomy';
 import type { Part, Setup } from '../../lib/types';
@@ -31,17 +32,20 @@ interface Props {
   pockets: PlacedPocket[];
   /** part → the drawer with nothing recorded that the plan suggests for it */
   homeOf: Map<string, string>;
+  /** part → room for it beside the same sort of parts in a recorded drawer */
+  recordedHomes: Map<string, RecordedHome>;
   scale: number;
   query: string;
   folds: Folds;
   onShowDrawer: (key: string) => void;
 }
 
-export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSetup, pockets, homeOf, scale, query, folds, onShowDrawer }: Props) {
+export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, folds, onShowDrawer }: Props) {
   const [order, setOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** one drawer to put many parts in, a click each */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
-  const [lastPut, setLastPut] = useState<{ partNum: string; name: string; key: string; pocket: number; code: string } | null>(null);
+  /** what was just put away, to undo: one part, or every part with room in a recorded drawer at once */
+  const [lastPut, setLastPut] = useState<{ text: string; items: { partNum: string; key: string; pocket: number }[] } | null>(null);
   const families = unsortedByFamily(unsorted, scale, order);
   const pieces = families.reduce((t, f) => t + f.pieces, 0);
   const volume = families.reduce((t, f) => t + f.volume, 0);
@@ -49,7 +53,8 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
   const matches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
   const hit = !!q && unsorted.some(matches);
   const byKey = new Map(comps.map((c) => [c.key, c]));
-  const noRoom = unsorted.filter((p) => !homeOf.has(p.partNum)).length;
+  const noRoom = unsorted.filter((p) => !homeOf.has(p.partNum) && !recordedHomes.has(p.partNum)).length;
+  const withRoom = unsorted.filter((p) => recordedHomes.has(p.partNum));
 
   const chooseOrder = (next: UnsortedOrder) => {
     setOrder(next);
@@ -74,11 +79,25 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
       const list = s.drawers[key] ?? [newPocket(uid())];
       return { ...s, drawers: { ...s.drawers, [key]: addToPocket(list, Math.min(index, list.length - 1), [p.partNum]) } };
     });
-    setLastPut({ partNum: p.partNum, name: p.name, key, pocket: index, code: pocketCode(comp, index) });
+    setLastPut({ text: `Added ${p.name} to ${pocketCode(comp, index)}.`, items: [{ partNum: p.partNum, key, pocket: index }] });
+  };
+  /** Every part that has room beside its own sort in a recorded drawer, into that pocket */
+  const putAllWithRoom = () => {
+    const items = withRoom.map((p) => ({ partNum: p.partNum, key: recordedHomes.get(p.partNum)!.key, pocket: recordedHomes.get(p.partNum)!.pocket }));
+    setSetup((s) => {
+      const drawers = { ...s.drawers };
+      for (const it of items) if (drawers[it.key]) drawers[it.key] = addToPocket(drawers[it.key], it.pocket, [it.partNum]);
+      return { ...s, drawers };
+    });
+    setLastPut({ text: `Added ${items.length} parts to ${new Set(items.map((i) => i.key)).size} drawers.`, items });
   };
   const undoPut = () => {
     if (!lastPut) return;
-    setSetup((s) => (s.drawers[lastPut.key] ? { ...s, drawers: { ...s.drawers, [lastPut.key]: removeFromPocket(s.drawers[lastPut.key], lastPut.pocket, lastPut.partNum) } } : s));
+    setSetup((s) => {
+      const drawers = { ...s.drawers };
+      for (const it of lastPut.items) if (drawers[it.key]) drawers[it.key] = removeFromPocket(drawers[it.key], it.pocket, it.partNum);
+      return { ...s, drawers };
+    });
     setLastPut(null);
   };
   /** Where a part could go: pockets already holding its family or group first, roomiest first, then every drawer */
@@ -117,9 +136,17 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
       {unsorted.length > 0 && (
         <>
           <p className="muted small">
-            Parts that aren’t in any drawer you’ve recorded. Each shows where the plan would put it, among the drawers you haven’t recorded: click that to see the whole suggestion. Or put a part straight into any drawer.
-            {noRoom > 0 && ` ${noRoom} ${noRoom === 1 ? 'has' : 'have'} no room anywhere unrecorded.`}
+            Parts that aren’t in any drawer you’ve recorded. Where there’s room beside the same sort of parts in a recorded drawer, that’s offered first (<b>Put in A3.2</b>); the rest are suggested for drawers you haven’t recorded (click to see the whole suggestion). Or put a part straight into any drawer.
+            {noRoom > 0 && ` ${noRoom} ${noRoom === 1 ? 'has' : 'have'} no room anywhere.`}
           </p>
+          {withRoom.length > 0 && (
+            <p className="small">
+              <button className="small-btn" onClick={putAllWithRoom}>
+                Put all {withRoom.length} beside their own sort
+              </button>{' '}
+              <span className="muted">into the recorded pockets offered below. It can be undone.</span>
+            </p>
+          )}
           <div className="unsorted-tools">
             <label className="small">
               Biggest first by{' '}
@@ -151,7 +178,7 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
             )}
             {lastPut && (
               <span className="small" aria-live="polite">
-                Added {lastPut.name} to {lastPut.code}.{' '}
+                {lastPut.text}{' '}
                 <button className="link small" onClick={undoPut}>
                   Undo
                 </button>
@@ -169,6 +196,8 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
               {shown.slice(0, SHOWN).map((p) => {
                 const home = homeOf.get(p.partNum);
                 const homeComp = home ? byKey.get(home) : undefined;
+                const there = recordedHomes.get(p.partNum);
+                const thereComp = there ? byKey.get(there.key) : undefined;
                 return (
                   <li key={p.partNum}>
                     <PartImage partNum={p.partNum} size={36} title={p.name} />
@@ -182,12 +211,16 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
                       </span>
                     </span>
                     <span className="unsorted-actions">
-                      {homeComp ? (
+                      {there && thereComp ? (
+                        <button className="small-btn" title={`Room beside ${there.sameGroup ? 'the same group of parts' : 'parts of the same family'} in ${codeWithName(there.code, thereComp)}`} onClick={() => putIn(p, there.key, there.pocket)}>
+                          Put in {codeWithName(there.code, thereComp)}
+                        </button>
+                      ) : homeComp ? (
                         <button className="link small" title="See everything the plan suggests for that drawer" onClick={() => onShowDrawer(homeComp.key)}>
                           suggested: {codeWithName(homeComp.code, homeComp)}
                         </button>
                       ) : (
-                        <span className="muted small">no room unrecorded</span>
+                        <span className="muted small">no room anywhere</span>
                       )}
                       {targetComp && (
                         <button className="ghost small-btn" title={`Put ${p.name} in ${codeWithName(targetCode, targetComp)}`} onClick={() => putIn(p, targetComp.key, targetIndex)}>

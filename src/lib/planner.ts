@@ -608,7 +608,7 @@ function assignFamilies(cut: TreeNode[], zones: Zone[], capOf: (c: Compartment) 
 }
 
 /** Lay out every zone's groups in reading order; returns the result plus what didn't fit, per zone */
-function layoutZones(members: Map<Zone, TreeNode[]>, zones: Zone[], capOf: (c: Compartment) => number, tier: Tier, reserve: Map<Zone, number>) {
+function layoutZones(members: Map<Zone, TreeNode[]>, zones: Zone[], capOf: (c: Compartment) => number, tier: Tier, reserve: Map<Zone, number>, spread: boolean) {
   const cells: Cell[] = [];
   const spares = new Map<string, string>();
   const ends = new Map<Zone, number>();
@@ -625,8 +625,9 @@ function layoutZones(members: Map<Zone, TreeNode[]>, zones: Zone[], capOf: (c: C
     }
     const capacity = zoneCells(z).reduce((t, c) => t + capOf(c), 0);
     const need = groups.reduce((t, g) => t + g.volume, 0);
-    // Room to spare: fill each compartment only as far as needed so groups spread evenly through the zone
-    const breathe = Math.min(1, Math.max(0.45, need / Math.max(1, capacity) + 0.15));
+    // Normally each compartment is filled to its planned fill in turn, and whatever's left over stays empty at the
+    // end. Asked to spread, compartments are only filled as far as needed for the groups to spread through the zone.
+    const breathe = spread ? Math.min(1, Math.max(0.45, need / Math.max(1, capacity) + 0.15)) : 1;
     let r = fillZone(groups, z, capOf, !tier.share, quota, 0, (c) => capOf(c) * breathe);
     if (r.leftover.length && breathe < 1) r = fillZone(groups, z, capOf, !tier.share, quota);
     if (r.leftover.length && quota.size) r = fillZone(groups, z, capOf, !tier.share, new Map());
@@ -653,7 +654,7 @@ function packTier(cut: TreeNode[], zones: Zone[], s: Settings, tierIndex: number
     }),
   );
   const { members, unassigned } = assignFamilies(cut, zones, capOf, !tier.share, reserve);
-  const { cells, spares, ends, leftovers } = layoutZones(members, zones, capOf, tier, reserve);
+  const { cells, spares, ends, leftovers } = layoutZones(members, zones, capOf, tier, reserve, !!s.spread);
 
   // Anything still over goes after the last used compartment of a zone — one already holding its family if possible
   let carry = [...unassigned, ...[...leftovers.values()].flat()].sort((a, b) => a.seq - b.seq);
