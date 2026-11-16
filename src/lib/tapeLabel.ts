@@ -20,7 +20,6 @@ export function shortName(label: string): string {
   return label
     .replace(/\s*\([^)]*\)/g, '')
     .replace(/\s*\[[^\]]*\]/g, '')
-    .replace(/ — other$/, ' other')
     .replace(/ with .*$/i, '')
     .replace(/,.*$/, '')
     .replace(/\s+/g, ' ')

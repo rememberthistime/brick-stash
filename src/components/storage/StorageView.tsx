@@ -9,6 +9,7 @@ import { planPlaces, setupPlaces } from '../../lib/pickList';
 import { buildTree, expandCompartments, leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner';
 import { analyseSetup, closeUnit, containerChoices, howManyFit, openableUnits, openUnit, setupComps, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { stem } from '../../lib/storageList';
+import { shortName } from '../../lib/tapeLabel';
 import type { Catalog, OpenedUnit, Part, Project, Setup } from '../../lib/types';
 import { download, uid } from '../../state';
 import { Stat } from '../CollectionTab';
@@ -191,7 +192,7 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
         </div>
         {lifted.length > 0 && (
           <p className="muted small setup-lifted">
-            <b>Containers lifted out:</b> {lifted.map((c) => `${c.container.name}, ${c.used} of ${c.total} placed`).join(' · ')}
+            <b>Loose containers in use:</b> {lifted.map((c) => `${c.used} ${c.container.name}${c.used > (c.total ?? 0) ? `, more than the ${c.total} lifted out` : ''}`).join(' · ')}
           </p>
         )}
       </section>
@@ -332,7 +333,8 @@ function DrawerTile({ comp, recorded, pockets, dim, onClick }: { comp: SetupComp
   const inUse = pockets.filter((p) => p.parts.length);
   const family = [...inUse].sort((a, b) => b.used - a.used)[0]?.family;
   const measured = inUse.length > 0 && inUse.every((p) => p.fill !== undefined);
-  const names = [...new Set(inUse.map((p) => p.label || (p.mixed ? 'Mixed' : p.groupLabel)))];
+  // One part on its own is named by the part, shortened; anything else by its label or group
+  const names = [...new Set(inUse.map((p) => p.label || (p.mixed ? 'Mixed on purpose' : p.parts.length === 1 ? shortName(p.parts[0].part.name) : p.groupLabel)))];
   return (
     <button className={`setup-tile ${recorded ? '' : 'todo'} ${dim ? 'dim' : ''} ${family ? `fam-border-${family}` : ''}`} onClick={onClick} title={comp.sections ? `${comp.unitName}, whole box` : `${comp.unitName} › ${comp.label} — ${comp.w}×${comp.d}×${comp.h} mm`}>
       <span className="setup-tile-head">
@@ -353,7 +355,7 @@ function DrawerTile({ comp, recorded, pockets, dim, onClick }: { comp: SetupComp
 
 /** A drawer with nothing recorded, showing what the plan suggests for it */
 function SuggestedTile({ comp, s, dim, onClick }: { comp: SetupComp; s: Suggestion; dim: boolean; onClick: () => void }) {
-  const names = s.sections.map((x) => sectionLabel(x));
+  const names = s.sections.map((x) => shortName(sectionLabel(x)));
   return (
     <button className={`setup-tile suggested ${dim ? 'dim' : ''} fam-border-${s.sections[0]?.node.familyKey ?? ''}`} onClick={onClick} title={`${codeWithName(comp.code, comp)} — not recorded; click to see the suggestion`}>
       <span className="setup-tile-head">

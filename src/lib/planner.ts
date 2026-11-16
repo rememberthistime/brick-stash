@@ -1,5 +1,7 @@
 import type { Granularity, Part, Settings, StorageUnit } from './types';
-import { FAMILIES, bucketOrder, catOrder, familyFor, familyGroup, familyOrder, parseSize, sizeBucket } from './taxonomy';
+import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeGroupName } from './taxonomy';
+
+const familyLabelOf = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? 'Parts';
 import { compartmentVolume } from './volume';
 import { partVolume } from './collection';
 import { drawerKey, inReachOrder, withUnitCodes } from './codes';
@@ -33,13 +35,14 @@ export function plusLabel(base: string, added: TreeNode[]) {
   return added.length === 1 ? `${base} + ${added[0].label}` : `${base} + ${added.length} more`;
 }
 
-/** One section for several tiny siblings, e.g. "Plates Special 1 × 1–2 (mixed)" */
+/** One section for several tiny siblings, e.g. "Mixed modified plates" */
 function mergeNodes(a: TreeNode, b: TreeNode): TreeNode {
   const members = [...(a.merged ? a.children : [a]), b];
   const parent = a.parent!;
   return {
     id: `${parent.id}/~mix:${members[0].id}`,
-    label: `${parent.label.replace(/ — other$/, '')} (mixed)`,
+    // Siblings straight under the whole collection are named for their family, not "Mixed collection"
+    label: mixedName(parent.id === 'root' ? familyLabelOf(a.familyKey) : parent.label),
     familyKey: a.familyKey,
     children: members,
     pieces: members.reduce((t, m) => t + m.pieces, 0),
@@ -95,12 +98,12 @@ export function buildTree(parts: Part[], categories: Record<string, string>, vol
     const catId = catKey === 'none' ? null : Number(catKey);
     const fam = familyFor(catId);
     const famNode = child(root, fam.key, fam.label, fam.key);
-    const catName = catId == null ? 'Unknown parts' : categories[catId] ?? `Category ${catId}`;
+    const catName = catId == null ? 'Unknown parts' : categoryName(categories[catId] ?? `Category ${catId}`);
     const catNode = fam.cats.length === 1 || catId == null ? famNode : child(famNode, `${fam.key}/${catKey}`, catName, fam.key);
     const buckets = new Set(catParts.map((p) => sizeBucket(p.name, fam.key)));
     for (const p of catParts) {
       const b = sizeBucket(p.name, fam.key);
-      const parent = buckets.size > 1 && b ? child(catNode, `${catNode.id}/${b}`, `${catNode.label} ${b}`, fam.key) : catNode;
+      const parent = buckets.size > 1 && b ? child(catNode, `${catNode.id}/${b}`, sizeGroupName(catNode.label, b), fam.key) : catNode;
       const leafOf = (x: Part): TreeNode => ({ id: `part:${x.partNum}`, label: x.name, familyKey: fam.key, children: [], part: x, pieces: x.qty, volume: partVolume(x, volumeScale), seq: 0 });
       const added = (guests.get(p.partNum) ?? []).map(leafOf);
       parent.children.push(
@@ -713,7 +716,7 @@ function splitNode(n: TreeNode, g: Granularity, forced: boolean): TreeNode[] {
   if (small.length <= 1) return n.children;
   const lump: TreeNode = {
     id: `${n.id}/~other`,
-    label: `${n.label} — other`,
+    label: otherName(n.label),
     familyKey: n.familyKey,
     children: small,
     pieces: small.reduce((s, c) => s + c.pieces, 0),
@@ -769,7 +772,7 @@ export interface Plan {
 
 /**
  * Granularity straight from the setting: a group with at least `split` pieces is broken into its
- * sub-groups (small ones lumped into "… — other"); a group too big for any compartment is always broken up.
+ * sub-groups (small ones lumped into "Other …"); a group too big for any compartment is always broken up.
  */
 function initialCut(n: TreeNode, g: Granularity, maxCap: number): TreeNode[] {
   if (!n.children.length) return [n];

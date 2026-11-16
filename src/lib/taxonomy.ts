@@ -113,3 +113,80 @@ export function sizeBucket(name: string, familyKey: string): string | null {
 
 const BUCKET_ORDER = ['1 × 1–2', '1 × 3+', '2 × 2–3', '2 × 4+', 'Large (3+ wide)', 'Short (≤4L)', 'Medium (5–8L)', 'Long (9L+)'];
 export const bucketOrder = (b: string | null) => (b == null ? 99 : BUCKET_ORDER.indexOf(b));
+
+// ─── Names people would use ──────────────────────────────────────────────────
+// Rebrickable's category names are catalogue headings ("Bricks Sloped", "Plates Special"). Groups are named the way
+// you'd say them out loud instead: "Slopes", "Modified plates", "Plates 2×4 and bigger".
+
+const CATEGORY_NAMES: Record<string, string> = {
+  'Bricks Sloped': 'Slopes',
+  'Bricks Special': 'Modified bricks',
+  'Bricks Wedged': 'Wedge bricks',
+  'Bricks Curved': 'Curved bricks',
+  'Bricks Round and Cones': 'Round bricks and cones',
+  'Plates Special': 'Modified plates',
+  'Plates Round Curved and Dishes': 'Round plates and dishes',
+  'Plates Wedged': 'Wedge plates',
+  'Tiles Special': 'Modified tiles',
+  'Tiles Round and Curved': 'Round tiles',
+  'Transportation - Land': 'Land vehicle parts',
+  'Transportation - Sea and Air': 'Boat and plane parts',
+  'Animals / Creatures': 'Animals',
+  'Animal / Creature Accessories': 'Animal accessories',
+  'Animal / Creature Body Parts': 'Animal body parts',
+  'Flags, Banners and Signs': 'Flags and signs',
+  'Hinges, Arms and Turntables': 'Hinges, arms and turntables',
+  'Minifig Shields, Weapons, & Tools': 'Minifig shields, weapons and tools',
+  'Non-Buildable Figures (Duplo, Fabuland, etc)': 'Non-buildable figures',
+  'Projectiles / Launchers': 'Projectiles and launchers',
+  'Other': 'Other parts',
+};
+
+/** Words that stay capitalised wherever they are: names, not ordinary words */
+const PROPER = new Set(['Technic', 'Duplo', 'Quatro', 'Primo', 'Minifig', 'Minifigs', 'Minidoll', 'Belville', 'Scala', 'Fabuland', 'Znap', 'Clikits', 'Modulex', 'HO', 'LEGO']);
+
+const sentenceCase = (s: string) =>
+  s
+    .split(' ')
+    .map((w, i) => (i === 0 || PROPER.has(w) || /^[A-Z0-9]+$/.test(w) ? w : w.toLowerCase()))
+    .join(' ');
+
+/** "Bricks Sloped" → "Slopes", "Technic Beams Special" → "Technic beams special" */
+export const categoryName = (name: string) => CATEGORY_NAMES[name] ?? sentenceCase(name);
+
+/** Lower-cased to follow another word, keeping names such as Technic as they are: "Gears & Mechanical" → "gears & mechanical" */
+const following = (s: string) =>
+  s
+    .split(' ')
+    .map((w) => (PROPER.has(w) || /^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase()))
+    .join(' ');
+
+/** A size group of a category, said the way you'd say it: "Plates 2×4 and bigger", "Large slopes", "Short Technic beams" */
+export function sizeGroupName(category: string, bucket: string): string {
+  switch (bucket) {
+    case '1 × 1–2':
+      return `${category} 1×1 and 1×2`;
+    case '1 × 3+':
+      return `${category} 1×3 and longer`;
+    case '2 × 2–3':
+      return `${category} 2×2 and 2×3`;
+    case '2 × 4+':
+      return `${category} 2×4 and bigger`;
+    case 'Large (3+ wide)':
+      return `Large ${following(category)}`;
+    case 'Short (≤4L)':
+      return `Short ${following(category)}`;
+    case 'Medium (5–8L)':
+      return `Medium ${following(category)}`;
+    case 'Long (9L+)':
+      return `Long ${following(category)}`;
+    default:
+      return `${category} ${bucket}`;
+  }
+}
+
+/** The small leftovers of a group, kept together: "Other slopes" */
+export const otherName = (group: string) => `Other ${following(group.replace(/^Other /, ''))}`;
+
+/** Several small groups of one kind sharing a section: "Mixed slopes" */
+export const mixedName = (group: string) => `Mixed ${following(group.replace(/^(Other|Mixed) /, ''))}`;

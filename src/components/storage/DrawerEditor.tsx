@@ -424,6 +424,7 @@ function PocketRow({
         <label className="small setup-mixed">
           <input type="checkbox" checked={!!pocket.mixed} onChange={(e) => onChange({ mixed: e.target.checked || undefined })} /> Mixed on purpose
         </label>
+        {divided && (
         <input
           className="setup-label-input"
           list={`${pocket.id}-names`}
@@ -433,11 +434,14 @@ function PocketRow({
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onChange({ label: e.target.value || undefined })}
         />
-        <datalist id={`${pocket.id}-names`}>
-          {LABEL_IDEAS.map((n) => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
+        )}
+        {divided && (
+          <datalist id={`${pocket.id}-names`}>
+            {LABEL_IDEAS.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+        )}
         {onRemovePocket && (
           <button className="link small" onClick={onRemovePocket}>
             Remove

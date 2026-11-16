@@ -68,7 +68,7 @@ describe('text', () => {
   it('shortens long part names', () => {
     expect(shortName('Brick Special 1 x 2 with Masonry Brick Profile')).toBe('Brick Special 1 x 2');
     expect(shortName('Brick Curved 4 x 1 No Studs [Stud Holder with Symmetric Ridges]')).toBe('Brick Curved 4 x 1 No Studs');
-    expect(shortName('Bricks Sloped 1 × 3+ — other')).toBe('Bricks Sloped 1 × 3+ other');
+    expect(shortName('Short Technic beams (up to 4 long)')).toBe('Short Technic beams');
     expect(shortName('Plate 1 x 2 (1/2)')).toBe('Plate 1 x 2');
   });
 

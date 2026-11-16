@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { withUnitCodes } from './lib/codes';
+import { namesFromLabels, withUnitCodes } from './lib/codes';
 import { startupAction } from './lib/sync';
 import type { Catalog, Project } from './lib/types';
 import { DEFAULT_KEEP_OUT, DEFAULT_SETTINGS, EMPTY_SETUP } from './lib/types';
@@ -20,8 +20,10 @@ export const withDefaults = (p: Project): Project => settled({ ...emptyProject()
 
 /** Every unit has a letter of its own before a project is used or saved, so drawer codes never depend on the order of the list */
 function settled(p: Project): Project {
-  const units = withUnitCodes(p.units);
-  return units === p.units ? p : { ...p, units };
+  const named = namesFromLabels(p.units, p.setup.drawers);
+  const units = withUnitCodes(named.units);
+  if (units === p.units && named.drawers === p.setup.drawers) return p;
+  return { ...p, units, setup: named.drawers === p.setup.drawers ? p.setup : { ...p.setup, drawers: named.drawers as Project['setup']['drawers'] } };
 }
 
 function load(): Project {

@@ -38,7 +38,8 @@ export function setupLabels(pockets: PlacedPocket[], comps: SetupComp[], perBox:
     const inDrawer = pockets.filter((p) => p.comp.key === comp.key);
     const cells = inDrawer.map((p) => {
       const parts = [...p.parts].sort((a, b) => b.used - a.used);
-      const name = p.label?.trim();
+      // A drawer with one pocket goes by its own name; pockets of a divided drawer by their labels
+      const name = p.label?.trim() || (inDrawer.length === 1 ? (comp.sections ? comp.unitTitle : comp.name)?.trim() : undefined);
       const cell: SheetCell = {
         title: name || (parts.length === 1 ? shortName(parts[0].part.name) : shortName(p.groupLabel)),
         detail: name && parts.length !== 1 ? (parts.length ? `${parts.length} types` : '') : parts.length === 1 ? parts[0].part.partNum : `${parts.length} types`,
