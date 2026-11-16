@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BOX_NAME_IDEAS, changePhoto, deletePhoto, photoUrl, saveBoxNames, topPhotoOf, useBoxNames, usePhotos, type BoxNames, type Photo } from '../lib/photos';
 import { buildTree, familyLabel, type Plan, type TreeNode } from '../lib/planner';
 import {
   acceptSuggestion,
@@ -10,7 +9,6 @@ import {
   containerChoices,
   floorLeft,
   howManyFit,
-  loadDraft,
   newPocket,
   openableUnits,
   openUnit,
@@ -30,12 +28,10 @@ import {
   type Finding,
   type FindingKind,
   type PlacedPocket,
-  type SetupDraft,
   type SetupAnalysis,
   type SetupComp,
 } from '../lib/setup';
 import { setupLabels } from '../lib/labels';
-import { fetchDrafts, reviewedDrafts, scoreOf } from '../lib/review';
 import { stem } from '../lib/storageList';
 import { familyFor, familyGroup } from '../lib/taxonomy';
 import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../lib/codes';
@@ -70,6 +66,8 @@ const FINDINGS: { kind: FindingKind; title: string; hint: string }[] = [
   { kind: 'unsure', title: 'Worth checking', hint: 'No real fill entered, and the estimate can’t be right.' },
 ];
 const SHOWN_FINDINGS = 6;
+/** Common names for boxes of mixed small parts, offered when labelling one */
+const LABEL_IDEAS = ['Fences', 'Minifig accessories', 'Food', 'Animal parts', 'Flags', 'Plants', 'Technic connectors', 'Technic pins', 'Hinges', 'Clips and bars', 'Mixed'];
 /** Parts listed per family under "Not sorted yet" */
 const UNSORTED_SHOWN = 150;
 /** How this browser last ordered "Not sorted yet" */
@@ -85,17 +83,13 @@ const rememberedOrder = (): UnsortedOrder => {
 export default function SetupTab({ project, update, plan, parts, categories, goTo }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [draftNote, setDraftNote] = useState('');
   const [printing, setPrinting] = useState(false);
   const [perBox, setPerBox] = useState(false);
   const [unsortedOrder, setUnsortedOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** the box that parts under "Not sorted yet" are put into */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
   const [lastPut, setLastPut] = useState<{ partNum: string; name: string; key: string; pocket: number; code: string } | null>(null);
-  const draftRef = useRef<HTMLInputElement>(null);
   const folds = useFolds();
-  const { photos, refresh: refreshPhotos } = usePhotos();
-  const { boxes, refresh: refreshBoxes } = useBoxNames();
   const setup = project.setup;
   const setSetup = (f: (s: Setup) => Setup) => update((p) => ({ setup: f(p.setup) }));
   const scale = project.settings.volumeScale;
@@ -133,7 +127,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
         entries={setupLabels(analysis.pockets, comps, perBox)}
         close={() => setPrinting(false)}
         backLabel="Back to My setup"
-        note="Named boxes print their name; others print their main part or group."
+        note="Labelled boxes print their label; others print their main part or group."
         options={
           <label className="small">
             <input type="checkbox" checked={perBox} onChange={(e) => setPerBox(e.target.checked)} /> A label for each box
@@ -219,47 +213,6 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   const { check } = analysis;
   const stepTo = (d: number) => setEditing(comps[(index + d + comps.length) % comps.length].key);
   const lifted = choices.filter((c) => c.total !== null);
-  const applyDraft = (draft: SetupDraft, notes: string[] = []) => {
-    // Codes still to be confirmed ("A3?") can't be loaded until they are, so they're left out quietly
-    const result = loadDraft(setup, { drawers: draft.drawers.filter((d) => !d.code.endsWith('?')) }, base, parts, uid);
-    if (result.replaced.length && !confirm(`This replaces what you've recorded for ${result.replaced.join(', ')}. Your other drawers aren't affected. Carry on?`)) return;
-    setSetup(() => result.setup);
-    setDraftNote(
-      [
-        result.loaded.length ? `Loaded ${result.loaded.join(', ')}. Check them over, as drafts can be wrong.` : 'Nothing was loaded.',
-        result.noDrawer.length ? `No drawer called ${result.noDrawer.join(', ')}.` : '',
-        result.noPart.length ? `Not in your planned collection, so left out: ${result.noPart.join(', ')}.` : '',
-        ...notes,
-      ]
-        .filter(Boolean)
-        .join(' '),
-    );
-  };
-  const openDraft = async (file: File) => {
-    try {
-      const draft = JSON.parse(await file.text()) as SetupDraft;
-      if (!Array.isArray(draft.drawers)) throw new Error('it has no list of drawers');
-      applyDraft(draft);
-    } catch (e) {
-      setDraftNote(`Couldn't load that file: ${(e as Error).message}`);
-    }
-  };
-  /** Drafts whose every box has been checked, with the answers applied */
-  const loadChecked = async () => {
-    try {
-      const { drafts, reviews } = await fetchDrafts();
-      // Drafts marked as finished on the review page are done with, so they're neither loaded nor waited for
-      const open = drafts.drawers.filter((d) => !reviews[d.code]?.closed);
-      const finished = open.filter((d) => {
-        const s = scoreOf(d, reviews[d.code]);
-        return s.boxes > 0 && s.checked === s.boxes;
-      });
-      const waiting = open.filter((d) => !finished.includes(d)).map((d) => reviews[d.code]?.code ?? d.code);
-      applyDraft(reviewedDrafts({ drawers: finished }, reviews), waiting.length ? [`Still to finish checking: ${waiting.join(', ')}.`] : []);
-    } catch (e) {
-      setDraftNote(`Couldn't load the drafts: ${e instanceof TypeError ? 'the server can’t be reached' : (e as Error).message}`);
-    }
-  };
   const openMany = (unitIds: string[], how: OpenedUnit['how']) => setSetup((s) => unitIds.reduce((x, id) => openUnit(x, openable.get(id)!, how, uid), s));
   const closeMany = (unitIds: string[]) => setSetup((s) => unitIds.reduce((x, id) => closeUnit(x, openable.get(id)!), s));
 
@@ -289,27 +242,6 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
           <button className="ghost small-btn" disabled={!analysis.drawersRecorded} onClick={() => setPrinting(true)}>
             Print labels…
           </button>
-          <a className="small-btn" href="/review" target="_blank" rel="noreferrer">
-            Check drafts
-          </a>
-          <button className="ghost small-btn" onClick={loadChecked} title="Drafts read from your photos that you’ve finished checking, with your answers applied">
-            Load checked drafts
-          </button>
-          <button className="link small" onClick={() => draftRef.current?.click()}>
-            or from a file…
-          </button>
-          <input
-            ref={draftRef}
-            type="file"
-            accept=".json"
-            hidden
-            onChange={(e) => {
-              if (e.target.files?.[0]) openDraft(e.target.files[0]);
-              e.target.value = '';
-            }}
-          />
-          {draftNote && <span className="muted">{draftNote}</span>}
-          <PhoneLink />
         </div>
         {lifted.length > 0 && (
           <p className="muted small setup-lifted">
@@ -349,7 +281,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
             )}
             <div className="setup-tiles">
               {list.map((c) => (
-                <DrawerTile key={c.key} comp={c} recorded={!!setup.drawers[c.key]?.length} pockets={placed.get(c.key) ?? []} photos={photos.filter((p) => p.code === c.code).length} dim={!!q && !matchesFilter(c)} onClick={() => setEditing(c.key)} />
+                <DrawerTile key={c.key} comp={c} recorded={!!setup.drawers[c.key]?.length} pockets={placed.get(c.key) ?? []} dim={!!q && !matchesFilter(c)} onClick={() => setEditing(c.key)} />
               ))}
             </div>
           </Fold>
@@ -497,13 +429,6 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
           comp={current}
           pockets={setup.drawers[current.key] ?? null}
           placed={placed.get(current.key) ?? []}
-          photos={photos.filter((p) => p.code === current.code)}
-          codes={comps.map((c) => c.code)}
-          boxes={boxes}
-          onPhotosChanged={() => {
-            refreshPhotos();
-            refreshBoxes();
-          }}
           tree={tree}
           whereIs={whereIs}
           choices={choices.filter((c) => howManyFit(c.container, current) > 0)}
@@ -536,139 +461,7 @@ export default function SetupTab({ project, update, plan, parts, categories, goT
   );
 }
 
-/** Where to point a phone. On this computer "localhost" means nothing to the phone, so ask the server for its address. */
-function PhoneLink() {
-  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
-  const [urls, setUrls] = useState<string[]>(local ? [] : [`${location.origin}/snap`]);
-  useEffect(() => {
-    if (!local) return;
-    fetch('/api/info')
-      .then((r) => (r.ok ? r.json() : { urls: [] }))
-      .then((info: { urls: string[] }) => setUrls(info.urls))
-      .catch(() => {
-        /* no server to ask, so no link to show */
-      });
-  }, [local]);
-  if (!urls.length) return null;
-  return (
-    <span className="muted setup-phone">
-      Photos from your phone: open <b>{urls.join(' or ')}</b>
-    </span>
-  );
-}
-
-/** The drawer's photos: the top photo with a numbered dot for each marked piece or close-up, marking a box
- * afterwards by clicking it, and refiling everything under another drawer when units move around. */
-function DrawerPhotos({ photos, codes, boxes, onChanged }: { photos: Photo[]; codes: string[]; boxes: BoxNames; onChanged: () => void }) {
-  const [marking, setMarking] = useState<string | null>(null);
-  const [moveTo, setMoveTo] = useState('');
-  const [busy, setBusy] = useState(false);
-  if (!photos.length) return null;
-  const code = photos[0].code;
-  const run = async (work: () => Promise<unknown>) => {
-    setBusy(true);
-    try {
-      await work();
-    } catch (e) {
-      alert(`Couldn't do that: ${(e as Error).message}`);
-    }
-    setBusy(false);
-    onChanged();
-  };
-  const remove = (p: Photo) => confirm(`Delete ${p.name}?`) && run(() => deletePhoto(p.name));
-  const top = topPhotoOf(photos, code);
-  const markable = photos.filter((p) => p.view === 'piece' || p.view === 'closeup');
-  const marked = markable.filter((p) => p.spot);
-  const number = (p: Photo) => marked.indexOf(p) + 1;
-  const pick = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!marking) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const at = (v: number, size: number) => Math.min(99, Math.max(0, Math.floor((v / size) * 100)));
-    const spot = { x: at(e.clientX - r.left, r.width), y: at(e.clientY - r.top, r.height) };
-    const name = marking;
-    setMarking(null);
-    void run(() => changePhoto(name, { spot }));
-  };
-  const others = codes.filter((c) => c !== code);
-  const moveAll = () => {
-    if (!moveTo || !confirm(`Move all ${photos.length} photos from ${code} to ${moveTo}? Their box marks go with them.`)) return;
-    // Oldest first, so they keep their order in the new drawer
-    void run(async () => {
-      for (const p of [...photos].sort((a, b) => a.mtime - b.mtime)) await changePhoto(p.name, { code: moveTo });
-      // Box names are places on the top photo, so they go where it goes
-      if (boxes[code]?.length) {
-        await saveBoxNames(moveTo, [...(boxes[moveTo] ?? []), ...boxes[code]]);
-        await saveBoxNames(code, []);
-      }
-    });
-    setMoveTo('');
-  };
-  return (
-    <>
-      {top && markable.length > 0 && (
-        <div className={`setup-photo-map ${marking ? 'marking' : ''}`}>
-          <img src={photoUrl(top)} alt={`${top.name}, with where each piece and close-up came from`} onClick={pick} />
-          {(boxes[code] ?? []).map((b) => (
-            <span key={`${b.x}-${b.y}`} className="setup-box-name" style={{ left: `${b.x}%`, top: `${b.y}%` }}>
-              {b.name}
-            </span>
-          ))}
-          {marked.map((p) => (
-            <a key={p.name} className="setup-photo-dot" href={photoUrl(p)} target="_blank" rel="noreferrer" title={p.name} style={{ left: `${p.spot!.x}%`, top: `${p.spot!.y}%` }}>
-              {number(p)}
-            </a>
-          ))}
-        </div>
-      )}
-      {marking && (
-        <p className="small setup-marking">
-          Click the box on the top photo that {marking} came from.{' '}
-          <button className="link small" onClick={() => setMarking(null)}>
-            Cancel
-          </button>
-        </p>
-      )}
-      <div className="setup-photos">
-        {photos.map((p) => (
-          <figure key={p.name} className={`setup-photo ${marking === p.name ? 'selected' : ''}`}>
-            <a href={photoUrl(p)} target="_blank" rel="noreferrer" title={p.name}>
-              <img src={photoUrl(p)} alt={p.name} loading="lazy" />
-            </a>
-            {p.spot && <span className="setup-photo-number">{number(p)}</span>}
-            <button className="icon" aria-label={`Delete ${p.name}`} disabled={busy} onClick={() => remove(p)}>
-              ✕
-            </button>
-            {top && (p.view === 'piece' || p.view === 'closeup') && (
-              <figcaption>
-                <button className="link small" disabled={busy} onClick={() => setMarking(p.name)}>
-                  {p.spot ? 'Move mark' : 'Mark box'}
-                </button>
-              </figcaption>
-            )}
-          </figure>
-        ))}
-      </div>
-      {others.length > 0 && (
-        <div className="setup-layout small">
-          <span className="muted">Taken for a different drawer?</span>
-          <select aria-label="Drawer to move these photos to" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
-            <option value="">Move all to…</option>
-            {others.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <button className="ghost small-btn" disabled={!moveTo || busy} onClick={moveAll}>
-            Move
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
-function DrawerTile({ comp, recorded, pockets, photos, dim, onClick }: { comp: SetupComp; recorded: boolean; pockets: PlacedPocket[]; photos: number; dim: boolean; onClick: () => void }) {
+function DrawerTile({ comp, recorded, pockets, dim, onClick }: { comp: SetupComp; recorded: boolean; pockets: PlacedPocket[]; dim: boolean; onClick: () => void }) {
   const capacity = pockets.reduce((t, p) => t + p.capacity, 0);
   const used = pockets.reduce((t, p) => t + p.used, 0);
   const inUse = pockets.filter((p) => p.parts.length);
@@ -681,7 +474,6 @@ function DrawerTile({ comp, recorded, pockets, photos, dim, onClick }: { comp: S
         <span className="code">{comp.code}</span>
         {placeName(comp) && <span className="small place-name setup-tile-title">{placeName(comp)}</span>}
         {pockets.length > 1 && <span className="muted small">{pockets.length} pockets</span>}
-        {photos > 0 && <span className="muted small">{photos} {photos === 1 ? 'photo' : 'photos'}</span>}
         {inUse.length > 0 && (
           <span className={`small setup-tile-fill ${measured ? '' : 'muted'}`}>
             {measured ? '' : '~'}
@@ -698,10 +490,6 @@ function DrawerEditor({
   comp,
   pockets,
   placed,
-  photos,
-  codes,
-  boxes,
-  onPhotosChanged,
   tree,
   whereIs,
   choices,
@@ -720,10 +508,6 @@ function DrawerEditor({
   comp: SetupComp;
   pockets: SetupPocket[] | null;
   placed: PlacedPocket[];
-  photos: Photo[];
-  codes: string[];
-  boxes: BoxNames;
-  onPhotosChanged: () => void;
   tree: TreeNode;
   whereIs: Map<string, string[]>;
   /** containers that fit in here */
@@ -744,8 +528,6 @@ function DrawerEditor({
   const [active, setActive] = useState(0);
   const [query, setQuery] = useState('');
   const [lastAdded, setLastAdded] = useState<string | null>(null);
-  // The photos take a lot of room, so they start folded away once the drawer has pockets recorded to work on
-  const [showPhotos, setShowPhotos] = useState(() => !pockets || pockets.length < 2);
   const searchRef = useRef<HTMLInputElement>(null);
   const current = pockets ?? [newPocket(first)];
   const activeIndex = Math.min(active, current.length - 1);
@@ -835,16 +617,6 @@ function DrawerEditor({
           </>
         )}
 
-        {photos.length > 0 ? (
-          <details className="setup-fold" open={showPhotos} onToggle={(e) => setShowPhotos((e.target as HTMLDetailsElement).open)}>
-            <summary>
-              Photos <span className="muted small">{photos.length}</span>
-            </summary>
-            <DrawerPhotos photos={photos} codes={codes} boxes={boxes} onChanged={onPhotosChanged} />
-          </details>
-        ) : (
-          <DrawerPhotos photos={photos} codes={codes} boxes={boxes} onChanged={onPhotosChanged} />
-        )}
 
         <div className="setup-count">
           <span>Pockets</span>
@@ -880,7 +652,6 @@ function DrawerEditor({
             onChange={(change) => onChange(setPocket(current, i, change))}
             onRemove={(part) => onChange(removeFromPocket(current, i, part))}
             onRemovePocket={pocket.container ? () => onChange(removePocket(current, i, uid)) : undefined}
-            boxNames={(boxes[comp.code] ?? []).map((b) => b.name)}
           />
         ))}
 
@@ -1072,7 +843,6 @@ function PocketRow({
   onChange,
   onRemove,
   onRemovePocket,
-  boxNames,
 }: {
   pocket: SetupPocket;
   index: number;
@@ -1087,8 +857,6 @@ function PocketRow({
   onChange: (change: Partial<SetupPocket>) => void;
   onRemove: (part: string) => void;
   onRemovePocket?: () => void;
-  /** names given to boxes in this drawer on the phone */
-  boxNames: string[];
 }) {
   const fillPercent = pocket.fill === undefined ? '' : String(Math.round(pocket.fill * 100));
   const estimated = placed && placed.parts.length ? placed.estimate / placed.capacity : null;
@@ -1171,7 +939,7 @@ function PocketRow({
           onChange={(e) => onChange({ label: e.target.value || undefined })}
         />
         <datalist id={`${pocket.id}-names`}>
-          {[...new Set([...boxNames, ...BOX_NAME_IDEAS])].map((n) => (
+          {LABEL_IDEAS.map((n) => (
             <option key={n} value={n} />
           ))}
         </datalist>

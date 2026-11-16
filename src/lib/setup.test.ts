@@ -10,7 +10,6 @@ import {
   containerChoices,
   floorLeft,
   howManyFit,
-  loadDraft,
   litresInName,
   openableUnits,
   openUnit,
@@ -431,61 +430,6 @@ describe('changing how a unit is laid out', () => {
     const a = analyse(setupOf(drawers2));
     expect(a.findings.map((f) => f.kind)).not.toContain('mixed');
     expect(a.suggestions.filter((x) => x.moves.some((m) => m.from === 'a' || m.to === 'a'))).toEqual([]);
-  });
-});
-
-describe('loading drafts', () => {
-  let n = 0;
-  const id = () => `draft${n++}`;
-  const box: StorageUnit = { id: 'b', name: 'Boxsweden, 10L', accessibility: 2, compartments: [{ id: 's', label: 'Section', w: 90, d: 225, h: 80, qty: 6 }] };
-  const base = expandCompartments([unit, box], settings);
-  const first = base[0].key;
-  const draft = {
-    drawers: [
-      { code: 'A1', pockets: [{ share: 0.25, fill: 0.4, parts: ['b1'] }, { share: 0.75, parts: ['p1', 'gone'] }] },
-      { code: 'B', open: 'dividers' as const, pockets: [{ fill: 0.7, parts: ['b2'] }] },
-      { code: 'Q9', pockets: [{ parts: ['b3'] }] },
-    ],
-  };
-
-  it('fills in drawers with pockets, sizes and fills', () => {
-    const { setup, loaded } = loadDraft(EMPTY_SETUP, draft, base, parts, id);
-    expect(loaded).toEqual(['A1', 'B']);
-    expect(setup.drawers[first].map((p) => [p.share, p.fill, p.parts])).toEqual([[0.25, 0.4, ['b1']], [0.75, undefined, ['p1']]]);
-  });
-
-  it('opens up a unit that the draft treats as one space', () => {
-    const { setup } = loadDraft(EMPTY_SETUP, draft, base, parts, id);
-    expect(setup.open.b.how).toBe('dividers');
-    expect(setup.drawers[wholeKey('b')][0]).toMatchObject({ fill: 0.7, parts: ['b2'], share: 1 });
-  });
-
-  it('stands containers in a drawer, including empty ones', () => {
-    const small = { name: 'Small', w: 60, d: 60, h: 50 };
-    const { setup } = loadDraft(EMPTY_SETUP, { drawers: [{ code: 'A2', pockets: [{ container: small, fill: 0.5, parts: ['b1'] }, { container: small, parts: [] }] }] }, base, parts, id);
-    expect(setup.drawers[base[1].key].map((p) => [p.container, p.parts])).toEqual([[small, ['b1']], [small, []]]);
-    expect(placePockets(setup, setupComps(base), parts, 1)[0].capacity).toBeCloseTo(180);
-  });
-
-  it('carries a box’s label', () => {
-    const { setup } = loadDraft(EMPTY_SETUP, { drawers: [{ code: 'A2', pockets: [{ label: 'Fences', parts: ['b1'] }] }] }, base, parts, id);
-    expect(setup.drawers[base[1].key][0].label).toBe('Fences');
-    expect(placePockets(setup, setupComps(base), parts, 1)[0].label).toBe('Fences');
-  });
-
-  it('reports what it could not place, without failing', () => {
-    const { noDrawer, noPart } = loadDraft(EMPTY_SETUP, draft, base, parts, id);
-    expect(noDrawer).toEqual(['Q9']);
-    expect(noPart).toEqual(['gone']);
-  });
-
-  it('says which recorded drawers it would replace, and leaves others alone', () => {
-    const other = base[3].key;
-    const start: Setup = { ...EMPTY_SETUP, drawers: { [first]: [pocket('old', ['b3'])], [other]: [pocket('keep', ['p3'])] } };
-    const { setup, replaced } = loadDraft(start, draft, base, parts, id);
-    expect(replaced).toEqual(['A1']);
-    expect(setup.drawers[other][0].id).toBe('keep');
-    expect(start.drawers[first][0].id).toBe('old');
   });
 });
 

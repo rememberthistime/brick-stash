@@ -1,5 +1,5 @@
-// Drawer codes: a letter for each unit and a number for each of its compartments, as in A1 or C12. Photos, box names,
-// drafts, reviews and printed labels are all filed under them, so a unit keeps its letter for good: it's stored on
+// Drawer codes: a letter for each unit and a number for each of its compartments, as in A1 or C12. Recorded drawers
+// and printed labels are all filed under them, so a unit keeps its letter for good: it's stored on
 // the unit rather than worked out from where the unit sits in the list.
 import type { StorageUnit } from './types';
 
