@@ -68,3 +68,31 @@ describe('names for units and drawers', () => {
     expect(codeWithName(whole.code, whole)).toBe('A: Tub');
   });
 });
+
+describe('one name per drawer', () => {
+  it('moves a one-pocket drawer’s label to the drawer’s name, and leaves divided drawers alone', async () => {
+    const { namesFromLabels } = await import('./codes');
+    const units = withUnitCodes([unit('a', 2, 3), unit('b', 2, 1)]);
+    const drawers = {
+      'a:ac:0': [{ label: 'Fences' }],
+      'a:ac:1': [{ label: 'Hinges' }, { label: 'Clips' }],
+      'whole:b': [{ label: 'Tub of wheels' }],
+    };
+    const out = namesFromLabels(units, drawers);
+    expect(out.units[0].drawerNames).toEqual({ 'ac:0': 'Fences' });
+    expect(out.units[1].title).toBe('Tub of wheels');
+    expect(out.drawers['a:ac:0']).toEqual([{}]);
+    expect(out.drawers['a:ac:1']).toEqual(drawers['a:ac:1']);
+    // Settled already: nothing to do
+    const again = namesFromLabels(out.units, out.drawers);
+    expect(again.units).toBe(out.units);
+    expect(again.drawers).toBe(out.drawers);
+  });
+
+  it('keeps a label that differs from a name the drawer already has', async () => {
+    const { namesFromLabels } = await import('./codes');
+    const units = setPlaceName(withUnitCodes([unit('a', 2, 3)]), 'a', 'ac:0', 'Plates');
+    const drawers = { 'a:ac:0': [{ label: 'Fences' }] };
+    expect(namesFromLabels(units, drawers).drawers).toBe(drawers);
+  });
+});

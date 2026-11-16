@@ -13,7 +13,7 @@ const proxy = Object.fromEntries(
   }),
 );
 
-/** The project and photos API, so development works the same as `npm run serve` */
+/** The project API, so development works the same as `npm run serve` */
 function brickStashApi(): Plugin {
   const api = createApi(defaultDirs());
   const middleware: Connect.NextHandleFunction = (req, res, next) => {

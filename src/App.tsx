@@ -1,27 +1,36 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { download, useCatalog, useProject, withDefaults } from './state';
-import { mergeToParts, subtractParts } from './lib/collection';
+import { mergeToParts, partVolume, subtractParts } from './lib/collection';
 import { splitKeptOut, summariseKept } from './lib/keepOut';
-import { applyMeasured, calibrationFrom, withCalibration } from './lib/measure';
-import { lockedPlan, suggestHomes } from './lib/lock';
-import { applyMoves, basisChanges, basisOf } from './lib/moves';
+import { calibrationFrom, withCalibration } from './lib/measure';
 import { setupComps, setupMeasurements } from './lib/setup';
-import { buildTree, leaves, plan as runPlan } from './lib/planner';
+import { buildTree, expandCompartments } from './lib/planner';
 import type { Project } from './lib/types';
 import CollectionTab from './components/CollectionTab';
 import StorageTab from './components/StorageTab';
-import PlanTab from './components/PlanTab';
-import SetupTab from './components/SetupTab';
+import StorageView from './components/storage/StorageView';
 import Versions from './components/Versions';
 
-type Tab = 'collection' | 'storage' | 'plan' | 'setup';
-
-const NO_CATEGORIES: Record<string, string> = {};
+type Tab = 'collection' | 'storage' | 'drawers';
 
 export default function App() {
   const { catalog, error } = useCatalog();
   const { project, update, replace, sync, takeServerCopy } = useProject();
-  const [tab, setTab] = useState<Tab>('collection');
+  const [tab, setTabState] = useState<Tab>('collection');
+  // Most visits are to put parts away, so the app shows My storage once there's a project to show, unless a tab has
+  // been chosen by then. The project can arrive from the server a moment after the first draw.
+  const chosen = useRef(false);
+  const setTab = (t: Tab) => {
+    chosen.current = true;
+    setTabState(t);
+  };
+  const ready = project.units.length > 0 && project.rows.length > 0;
+  useEffect(() => {
+    if (ready && !chosen.current) {
+      chosen.current = true;
+      setTabState('drawers');
+    }
+  }, [ready]);
   const [versions, setVersions] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -30,44 +39,18 @@ export default function App() {
     () => subtractParts(owned, project.excluded.filter((e) => e.enabled).flatMap((e) => e.rows), catalog),
     [owned, project.excluded, catalog],
   );
-  // Volumes use the calibration the plan was last re-planned with, so measuring a drawer doesn't reshuffle anything
-  const calibrated = useMemo(() => withCalibration(subtraction.parts, project.basis.calibration), [subtraction.parts, JSON.stringify(project.basis.calibration)]);
-  const { planned: parts, kept, picked, forPlanning } = useMemo(() => splitKeptOut(calibrated, project.keepOut, project.units), [calibrated, project.keepOut, project.units]);
+  // With "Use these fills" on, how full your recorded drawers really are corrects every part's estimated size
+  const calibration = useMemo(() => {
+    if (!project.setup.useFills) return null;
+    const spaces = setupComps(expandCompartments(project.units, project.settings), project.setup.open);
+    return calibrationFrom(setupMeasurements(project.setup, spaces, subtraction.parts), project.settings.volumeScale);
+  }, [project.setup, project.units, project.settings, subtraction.parts]);
+  const calibrated = useMemo(() => withCalibration(subtraction.parts, calibration), [subtraction.parts, calibration]);
+  const { planned: parts, kept } = useMemo(() => splitKeptOut(calibrated, project.keepOut, project.units), [calibrated, project.keepOut, project.units]);
   const keptSummary = useMemo(() => summariseKept(kept, project.keepOut, project.settings.volumeScale), [kept, project.keepOut, project.settings.volumeScale]);
   // The Collection tab lists everything, kept out or not, so any of it can be switched back
   const everything = useMemo(() => buildTree(calibrated, catalog?.categories ?? {}, project.settings.volumeScale), [calibrated, catalog, project.settings.volumeScale]);
-  // Manual changes only reshape the plan through a re-plan, so making one needn't run the planner again
-  const basis = project.basis;
-  const basisKey = JSON.stringify(basis);
-  const leftOut = useMemo(() => new Set([...basis.out, ...Object.keys(basis.pins)]), [basisKey]);
-  const planningKey = forPlanning.map((p) => p.partNum).join();
-  const tree = useMemo(
-    () => buildTree(forPlanning.filter((p) => !leftOut.has(p.partNum)), catalog?.categories ?? {}, project.settings.volumeScale, basis.together),
-    [planningKey, basisKey, calibrated, catalog, project.settings.volumeScale],
-  );
-  const detached = useMemo(
-    () => leaves(buildTree(forPlanning.filter((p) => leftOut.has(p.partNum)), catalog?.categories ?? {}, project.settings.volumeScale)).filter((l) => l.part),
-    [planningKey, basisKey, calibrated, catalog, project.settings.volumeScale],
-  );
-  // A locked plan is read back from where everything was when it was locked, and the planner isn't run at all
-  const lock = project.lock ?? null;
-  const lockTree = useMemo(
-    () => (lock ? buildTree(forPlanning, catalog?.categories ?? {}, project.settings.volumeScale) : null),
-    [!!lock, planningKey, calibrated, catalog, project.settings.volumeScale],
-  );
-  const basePlan = useMemo(
-    () => (lock && lockTree ? lockedPlan(lock, lockTree, project.units, project.settings) : runPlan(tree, project.units, project.settings, new Set(Object.values(basis.pins)))),
-    [lock, lockTree, tree, project.units, project.settings, basisKey],
-  );
-  const { plan: movedPlan, stale: staleMoves, expanded } = useMemo(() => applyMoves(basePlan, project.moves, picked, lock ? [] : detached), [basePlan, project.moves, picked, detached, !!lock]);
-  const homes = useMemo(() => (lock && lockTree ? suggestHomes(movedPlan, lockTree, project.settings) : []), [!!lock, lockTree, movedPlan, project.settings]);
-  const plan = useMemo(() => applyMeasured(movedPlan, project.measurements), [movedPlan, project.measurements]);
-  // A recorded setup only teaches the planner if the user has said it should
-  const fromSetup = useMemo(() => (project.setup.useFills ? setupMeasurements(project.setup, setupComps(plan.compartments.map((c) => c.comp), project.setup.open), parts) : []), [project.setup, plan.compartments, parts]);
-  const measuredCalibration = useMemo(() => calibrationFrom([...project.measurements, ...fromSetup], project.settings.volumeScale), [project.measurements, fromSetup, project.settings.volumeScale]);
-  const currentBasis = useMemo(() => basisOf(expanded, picked, measuredCalibration), [expanded, picked, measuredCalibration]);
-  // Re-planning is what a lock holds off, so there's nothing pending while one is on
-  const pendingChanges = lock ? 0 : basisChanges(basis, currentBasis);
+  const totals = useMemo(() => ({ pieces: parts.reduce((t, p) => t + p.qty, 0), volume: parts.reduce((t, p) => t + partVolume(p, project.settings.volumeScale), 0) }), [parts, project.settings.volumeScale]);
 
   const importProject = async (f: File) => {
     try {
@@ -82,11 +65,11 @@ export default function App() {
     }
   };
 
-  const counts = {
-    collection: parts.length ? `${plan.stats.pieces.toLocaleString()} pcs` : '',
-    storage: project.units.length ? `${plan.compartments.length} spaces` : '',
-    plan: plan.stats.overflowVolume > 0 ? '⚠' : '',
-    setup: Object.keys(project.setup.drawers).length ? `${Object.keys(project.setup.drawers).length} recorded` : '',
+  const recorded = Object.values(project.setup.drawers).filter((d) => d.length).length;
+  const counts: Record<Tab, string> = {
+    collection: parts.length ? `${totals.pieces.toLocaleString()} pcs` : '',
+    storage: project.units.length ? `${project.units.length} units` : '',
+    drawers: recorded ? `${recorded} recorded` : '',
   };
 
   return (
@@ -105,10 +88,10 @@ export default function App() {
           </div>
         </div>
         <nav className="tabs">
-          {(['collection', 'storage', 'plan', 'setup'] as Tab[]).map((t, i) => (
+          {(['collection', 'storage', 'drawers'] as Tab[]).map((t, i) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
               <span className="step">{i + 1}</span>
-              {t === 'collection' ? 'Collection' : t === 'storage' ? 'Storage' : t === 'plan' ? 'Plan' : 'My setup'}
+              {t === 'collection' ? 'Collection' : t === 'storage' ? 'Storage' : 'My storage'}
               {counts[t] && <span className="badge">{counts[t]}</span>}
             </button>
           ))}
@@ -152,10 +135,9 @@ export default function App() {
       {versions && <Versions restore={replace} close={() => setVersions(false)} />}
 
       <main>
-        {tab === 'collection' && <CollectionTab project={project} update={update} catalog={catalog} parts={parts} totals={plan.stats} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />}
-        {tab === 'storage' && <StorageTab project={project} update={update} plan={plan} />}
-        {tab === 'setup' && <SetupTab project={project} update={update} plan={plan} parts={parts} categories={catalog?.categories ?? NO_CATEGORIES} goTo={setTab} />}
-        {tab === 'plan' && <PlanTab project={project} update={update} plan={plan} parts={parts} goTo={setTab} keptSummary={keptSummary} staleMoves={staleMoves} kept={kept} pendingChanges={pendingChanges} currentBasis={currentBasis} expandedMoves={expanded} homes={homes} catalog={catalog} />}
+        {tab === 'collection' && <CollectionTab project={project} update={update} catalog={catalog} parts={parts} totals={totals} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />}
+        {tab === 'storage' && <StorageTab project={project} update={update} />}
+        {tab === 'drawers' && <StorageView project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} catalog={catalog} goTo={setTab} />}
       </main>
 
       <footer className="no-print">

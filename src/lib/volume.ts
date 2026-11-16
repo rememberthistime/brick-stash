@@ -83,21 +83,6 @@ export function estimateUnitVolume(name: string, catId: number | null): number {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-/** Plain bricks, plates and tiles: the parts whose built volume is exactly footprint × height */
-const SOLID_HEIGHT: Record<number, number> = { 11: BRICK_H, 14: PLATE_H, 19: PLATE_H };
-
-/**
- * Volume (cm³) a plain brick/plate/tile takes when built into a solid block — studs sunk into the part
- * above, no air. Loose parts in a drawer can't pack tighter, so summed over a collection this is a hard
- * lower bound on the storage it needs. Null for everything else.
- */
-export function solidVolume(name: string, catId: number | null): number | null {
-  const h = catId == null ? undefined : SOLID_HEIGHT[catId];
-  const s = h ? parseSize(name) : null;
-  if (!h || !s || s.b > 32) return null;
-  return (s.a * STUD * s.b * STUD * (s.c ?? 1) * h) / 1000;
-}
-
 export const compartmentVolume =(d: { w: number; d: number; h: number }) => (d.w * d.d * d.h) / 1000; // cm³
 
 export const litres = (cm3: number) => cm3 / 1000;

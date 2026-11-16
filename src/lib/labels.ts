@@ -1,10 +1,9 @@
-// What goes on each label, from the plan or from the user's own setup, in one shape that both the tape labels and
-// the printed sheet draw from.
+// What goes on each label, from the drawers as recorded, in one shape that both the tape labels and the printed
+// sheet draw from.
 import { placeName } from './codes';
-import { leaves, sectionLabel, type PlannedCompartment } from './planner';
 import type { PlacedPocket, SetupComp } from './setup';
 import { stem } from './storageList';
-import { labelSpec, shortName, type LabelCell } from './tapeLabel';
+import { shortName, type LabelCell } from './tapeLabel';
 
 export interface SheetCell extends LabelCell {
   /** colours the sheet label's edge */
@@ -29,24 +28,6 @@ export interface LabelEntry {
   links: { partNum: string; name: string }[];
 }
 
-/** One label per planned compartment in use */
-export function planLabels(located: (PlannedCompartment & { code: string })[]): LabelEntry[] {
-  return located
-    .filter((c) => c.status === 'used')
-    .map((c) => {
-      const spec = labelSpec(c);
-      const sectionParts = c.sections.map((s) => leaves(s.node).flatMap((l) => (l.part ? [l.part] : [])).sort((a, b) => b.qty - a.qty));
-      return {
-        code: c.code,
-        where: `${c.comp.unitName} › ${c.comp.label}`,
-        ...(placeName(c.comp) ? { name: placeName(c.comp) } : {}),
-        kind: stem(c.comp.unitName),
-        cells: spec.cells.map((cell, i) => ({ ...cell, family: c.sections[i].node.familyKey, parts: sectionParts[i].map((p) => p.partNum), sheetTitle: sectionLabel(c.sections[i]) })),
-        links: sectionParts.flat().map((p) => ({ partNum: p.partNum, name: p.name })),
-      };
-    });
-}
-
 /**
  * Labels for the drawers as they really are. A box with a name ("Fences") says that, with a picture or two of what's
  * most in it, instead of listing every part. Boxes with nothing recorded and no name are left off.
@@ -57,7 +38,8 @@ export function setupLabels(pockets: PlacedPocket[], comps: SetupComp[], perBox:
     const inDrawer = pockets.filter((p) => p.comp.key === comp.key);
     const cells = inDrawer.map((p) => {
       const parts = [...p.parts].sort((a, b) => b.used - a.used);
-      const name = p.label?.trim();
+      // A drawer with one pocket goes by its own name; pockets of a divided drawer by their labels
+      const name = p.label?.trim() || (inDrawer.length === 1 ? (comp.sections ? comp.unitTitle : comp.name)?.trim() : undefined);
       const cell: SheetCell = {
         title: name || (parts.length === 1 ? shortName(parts[0].part.name) : shortName(p.groupLabel)),
         detail: name && parts.length !== 1 ? (parts.length ? `${parts.length} types` : '') : parts.length === 1 ? parts[0].part.partNum : `${parts.length} types`,

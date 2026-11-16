@@ -1,5 +1,5 @@
-// Drawer codes: a letter for each unit and a number for each of its compartments, as in A1 or C12. Photos, box names,
-// drafts, reviews and printed labels are all filed under them, so a unit keeps its letter for good: it's stored on
+// Drawer codes: a letter for each unit and a number for each of its compartments, as in A1 or C12. Recorded drawers
+// and printed labels are all filed under them, so a unit keeps its letter for good: it's stored on
 // the unit rather than worked out from where the unit sits in the list.
 import type { StorageUnit } from './types';
 
@@ -104,3 +104,28 @@ export const drawerKeyOf = (compKey: string) => {
   const [, spec, n] = compKey.split(':');
   return spec !== undefined && n !== undefined ? drawerKey(spec, Number(n)) : null;
 };
+
+/**
+ * One name per drawer. A drawer with a single pocket used to carry its name as that pocket's label, so such a label
+ * becomes the drawer's name (or an opened-up box's unit name) when that has none. Returns the same objects if
+ * there's nothing to move.
+ */
+export function namesFromLabels(units: StorageUnit[], drawers: Record<string, { label?: string }[]>): { units: StorageUnit[]; drawers: Record<string, { label?: string }[]> } {
+  let nextUnits = units;
+  let nextDrawers = drawers;
+  for (const [key, pockets] of Object.entries(drawers)) {
+    const label = pockets.length === 1 ? pockets[0].label?.trim() : undefined;
+    if (!label) continue;
+    const whole = key.startsWith('whole:');
+    const unitId = whole ? key.slice('whole:'.length) : key.split(':')[0];
+    const unit = nextUnits.find((u) => u.id === unitId);
+    if (!unit) continue;
+    const drawer = whole ? null : drawerKeyOf(key);
+    const current = drawer === null ? unit.title : unit.drawerNames?.[drawer];
+    if (current && current !== label) continue;
+    if (!current) nextUnits = setPlaceName(nextUnits, unitId, drawer, label);
+    const { label: _moved, ...rest } = pockets[0];
+    nextDrawers = { ...nextDrawers, [key]: [rest] };
+  }
+  return { units: nextUnits, drawers: nextDrawers };
+}

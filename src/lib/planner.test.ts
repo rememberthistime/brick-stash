@@ -4,8 +4,7 @@ import { join } from 'node:path';
 import type { Catalog, StorageUnit } from './types';
 import { DEFAULT_SETTINGS } from './types';
 import { familyOrder, parseSize, sizeBucket } from './taxonomy';
-import { estimateUnitVolume, solidVolume } from './volume';
-import { recommend } from './recommend';
+import { estimateUnitVolume } from './volume';
 import { baseMould, mergeToParts, parseInventory, subtractParts } from './collection';
 import { buildTree, leaves, plan, sectionLabel, targetFill } from './planner';
 import { PRESETS } from './presets';
@@ -136,15 +135,6 @@ describe('planner', () => {
     expect(fine.stats.groups).toBeGreaterThan(relaxed.stats.groups);
   });
 
-  it('flags a part list that cannot physically fit, using the solid-block minimum', () => {
-    expect(solidVolume('Brick 2 x 4', 11)).toBeCloseTo((16 * 32 * 9.6) / 1000);
-    expect(solidVolume('Brick Sloped 45° 2 x 2', 3)).toBeNull();
-    const big = mergeToParts([{ partNum: '3001', qty: 5000 }], catalog); // ~25 L built solid
-    const p = plan(buildTree(big, catalog.categories), [unitFrom('rub-9', 'one')], DEFAULT_SETTINGS);
-    expect(recommend(p, big, [unitFrom('rub-9', 'one')], [])[0].title).toMatch(/physically fit/);
-    const ok = plan(tree, units, DEFAULT_SETTINGS);
-    expect(recommend(ok, parts, units, []).some((r) => /physically fit/.test(r.title))).toBe(false);
-  });
 
   it('reports overflow when storage is too small', () => {
     const p = plan(tree, [unitFrom('rub-4', 'tiny')], DEFAULT_SETTINGS);

@@ -6,7 +6,6 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createApi, defaultDirs, UPSTREAMS } from './api.mjs';
-import { createReader, readerDefaults } from './reader.mjs';
 
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const PORT = Number(process.env.PORT ?? 5173);
@@ -18,13 +17,7 @@ if (!fs.existsSync(path.join(DIST, 'index.html'))) {
 }
 
 const dirs = defaultDirs();
-// In Docker, HOME is a folder in the data volume, so Claude's sign-in outlives updates to the image. It has to
-// exist before anyone signs in.
-if (process.env.HOME) fs.mkdirSync(process.env.HOME, { recursive: true });
-const reader = createReader(readerDefaults(dirs));
-const api = createApi({ ...dirs, reader });
-/** Photos are read when the user asks. Set a time like "21:07" to also read them each day, by this machine's clock. */
-const READ_AT = process.env.BRICK_READ_AT ?? 'off';
+const api = createApi(dirs);
 
 async function proxy(req, res, upstream, rest) {
   const headers = { ...req.headers };
@@ -78,14 +71,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Brick Stash is running.\n  On this computer: http://localhost:${PORT}`);
   for (const a of Object.values(os.networkInterfaces()).flat()) {
-    if (a && a.family === 'IPv4' && !a.internal && /^(192\.168|10)\./.test(a.address)) console.log(`  On your phone:    http://${a.address}:${PORT}/snap`);
+    if (a && a.family === 'IPv4' && !a.internal && /^(192\.168|10)\./.test(a.address)) console.log(`  On your network:  http://${a.address}:${PORT}`);
   }
-  console.log(`  Project: ${dirs.dataDir}\n  Photos:  ${dirs.photosDir}`);
-  if (!reader.state().available) console.log('  Photo reading: not available here (it needs Claude Code and the photo tool, which the Docker image has).');
-  else {
-    const next = reader.schedule(READ_AT);
-    const using = readerDefaults(dirs);
-    console.log(`  Photo reading uses the ${using.model} model, up to ${using.maxDrawers} drawers at a time (BRICK_READ_MODEL, BRICK_READ_MAX).`);
-    console.log(`  Photo reading: on request${next ? `, and daily at ${READ_AT} if there’s anything new (next: ${next.toLocaleString('en-AU')})` : ' only (set BRICK_READ_AT to a time like 21:07 to read daily as well)'}`);
-  }
+  console.log(`  Project: ${dirs.dataDir}`);
 });
