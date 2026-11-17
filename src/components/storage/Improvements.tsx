@@ -1,4 +1,4 @@
-// What My storage makes of the drawers as recorded: moves worth making, how the estimates compare, and what to look at.
+// What the app makes of the drawers as recorded: moves worth making, how the estimates compare, and what to look at.
 import { acceptSuggestion, type EstimateRow, type Finding, type FindingKind, type SetupAnalysis } from '../../lib/setup';
 import type { Part, Setup } from '../../lib/types';
 import PartImage from '../PartImage';
@@ -149,7 +149,7 @@ export function EstimateCheck({ setup, setSetup, analysis }: { setup: Setup; set
         <input type="checkbox" checked={setup.useFills} onChange={(e) => setSetup((s) => ({ ...s, useFills: e.target.checked }))} /> Use these fills to correct the volume estimates
       </label>
       <p className="muted small">
-        Reaches the Plan tab when you click Re-plan there. It’s best once most of the collection is recorded ({pct(analysis.volumePlaced)} so far), because a part with some still in an unrecorded drawer will look smaller than it really is.
+        Corrects every part’s size, so the suggestions for empty drawers follow. It’s best once most of the collection is recorded ({pct(analysis.volumePlaced)} so far), because a part with some still in an unrecorded drawer will look smaller than it really is.
       </p>
     </>
   );

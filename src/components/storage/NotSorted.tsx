@@ -24,8 +24,6 @@ const rememberedOrder = (): UnsortedOrder => {
 
 interface Props {
   unsorted: Part[];
-  /** share of the collection, by volume, in recorded drawers */
-  volumePlaced: number;
   comps: SetupComp[];
   setup: Setup;
   setSetup: (f: (s: Setup) => Setup) => void;
@@ -40,15 +38,13 @@ interface Props {
   onShowDrawer: (key: string) => void;
 }
 
-export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, folds, onShowDrawer }: Props) {
+export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, folds, onShowDrawer }: Props) {
   const [order, setOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** one drawer to put many parts in, a click each */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
   /** what was just put away, to undo: one part, or every part with room in a recorded drawer at once */
   const [lastPut, setLastPut] = useState<{ text: string; items: { partNum: string; key: string; pocket: number }[] } | null>(null);
   const families = unsortedByFamily(unsorted, scale, order);
-  const pieces = families.reduce((t, f) => t + f.pieces, 0);
-  const volume = families.reduce((t, f) => t + f.volume, 0);
   const q = query.trim().toLowerCase();
   const matches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
   const hit = !!q && unsorted.some(matches);
@@ -125,18 +121,12 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
   const targetCode = targetComp ? ((setup.drawers[targetComp.key]?.length ?? 0) > 1 ? `${targetComp.code}.${targetIndex + 1}` : targetComp.code) : '';
 
   return (
-    <Fold
-      id="storage:unsorted"
-      folds={folds}
-      defaultOpen
-      force={hit}
-      title="Not sorted yet"
-      summary={unsorted.length ? `${unsorted.length.toLocaleString()} part types, ${pieces.toLocaleString()} pieces, ${L(volume)} (${pct(1 - volumePlaced)} of the collection)` : 'every part is in a drawer'}
-    >
+    <>
+      {!unsorted.length && <div className="card empty-state">Every part is in a recorded drawer.</div>}
       {unsorted.length > 0 && (
         <>
-          <p className="muted small">
-            Parts that aren’t in any drawer you’ve recorded. Where there’s room beside the same sort of parts in a recorded drawer, that’s offered first (<b>Put in A3.2</b>); the rest are suggested for drawers you haven’t recorded (click to see the whole suggestion). Or put a part straight into any drawer.
+          <p className="muted small page-note">
+            <b>Put in</b> adds a part beside the same sort of parts in a recorded drawer. <b>Suggested</b> shows the whole plan for an empty drawer. <b>Put in…</b> chooses any drawer.
             {noRoom > 0 && ` ${noRoom} ${noRoom === 1 ? 'has' : 'have'} no room anywhere.`}
           </p>
           {withRoom.length > 0 && (
@@ -147,7 +137,7 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
               <span className="muted">into the recorded pockets offered below. It can be undone.</span>
             </p>
           )}
-          <div className="unsorted-tools">
+          <div className="unsorted-tools card">
             <label className="small">
               Biggest first by{' '}
               <select value={order} onChange={(e) => chooseOrder(e.target.value as UnsortedOrder)}>
@@ -187,11 +177,11 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
           </div>
         </>
       )}
-      {families.map((f) => {
+      {families.map((f, fi) => {
         const shown = q ? f.parts.filter(matches) : f.parts;
         if (!shown.length) return null;
         return (
-          <Fold key={f.family} id={`storage:unsorted:${f.family}`} folds={folds} inner force={hit} title={<><span className={`swatch fam-${f.family}`} /> {f.label}</>} summary={`${f.parts.length} part types, ${f.pieces.toLocaleString()} pieces, ${L(f.volume)}`}>
+          <Fold key={f.family} id={`storage:unsorted:${f.family}`} folds={folds} defaultOpen={fi === 0} force={hit} title={<><span className={`swatch fam-${f.family}`} /> {f.label}</>} summary={`${f.parts.length} part types, ${f.pieces.toLocaleString()} pieces, ${L(f.volume)}`}>
             <ul className="unsorted-list">
               {shown.slice(0, SHOWN).map((p) => {
                 const home = homeOf.get(p.partNum);
@@ -200,14 +190,13 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
                 const thereComp = there ? byKey.get(there.key) : undefined;
                 return (
                   <li key={p.partNum}>
-                    <PartImage partNum={p.partNum} size={36} title={p.name} />
+                    <PartImage partNum={p.partNum} size={56} title={p.name} />
                     <span className="unsorted-name">
                       <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
                         {p.name}
                       </a>
-                      <span className="muted small">
-                        {' '}
-                        {p.partNum} · × {p.qty.toLocaleString()}
+                      <span className="part-meta">
+                        <span className="mono">{p.partNum}</span> · <span className="qty">{p.qty.toLocaleString()} pcs</span>
                       </span>
                     </span>
                     <span className="unsorted-actions">
@@ -237,7 +226,7 @@ export default function NotSorted({ unsorted, volumePlaced, comps, setup, setSet
           </Fold>
         );
       })}
-    </Fold>
+    </>
   );
 }
 

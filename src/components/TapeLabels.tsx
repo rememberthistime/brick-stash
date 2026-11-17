@@ -31,7 +31,7 @@ function loadImage(partNum: string) {
   return found;
 }
 
-export default function TapeLabels({ entries, close, backLabel, showSheet, options }: { entries: LabelEntry[]; close: () => void; backLabel: string; showSheet: () => void; options?: ReactNode }) {
+export default function TapeLabels({ entries, showSheet, options }: { entries: LabelEntry[]; showSheet: () => void; options?: ReactNode }) {
   const kinds = useMemo(() => [...new Set(entries.map((e) => e.kind))], [entries]);
   const [kind, setKind] = useState('');
   const [labels, setLabels] = useState<Record<string, RenderedLabel>>({});
@@ -69,9 +69,6 @@ export default function TapeLabels({ entries, close, backLabel, showSheet, optio
   return (
     <div className="labels-view">
       <div className="row no-print">
-        <button className="ghost" onClick={close}>
-          {backLabel}
-        </button>
         <button className="ghost" onClick={showSheet}>
           Sheet labels instead
         </button>

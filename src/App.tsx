@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { download, useCatalog, useProject, withDefaults } from './state';
 import { mergeToParts, partVolume, subtractParts } from './lib/collection';
 import { splitKeptOut, summariseKept } from './lib/keepOut';
@@ -6,32 +6,23 @@ import { calibrationFrom, withCalibration } from './lib/measure';
 import { setupComps, setupMeasurements } from './lib/setup';
 import { buildTree, expandCompartments } from './lib/planner';
 import type { Project } from './lib/types';
-import CollectionTab from './components/CollectionTab';
+import CollectionTab, { type CollectionPage } from './components/CollectionTab';
 import StorageTab from './components/StorageTab';
-import StorageView from './components/storage/StorageView';
+import StorageView, { STORAGE_PAGES, type StoragePage } from './components/storage/StorageView';
+import { useStorageModel } from './components/storage/model';
+import { PlanSettings } from './components/storage/PlanSettings';
+import { L, pct } from './components/storage/format';
+import { PageHead, Sidebar, usePage, type Page } from './components/Shell';
 import Versions from './components/Versions';
 
-type Tab = 'collection' | 'storage' | 'drawers';
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
 export default function App() {
   const { catalog, error } = useCatalog();
   const { project, update, replace, sync, takeServerCopy } = useProject();
-  const [tab, setTabState] = useState<Tab>('collection');
-  // Most visits are to put parts away, so the app shows My storage once there's a project to show, unless a tab has
-  // been chosen by then. The project can arrive from the server a moment after the first draw.
-  const chosen = useRef(false);
-  const setTab = (t: Tab) => {
-    chosen.current = true;
-    setTabState(t);
-  };
   const ready = project.units.length > 0 && project.rows.length > 0;
-  useEffect(() => {
-    if (ready && !chosen.current) {
-      chosen.current = true;
-      setTabState('drawers');
-    }
-  }, [ready]);
-  const [versions, setVersions] = useState(false);
+  const [page, setPage] = usePage(ready);
+  const [menu, setMenu] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const owned = useMemo(() => mergeToParts(project.rows, catalog, project.volumeOverrides), [project.rows, catalog, project.volumeOverrides]);
@@ -48,9 +39,11 @@ export default function App() {
   const calibrated = useMemo(() => withCalibration(subtraction.parts, calibration), [subtraction.parts, calibration]);
   const { planned: parts, kept } = useMemo(() => splitKeptOut(calibrated, project.keepOut, project.units), [calibrated, project.keepOut, project.units]);
   const keptSummary = useMemo(() => summariseKept(kept, project.keepOut, project.settings.volumeScale), [kept, project.keepOut, project.settings.volumeScale]);
-  // The Collection tab lists everything, kept out or not, so any of it can be switched back
+  // The Parts page lists everything, kept out or not, so any of it can be switched back
   const everything = useMemo(() => buildTree(calibrated, catalog?.categories ?? {}, project.settings.volumeScale), [calibrated, catalog, project.settings.volumeScale]);
   const totals = useMemo(() => ({ pieces: parts.reduce((t, p) => t + p.qty, 0), volume: parts.reduce((t, p) => t + partVolume(p, project.settings.volumeScale), 0) }), [parts, project.settings.volumeScale]);
+  const model = useStorageModel(project, parts, catalog);
+  const { analysis, gaps, recordedHomes, layoutMoves } = model;
 
   const importProject = async (f: File) => {
     try {
@@ -65,16 +58,121 @@ export default function App() {
     }
   };
 
-  const recorded = Object.values(project.setup.drawers).filter((d) => d.length).length;
-  const counts: Record<Tab, string> = {
-    collection: parts.length ? `${totals.pieces.toLocaleString()} pcs` : '',
-    storage: project.units.length ? `${project.units.length} units` : '',
-    drawers: recorded ? `${recorded} recorded` : '',
+  const storageReady = parts.length > 0 && project.units.length > 0;
+  const built = project.excluded.filter((e) => e.enabled).length;
+  const unsorted = analysis.unplaced.length;
+  const withRoom = analysis.unplaced.filter((p) => recordedHomes.has(p.partNum)).length;
+  const swaps = layoutMoves.reduce((t, r) => t + r.cycles.length, 0);
+  const moves = analysis.suggestions.length;
+  const overflow = gaps.plan.stats.overflowVolume;
+  const n = (x: number) => (x ? x.toLocaleString() : '');
+  const counts: Partial<Record<Page, ReactNode>> = {
+    parts: n(parts.length),
+    built: n(built),
+    kept: n(kept.length),
+    units: n(project.units.length),
+    spaces: n(project.spaces.length),
+    drawers: storageReady ? `${analysis.drawersRecorded}/${analysis.drawersTotal}` : '',
+    'put-away': storageReady ? n(unsorted) : '',
+    moves: storageReady ? `${n(moves)}${moves && analysis.moreSuggestions ? '+' : ''}` : '',
+    tidy: storageReady ? n(swaps) : '',
+    review: storageReady ? n(analysis.findings.length) : '',
   };
+
+  const heads: Record<Page, { headline: ReactNode; sub?: ReactNode }> = {
+    parts: parts.length
+      ? { headline: `${plural(parts.length, 'part type')}, ${totals.pieces.toLocaleString()} pieces`, sub: `About ${(totals.volume / 1000).toFixed(1)} L loose. Colours are merged, as parts are stored by type. Untick a family or part to keep it out of storage; click a family to see its parts.` }
+      : { headline: 'No parts yet' },
+    import: project.rows.length
+      ? { headline: `${plural(project.rows.length, 'row')} loaded`, sub: 'Load a parts list from Rebrickable, BrickLink, Brickset or any spreadsheet, or add whole sets. Replace swaps the collection for the new list; Add puts it on top.' }
+      : { headline: 'Start with your parts list', sub: 'Any spreadsheet saved as CSV works, as do Rebrickable, BrickLink and Brickset exports.' },
+    built: built
+      ? { headline: `${plural(built, 'set')} kept built`, sub: `${subtraction.removed.toLocaleString()} pieces are taken off the collection, as they don't need a drawer.` }
+      : { headline: 'No sets kept built', sub: 'Sets you keep built are taken off the collection, so their parts don’t need a drawer.' },
+    kept: kept.length
+      ? { headline: `${plural(keptSummary.pieces, 'piece')} kept out of storage`, sub: `${keptSummary.labels.join(', ')}. About ${L(keptSummary.volume)}. They’re still in the pick list.` }
+      : { headline: 'Nothing kept out', sub: 'Minifigures, bulky parts or anything else you don’t keep in drawers can be left out of the plan.' },
+    units: project.units.length ? { headline: `${plural(project.units.length, 'storage unit')}`, sub: 'Pick each product you own and how many. The most-used parts go in the units marked easiest to reach.' } : { headline: 'No storage yet', sub: 'Add the drawers and boxes you have, or plan to buy.' },
+    spaces: project.spaces.length
+      ? { headline: plural(project.spaces.length, 'space'), sub: 'Cupboards, shelves or the space under them, inside size in mm. Put units in a space (on Units, expand a unit, then In) to see how much of it they take and what else would fit.' }
+      : { headline: 'No spaces yet', sub: 'Optional: the cupboards and shelves your units sit in, to see what else would fit.' },
+    drawers: storageReady
+      ? {
+          headline: `${analysis.drawersRecorded} of ${plural(analysis.drawersTotal, 'drawer')} recorded`,
+          sub: (
+            <>
+              {pct(analysis.volumePlaced)} of the collection, by volume, is in a recorded drawer{analysis.capacity ? `, and those drawers are ${pct(analysis.used / analysis.capacity)} full` : ''}. Click a drawer to record what’s in it. Dashed ones aren’t recorded: they show what the plan suggests, and nothing changes unless you take it.
+            </>
+          ),
+        }
+      : { headline: 'Drawers' },
+    'put-away': storageReady
+      ? unsorted
+        ? {
+            headline: `${plural(unsorted, 'part type')} ${unsorted === 1 ? 'isn’t' : 'aren’t'} in a drawer`,
+            sub: [withRoom ? `${withRoom.toLocaleString()} have room beside their own sort in a recorded drawer.` : '', gaps.suggested.size ? `The rest are suggested for ${plural(gaps.suggested.size, 'empty drawer')}.` : '', overflow ? `${L(overflow)} has no room anywhere.` : ''].filter(Boolean).join(' '),
+          }
+        : { headline: 'Everything is in a drawer' }
+      : { headline: 'Put away' },
+    moves: storageReady
+      ? { headline: moves ? `${moves}${analysis.moreSuggestions ? '+' : ''} ${moves === 1 && !analysis.moreSuggestions ? 'move' : 'moves'} worth making` : analysis.drawersRecorded ? 'No moves to suggest' : 'Record some drawers first', sub: 'Each is optional. Accepting one only changes what’s recorded here, and adds it to a list of moves to make.' }
+      : { headline: 'Suggested moves' },
+    tidy: storageReady ? { headline: swaps ? `${plural(swaps, 'swap')} would bring each family together` : 'Each family is together', sub: 'Whole drawers swapped between units of the same kind, so similar parts sit side by side. Optional, and can be undone.' } : { headline: 'Tidy the layout' },
+    review: storageReady ? { headline: analysis.findings.length ? `${plural(analysis.findings.length, 'thing')} to look at` : 'Nothing to look at', sub: 'What stands out in the drawers as recorded, and how the size estimates compare with the fills you’ve entered.' } : { headline: 'Review' },
+    labels: { headline: 'Labels for your drawers', sub: 'Brother tape labels, or a sheet of sticky labels, for every recorded drawer.' },
+    pick: { headline: 'Find the parts for a build', sub: 'Which drawers to open, and how many of each part to take, for a set or any parts list.' },
+    export: { headline: 'Your storage as a spreadsheet' },
+    settings: { headline: 'How the plan works', sub: `${project.settings.granularity[0].toUpperCase()}${project.settings.granularity.slice(1)} grouping, ${pct(project.settings.growth)} room to grow, drawers filled to ${pct(project.settings.practicalFill)}.` },
+    project: { headline: 'Your project is saved on the server', sub: 'Every device on the network sees the same project. A copy is kept from the start of each day it changes, for 30 days.' },
+  };
+  const head = heads[page];
+
+  let body: ReactNode;
+  if (page === 'parts' || page === 'import' || page === 'built' || page === 'kept')
+    body = <CollectionTab view={page as CollectionPage} goTo={setPage} project={project} update={update} catalog={catalog} parts={parts} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />;
+  else if (page === 'units' || page === 'spaces') body = <StorageTab view={page} project={project} update={update} />;
+  else if (STORAGE_PAGES.has(page)) body = <StorageView page={page as StoragePage} model={model} project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} catalog={catalog} goTo={setPage} />;
+  else if (page === 'settings')
+    body = (
+      <section className="card page-narrow">
+        <PlanSettings settings={project.settings} onChange={(settings) => update({ settings })} />
+      </section>
+    );
+  else
+    body = (
+      <div className="page-narrow">
+        <section className="card">
+          <h3 className="card-title">A copy of your own</h3>
+          <p className="muted small">Save project downloads the whole project as one file. Open… replaces the project with one you saved, on every device.</p>
+          <div className="row">
+            <button onClick={() => download('brick-stash-project.json', JSON.stringify(project, null, 2), 'application/json')}>Save project</button>
+            <button className="ghost" onClick={() => fileRef.current?.click()}>
+              Open…
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                // Cleared so choosing the same file again still counts as a change
+                e.target.value = '';
+                if (f) void importProject(f);
+              }}
+            />
+          </div>
+        </section>
+        <Versions restore={replace} />
+      </div>
+    );
 
   return (
     <div className="app">
       <header className="topbar no-print">
+        <button className="ghost menu-btn" aria-label="Pages" aria-expanded={menu} onClick={() => setMenu(!menu)}>
+          ☰
+        </button>
         <div className="brand">
           <span className="logo" aria-hidden>
             <i />
@@ -82,68 +180,37 @@ export default function App() {
             <i />
             <i />
           </span>
-          <div>
-            <h1>Brick Stash</h1>
-            <p>Storage planner for LEGO® collections — by type, with room to grow</p>
-          </div>
+          <h1>Brick Stash</h1>
         </div>
-        <nav className="tabs">
-          {(['collection', 'storage', 'drawers'] as Tab[]).map((t, i) => (
-            <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-              <span className="step">{i + 1}</span>
-              {t === 'collection' ? 'Collection' : t === 'storage' ? 'Storage' : 'My storage'}
-              {counts[t] && <span className="badge">{counts[t]}</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="project-actions">
-          <button className="ghost" onClick={() => download('brick-stash-project.json', JSON.stringify(project, null, 2), 'application/json')}>
-            Save project
-          </button>
-          <button className="ghost" onClick={() => fileRef.current?.click()}>
-            Open…
-          </button>
-          <button className="ghost" onClick={() => setVersions((v) => !v)}>
-            Earlier versions…
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              // Cleared so choosing the same file again still counts as a change
-              e.target.value = '';
-              if (f) void importProject(f);
-            }}
-          />
-        </div>
+        <span className="topbar-note muted small">
+          {parts.length ? `${totals.pieces.toLocaleString()} pieces · ${plural(project.units.length, 'unit')}` : 'Storage planner for LEGO® collections'}
+        </span>
       </header>
 
       {error && <div className="banner error">{error}</div>}
       {sync === 'offline' && <div className="banner warn no-print sync-banner">Can’t reach the Brick Stash server. Your changes are safe in this browser and will be sent when it’s back.</div>}
       {sync === 'conflict' && (
         <div className="banner error no-print">
-          This project was changed on another device, so changes here aren’t being saved. <b>Save project</b> keeps a copy of what’s on this screen.{' '}
+          This project was changed on another device, so changes here aren’t being saved. <b>Save project</b> (in Project &amp; versions) keeps a copy of what’s on this screen.{' '}
           <button className="link" onClick={takeServerCopy}>
             Load the latest version
           </button>
         </div>
       )}
 
-      {versions && <Versions restore={replace} close={() => setVersions(false)} />}
-
-      <main>
-        {tab === 'collection' && <CollectionTab project={project} update={update} catalog={catalog} parts={parts} totals={totals} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />}
-        {tab === 'storage' && <StorageTab project={project} update={update} />}
-        {tab === 'drawers' && <StorageView project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} catalog={catalog} goTo={setTab} />}
-      </main>
-
-      <footer className="no-print">
-        Part data from <a href="https://rebrickable.com/downloads/">Rebrickable</a>
-        {catalog ? ` (catalogue ${catalog.built})` : ''}. Volumes are estimates. LEGO® is a trademark of the LEGO Group, which does not sponsor or endorse this tool.
-      </footer>
+      <div className="shell">
+        <Sidebar page={page} setPage={setPage} counts={counts} open={menu} setOpen={setMenu} />
+        <main>
+          <PageHead page={page} headline={head.headline}>
+            {head.sub}
+          </PageHead>
+          {body}
+          <footer className="no-print">
+            Part data from <a href="https://rebrickable.com/downloads/">Rebrickable</a>
+            {catalog ? ` (catalogue ${catalog.built})` : ''}. Volumes are estimates. LEGO® is a trademark of the LEGO Group, which does not sponsor or endorse this tool.
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }
