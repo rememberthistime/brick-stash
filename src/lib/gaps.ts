@@ -1,4 +1,4 @@
-// Planning around the drawers as they really are. Drawers recorded on My storage stay exactly as recorded; the planner
+// Planning around the drawers as they really are. Recorded drawers stay exactly as recorded; the planner
 // only works out where the parts that aren't in any of them could go: first where there's room beside the same sort of
 // parts in a recorded drawer (offered, never done), then laid out in the drawers that haven't been recorded. So with
 // nothing recorded it's a fresh plan, and as more is recorded it's a smaller and smaller job of filling the gaps.
@@ -9,7 +9,7 @@ import { familyFor, familyGroup } from './taxonomy';
 import type { Part, Settings, Setup, SetupPocket, StorageUnit } from './types';
 
 export interface GapPlan {
-  /** every space, as My storage shows them: opened-up units are one space */
+  /** every space, as the Drawers page shows them: opened-up units are one space */
   comps: SetupComp[];
   /** the plan for the parts with no drawer, laid out in the drawers with nothing recorded */
   plan: Plan;

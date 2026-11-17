@@ -8,14 +8,17 @@ import { pickPart, toggleFamily, type KeptPart, type KeptSummary } from '../lib/
 import { download } from '../state';
 import BuiltSets from './BuiltSets';
 import KeepOutCard from './KeepOutCard';
+import PartImage from './PartImage';
+
+export type CollectionPage = 'import' | 'parts' | 'built' | 'kept';
 
 interface Props {
+  view: CollectionPage;
+  goTo: (p: 'import') => void;
   project: Project;
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
   catalog: Catalog | null;
   parts: Part[];
-  /** what's in the plan */
-  totals: { pieces: number; volume: number };
   /** every part after built sets are subtracted, including those kept out of the plan */
   everything: TreeNode;
   subtraction: SubtractResult;
@@ -41,7 +44,7 @@ const readKey = () => {
   }
 };
 
-export default function CollectionTab({ project, update, catalog, parts, totals, everything, subtraction, kept, keptSummary }: Props) {
+export default function CollectionTab({ view, goTo, project, update, catalog, parts, everything, subtraction, kept, keptSummary }: Props) {
   const [mode, setMode] = useState<'append' | 'replace'>('replace');
   const [messages, setMessages] = useState<string[]>([]);
   const [paste, setPaste] = useState('');
@@ -139,11 +142,17 @@ export default function CollectionTab({ project, update, catalog, parts, totals,
   const keptNums = new Set(kept.map((x) => x.part.partNum));
   const keepOut = project.keepOut;
 
-  return (
-    <div className="grid-2">
-      <div>
+  if (view === 'built') return <BuiltSets project={project} update={update} apiKey={apiKey} apiKeyInput={keyInput} subtraction={subtraction} />;
+  if (view === 'kept')
+    return allParts.length > 0 ? (
+      <KeepOutCard project={project} update={update} parts={allParts} kept={kept} summary={keptSummary} />
+    ) : (
+      <div className="card empty-state">No parts yet.</div>
+    );
+  if (view === 'import')
+    return (
+      <div className="page-narrow">
         <section className="card">
-          <h2>Import your collection</h2>
           <p className="muted">
             Any spreadsheet saved as CSV works — it needs a <b>part number</b> column and ideally a <b>quantity</b> column. Colour is optional (we store by type, not colour).
             Exports from <b>Rebrickable</b> (My Parts → Export), <b>BrickLink</b> (wanted list / inventory XML) and <b>Brickset</b> are recognised.
@@ -232,27 +241,20 @@ export default function CollectionTab({ project, update, catalog, parts, totals,
           ))}
         </section>
 
-        <BuiltSets project={project} update={update} apiKey={apiKey} apiKeyInput={keyInput} subtraction={subtraction} />
       </div>
-
-      <div>
+    );
+  return (
+    <>
         <section className="card">
-          <h2>What you have</h2>
           {!allParts.length ? (
-            <p className="muted">No parts yet. Import a file or try the sample.</p>
+            <p className="muted">
+              No parts yet.{' '}
+              <button className="link" onClick={() => goTo('import')}>
+                Import a file or try the sample →
+              </button>
+            </p>
           ) : (
             <>
-              <div className="stats">
-                <Stat
-                  label="Pieces in the plan"
-                  value={totals.pieces.toLocaleString()}
-                  hint={
-                    [subtraction.removed ? `${subtraction.removed.toLocaleString()} in built sets` : '', keptSummary.pieces ? `${keptSummary.pieces.toLocaleString()} kept out` : ''].filter(Boolean).join(', ') || undefined
-                  }
-                />
-                <Stat label="Part types" value={parts.length.toLocaleString()} hint="colours merged" />
-                <Stat label="Est. loose volume" value={`${(totals.volume / 1000).toFixed(1)} L`} />
-              </div>
               {!catalog && <p className="muted">Loading part catalogue…</p>}
               {catalog && unknown.length > 0 && (
                 <div className="banner warn">
@@ -262,10 +264,16 @@ export default function CollectionTab({ project, update, catalog, parts, totals,
                       Look them up as BrickLink ids
                     </button>
                   ) : (
-                    ' Add a Rebrickable API key (left) to look them up as BrickLink ids.'
+                    ' Add a Rebrickable API key on Import to look them up as BrickLink ids.'
                   )}
                 </div>
               )}
+              {busy && <div className="banner">{busy}</div>}
+              {view === 'parts' && messages.map((m, i) => (
+                <div key={i} className="banner">
+                  {m}
+                </div>
+              ))}
               <table className="families">
                 <thead>
                   <tr>
@@ -302,9 +310,7 @@ export default function CollectionTab({ project, update, catalog, parts, totals,
             </>
           )}
         </section>
-        {allParts.length > 0 && <KeepOutCard project={project} update={update} parts={allParts} kept={kept} summary={keptSummary} />}
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -374,6 +380,7 @@ function FamilyRows({
               <thead>
                 <tr>
                   <th title="Untick to keep a part out of the plan">In plan</th>
+                  <th aria-label="Picture" />
                   {header('num', 'Part', undefined, false)}
                   {header('name', 'Name', undefined, false)}
                   {header('qty', 'Qty')}
@@ -390,7 +397,10 @@ function FamilyRows({
                         <td className="center">
                           <input type="checkbox" checked={!keptNums.has(p.partNum)} onChange={(e) => pick(p, !e.target.checked)} />
                         </td>
-                        <td>
+                        <td className="pic">
+                          <PartImage partNum={p.partNum} size={48} title={p.name} />
+                        </td>
+                        <td className="mono">
                           <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer">
                             {p.partNum}
                           </a>

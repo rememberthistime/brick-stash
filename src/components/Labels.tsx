@@ -4,17 +4,14 @@ import type { LabelEntry } from '../lib/labels';
 import PartImage from './PartImage';
 import TapeLabels from './TapeLabels';
 
-export default function Labels({ entries, close, backLabel, note, options }: { entries: LabelEntry[]; close: () => void; backLabel: string; note?: ReactNode; options?: ReactNode }) {
+export default function Labels({ entries, note, options }: { entries: LabelEntry[]; note?: ReactNode; options?: ReactNode }) {
   const [pictures, setPictures] = useState(true);
   const [tape, setTape] = useState(true);
-  if (tape) return <TapeLabels entries={entries} close={close} backLabel={backLabel} showSheet={() => setTape(false)} options={options} />;
+  if (tape) return <TapeLabels entries={entries} showSheet={() => setTape(false)} options={options} />;
   return (
     <div className="labels-view">
       <div className="row no-print">
         <button onClick={() => window.print()}>Print</button>
-        <button className="ghost" onClick={close}>
-          {backLabel}
-        </button>
         <button className="ghost" onClick={() => setTape(true)}>
           Brother tape labels
         </button>

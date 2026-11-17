@@ -14,12 +14,11 @@ interface Props {
   fromPlan: Places;
   /** where parts really are, if any drawers have been recorded on My setup */
   fromSetup: Places | null;
-  close: () => void;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSetup, close }: Props) {
+export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSetup }: Props) {
   const [sets, setSets] = useState('');
   const [pasted, setPasted] = useState('');
   const [wanted, setWanted] = useState<{ title: string; rows: InventoryRow[] } | null>(null);
@@ -59,7 +58,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
       }
       use(names.join(', '), rows);
     } catch (e) {
-      setError(e instanceof BadKeyError ? 'Rebrickable turned the key down. Check it on the Collection tab, under Add whole sets.' : `Couldn’t fetch that: ${(e as Error).message}`);
+      setError(e instanceof BadKeyError ? 'Rebrickable turned the key down. Check it on Import, under Add whole sets.' : `Couldn’t fetch that: ${(e as Error).message}`);
     }
     setBusy('');
   };
@@ -117,9 +116,6 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
   return (
     <div className="pick-view">
       <div className="row no-print">
-        <button className="ghost" onClick={close}>
-          Back to My storage
-        </button>
         {list && <button onClick={() => window.print()}>Print</button>}
         {fromSetup && fromSetup.size > 0 && (
           <label>
@@ -154,7 +150,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
             />
           </label>
         </div>
-        {!apiKey && <p className="muted small">Looking a set up by number uses your Rebrickable key, which this browser doesn’t have yet: add it on the Collection tab, under Add whole sets. A parts file needs no key: on Rebrickable, open the set’s Inventory and export it as CSV, or use a BrickLink wanted list (XML).</p>}
+        {!apiKey && <p className="muted small">Looking a set up by number uses your Rebrickable key, which this browser doesn’t have yet: add it on Import, under Add whole sets. A parts file needs no key: on Rebrickable, open the set’s Inventory and export it as CSV, or use a BrickLink wanted list (XML).</p>}
         <details>
           <summary>…or paste a parts list</summary>
           <textarea rows={5} placeholder={'Part,Color,Quantity\n3001,Red,4'} value={pasted} onChange={(e) => setPasted(e.target.value)} />
@@ -202,7 +198,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
               <ul className="pick-lines">{d.lines.map((l) => row(l, true))}</ul>
             </section>
           ))}
-          {group('Stored elsewhere', 'kept out on the Collection tab', list.elsewhere)}
+          {group('Stored elsewhere', 'kept out of storage', list.elsewhere)}
           {group('No drawer yet', look === 'real' ? 'in your collection, but not in a recorded or suggested drawer' : 'in your collection, but with no drawer yet', list.unplaced)}
           {group('Not in your collection', `${plural(list.missing.reduce((t, l) => t + l.want, 0), 'piece')} to find`, list.missing)}
         </>

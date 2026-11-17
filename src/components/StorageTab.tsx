@@ -10,14 +10,17 @@ import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPres
 import { uid } from '../state';
 import { Stat } from './CollectionTab';
 
+export type StoragePageView = 'units' | 'spaces';
+
 interface Props {
+  view: StoragePageView;
   project: Project;
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
 }
 
 const unitVolume = (u: StorageUnit) => u.compartments.reduce((t, c) => t + compartmentVolume(c) * c.qty, 0);
 
-export default function StorageTab({ project, update }: Props) {
+export default function StorageTab({ view, project, update }: Props) {
   const comps = expandCompartments(project.units, project.settings);
   const [preset, setPreset] = useState(PRESETS[0].id);
   const [count, setCount] = useState(1);
@@ -85,11 +88,59 @@ export default function StorageTab({ project, update }: Props) {
   const retailers = [...new Set(PRESETS.map((p) => p.retailer))];
   const groups = groupUnits(units);
 
-  return (
-    <div className="grid-2 storage">
+  if (view === 'spaces')
+    return (
+      <div className="page-narrow">
       <section className="card">
-        <h2>Your storage</h2>
-        <p className="muted">Pick each product you own and how many. The most-used parts go in the units marked easiest to reach.</p>
+        {spaces.map((s) => {
+          const use = spaceUse(s, units);
+          return (
+            <div key={s.id} className="space-block">
+              <div className="space-row">
+                <input value={s.name} onChange={(e) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))} />
+                <DimsInput value={s} onChange={(d) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, ...d } : x)))} />
+                <span className="muted small">{(compartmentVolume(s) / 1000).toFixed(0)} L</span>
+                <button className="icon danger" aria-label={`Remove ${s.name}`} onClick={() => setSpaces((ss) => ss.filter((x) => x.id !== s.id))}>
+                  ✕
+                </button>
+              </div>
+              <p className="small space-use">
+                {use.units.length ? (
+                  <>
+                    <b>{Math.round(use.used * 100)}% taken</b> by {use.units.length} {use.units.length === 1 ? 'unit' : 'units'} ({[...new Set(use.units.map((u) => u.code ?? '?'))].join(', ')})
+                    {use.unsized > 0 && <span className="muted">, {use.unsized} without an outside size, so not counted</span>}.{' '}
+                  </>
+                ) : (
+                  <span className="muted">Nothing in it yet. </span>
+                )}
+                {use.more.length > 0 ? (
+                  <span className="muted">Room for about {use.more.slice(0, 3).map((m) => `${m.count} more ${m.name}`).join(', or ')}.</span>
+                ) : (
+                  use.units.length > 0 && <span className="muted">No room for another of your units.</span>
+                )}
+              </p>
+            </div>
+          );
+        })}
+        <button className="ghost" onClick={() => setSpaces((ss) => [...ss, { id: uid(), name: `Cupboard ${ss.length + 1}`, w: 800, d: 450, h: 1800 }])}>
+          + Add space
+        </button>
+
+        <h3>Measuring tips</h3>
+        <ul className="tips">
+          <li>Measure inside the compartment at the narrowest point — drawer runners and lips steal space.</li>
+          <li>Height: use the usable depth (to just below the drawer above), not the drawer front.</li>
+          <li>Tick <b>No dividers</b> for tiny drawers or fabric boxes that can only hold one group.</li>
+          <li>
+            Tiny parts in deep tubs are hard to find — a shallow tray inside is a cheap fix. Use <b>÷2</b> to model fitting a fixed divider.
+          </li>
+        </ul>
+      </section>
+      </div>
+    );
+  return (
+    <>
+      <section className="card">
         <div className="stats">
           <Stat label="Units" value={String(units.length)} hint={`${groups.length} kinds`} />
           <Stat label="Compartments" value={String(comps.length)} />
@@ -157,56 +208,7 @@ export default function StorageTab({ project, update }: Props) {
         )}
       </section>
 
-      <section className="card">
-        <h2>Spaces (optional)</h2>
-        <p className="muted">
-          Cupboards, shelves or the space under them, inside size in mm. Put units in a space (expand a unit, then <b>In</b>), and with their outside sizes it shows how much of the space they take and roughly what else would fit.
-        </p>
-        {spaces.map((s) => {
-          const use = spaceUse(s, units);
-          return (
-            <div key={s.id} className="space-block">
-              <div className="space-row">
-                <input value={s.name} onChange={(e) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, name: e.target.value } : x)))} />
-                <DimsInput value={s} onChange={(d) => setSpaces((ss) => ss.map((x) => (x.id === s.id ? { ...x, ...d } : x)))} />
-                <span className="muted small">{(compartmentVolume(s) / 1000).toFixed(0)} L</span>
-                <button className="icon danger" aria-label={`Remove ${s.name}`} onClick={() => setSpaces((ss) => ss.filter((x) => x.id !== s.id))}>
-                  ✕
-                </button>
-              </div>
-              <p className="small space-use">
-                {use.units.length ? (
-                  <>
-                    <b>{Math.round(use.used * 100)}% taken</b> by {use.units.length} {use.units.length === 1 ? 'unit' : 'units'} ({[...new Set(use.units.map((u) => u.code ?? '?'))].join(', ')})
-                    {use.unsized > 0 && <span className="muted">, {use.unsized} without an outside size, so not counted</span>}.{' '}
-                  </>
-                ) : (
-                  <span className="muted">Nothing in it yet. </span>
-                )}
-                {use.more.length > 0 ? (
-                  <span className="muted">Room for about {use.more.slice(0, 3).map((m) => `${m.count} more ${m.name}`).join(', or ')}.</span>
-                ) : (
-                  use.units.length > 0 && <span className="muted">No room for another of your units.</span>
-                )}
-              </p>
-            </div>
-          );
-        })}
-        <button className="ghost" onClick={() => setSpaces((ss) => [...ss, { id: uid(), name: `Cupboard ${ss.length + 1}`, w: 800, d: 450, h: 1800 }])}>
-          + Add space
-        </button>
-
-        <h3>Measuring tips</h3>
-        <ul className="tips">
-          <li>Measure inside the compartment at the narrowest point — drawer runners and lips steal space.</li>
-          <li>Height: use the usable depth (to just below the drawer above), not the drawer front.</li>
-          <li>Tick <b>No dividers</b> for tiny drawers or fabric boxes that can only hold one group.</li>
-          <li>
-            Tiny parts in deep tubs are hard to find — a shallow tray inside is a cheap fix. Use <b>÷2</b> to model fitting a fixed divider.
-          </li>
-        </ul>
-      </section>
-    </div>
+    </>
   );
 }
 

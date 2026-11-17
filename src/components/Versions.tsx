@@ -12,7 +12,7 @@ interface Version {
 const dayOf = (date: string) => new Date(`${date}T00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
 /** The versions the server keeps: the project as it stood before the first change of each day, for 30 days */
-export default function Versions({ restore, close }: { restore: (p: Project) => void; close: () => void }) {
+export default function Versions({ restore, close }: { restore: (p: Project) => void; close?: () => void }) {
   const [versions, setVersions] = useState<Version[] | null>(null);
   const [error, setError] = useState('');
 
@@ -31,7 +31,7 @@ export default function Versions({ restore, close }: { restore: (p: Project) => 
       const p = (await r.json()) as Project;
       if (p.version !== 1 || !Array.isArray(p.rows)) throw new Error('That isn’t a Brick Stash project.');
       restore(withDefaults(p));
-      close();
+      close?.();
     } catch (e) {
       setError(`Couldn’t load that version: ${(e as Error).message}`);
     }
@@ -41,9 +41,11 @@ export default function Versions({ restore, close }: { restore: (p: Project) => 
     <section className="card versions no-print">
       <div className="versions-head">
         <h2>Earlier versions</h2>
-        <button className="ghost" onClick={close}>
-          Close
-        </button>
+        {close && (
+          <button className="ghost" onClick={close}>
+            Close
+          </button>
+        )}
       </div>
       <p className="muted small">The server keeps the project as it stood before the first change of each day, for 30 days.</p>
       {error && <div className="banner warn">{error}</div>}

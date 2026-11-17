@@ -1,4 +1,4 @@
-// Real-world corrections from the fills entered on My storage ("this pocket is about 40% full"). Together they work
+// Real-world corrections from the fills entered on recorded drawers ("this pocket is about 40% full"). Together they work
 // out how far the volume estimates are off, by part, by family and overall, and with "Use these fills" on that
 // corrects every part's estimated size.
 import type { Calibration, Measurement, Part } from './types';
