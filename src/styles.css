@@ -459,11 +459,6 @@ button.setup-pocket.folded:hover { border-color: var(--accent); }
 .setup-group-mark { width: 26px; height: 26px; flex: none; border-radius: 4px; background: var(--fam, var(--line)); }
 .setup-editor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .setup-editor-foot .link { margin-left: auto; }
-.bw-plan { margin: 6px 0; padding-left: 18px; }
-.bw-plan li { margin: 3px 0; }
-.brickwork { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 10px 0; background: var(--soft); }
-.brickwork h3 { margin: 0 0 4px; font-size: 1rem; }
-.brickwork p { margin: 0 0 8px; }
 .setup-suggestions { list-style: none; margin: 0; padding: 0; }
 .rearrange { border-top: 1px solid var(--line); padding: 8px 0; }
 .rearrange h4 { margin: 0 0 6px; }

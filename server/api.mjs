@@ -3,7 +3,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { brickWorkDefaults, createBrickWork } from './brickwork.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -42,7 +41,7 @@ function readBody(req, limit) {
   });
 }
 
-export function createApi({ dataDir, brickWork = createBrickWork(brickWorkDefaults()) }) {
+export function createApi({ dataDir }) {
   const projectFile = path.join(dataDir, 'project.json');
   const revOf = () => (fs.existsSync(projectFile) ? String(fs.statSync(projectFile).mtimeMs) : null);
 
@@ -108,24 +107,7 @@ export function createApi({ dataDir, brickWork = createBrickWork(brickWorkDefaul
         if (rev === null) send(res, 404, { error: 'No project yet.' });
         else send(res, 200, JSON.parse(fs.readFileSync(projectFile, 'utf8')), { 'X-Rev': rev, 'Cache-Control': 'no-store' });
       } else if (p === '/api/project' && req.method === 'PUT') await saveProject(req, res);
-      else if (p === '/api/brickwork' && req.method === 'GET') send(res, 200, await brickWork.status(), { 'Cache-Control': 'no-store' });
-      else if (p === '/api/brickwork/collection' && req.method === 'GET') {
-        if (!brickWork.configured) send(res, 404, { error: 'Brick Work isn’t set up here. Set BRICK_WORK_URL and BRICK_WORK_TOKEN on the server.' });
-        else send(res, 200, await brickWork.collection(), { 'Cache-Control': 'no-store' });
-      } else if (p.startsWith('/api/brickwork/') && !brickWork.configured) send(res, 404, { error: 'Brick Work isn’t set up here. Set BRICK_WORK_URL and BRICK_WORK_TOKEN on the server.' });
-      else if (p === '/api/brickwork/stock' && req.method === 'GET') send(res, 200, await brickWork.stock(), { 'Cache-Control': 'no-store' });
-      else if (p === '/api/brickwork/storages' && req.method === 'GET') send(res, 200, await brickWork.storages(), { 'Cache-Control': 'no-store' });
-      else if (p === '/api/brickwork/apply' && req.method === 'POST') {
-        let body;
-        try {
-          body = JSON.parse((await readBody(req, 8 * 1024 * 1024)).toString('utf8'));
-        } catch {
-          return send(res, 400, { error: 'That isn’t JSON.' }), true;
-        }
-        const ok = Array.isArray(body?.storages) && Array.isArray(body?.moves) && body.storages.every((x) => typeof x?.key === 'string' && typeof x?.name === 'string') && body.moves.every((m) => typeof m?.key === 'string' && Array.isArray(m.stockIds));
-        if (!ok) send(res, 400, { error: 'That isn’t a list of storages and moves.' });
-        else send(res, 200, await brickWork.apply(body));
-      } else if (p === '/api/versions' && req.method === 'GET') send(res, 200, listVersions(), { 'Cache-Control': 'no-store' });
+      else if (p === '/api/versions' && req.method === 'GET') send(res, 200, listVersions(), { 'Cache-Control': 'no-store' });
       else if (p.startsWith('/api/versions/') && req.method === 'GET') {
         // The pattern allows no slashes or dots beyond the extension, so a name can't leave the folder
         const name = p.slice('/api/versions/'.length);

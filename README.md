@@ -18,8 +18,6 @@ npm run fetch-data # refresh the Rebrickable part catalogue (public/data/parts.j
 - **Port** 5173.
 - **Path** `/data` → `/mnt/user/data/projects/lego`. Everything of yours is in there: `project.json`, and `backups/`. Anything else there, such as `photos/` and `.brick-stash/` from earlier versions of the app, is no longer used and can be deleted. It isn't in the appdata backup, so back that folder up separately. Updating the container never touches it.
 
-- **Variables** (optional, to read the collection from Brick Work): `BRICK_WORK_URL`, Brick Work's address as the Brick Stash container can reach it (such as `http://<NAS address>:3333`), and `BRICK_WORK_TOKEN`, a token created in Brick Work under **Admin › API tokens** (read to import the collection; read and write to file parts in Brick Work by drawer). The token stays on the server; the browser never sees it. Once set, `/api/brickwork` on Brick Stash says whether Brick Work is answering, and as which token.
-
 HTTPS comes from the reverse proxy (SWAG, on the home network only) at `https://lego.brindo.de`. There's no password, so keep it on your home network; Tailscale is fine for reaching it while you're out.
 
 **Your project** is kept on the server, with a copy in your browser. If the server's off, edits wait in the browser and are sent when it's back. If two devices change it at once, the second is told rather than overwriting the first. The server also keeps the project as it stood before the first change of each day, for 30 days, in `backups/`: **Earlier versions…** at the top of the app lists them and brings one back. **Save project** writes a JSON file, and **Open…** replaces the project with one (it asks first).
@@ -29,7 +27,6 @@ HTTPS comes from the reverse proxy (SWAG, on the home network only) at `https://
 ## Using it
 
 1. **Collection** — import a CSV (any spreadsheet with a part-number column, ideally quantity), a Rebrickable parts export, or BrickLink XML. Or paste rows, or pull whole sets from Rebrickable with your own API key.
-   - **From Brick Work**: with Brick Work set up on the server (see above), **Import my collection from Brick Work** reads your loose parts and the parts of every set you own there (less any recorded missing). Brick Work doesn't say which sets are kept built, so **Sets you keep built** takes those off, as it does for a Rebrickable export. Your drawers, sets kept built and parts kept out are untouched.
    - **Sets you keep built**: enter them, drop in a set's parts file, or upload Rebrickable's set list export, and their parts come off before anything is stored. Spares stay in, since they're loose in your boxes. The list is kept separately, so a fresh full export can be re-imported and the same sets still come off. Untick a set to put its parts back.
    - **Kept out**: untick a whole family (minifigs, baseplates) or a single part, or turn on *bulky one-offs*. These parts stay listed but aren't stored in drawers.
 2. **Storage** — the units you own: pick products from the catalogue (Officeworks, Spotlight, Howards Storage World, IKEA, small-parts cabinets…) and how many, paste a list like `8x <product link>`, or add custom units with **internal** mm sizes. Identical units show as one row; expand it to edit sizes, reach, or outside size. Use **÷2** on a compartment to model fitting a fixed divider.
@@ -45,7 +42,6 @@ HTTPS comes from the reverse proxy (SWAG, on the home network only) at `https://
    - **Estimates against your drawers**: real fills against the estimates, by family and for the drawers furthest off. Tick **Use these fills** and every part's estimated size is corrected from them. Best left until most of the collection is recorded.
    - **What the review found**: what's too full, split, spread out, mixed or half empty. Tick **Mixed on purpose** on a pocket and it's left alone.
    - **Print labels…** makes Brother P-touch 12 mm tape labels (`.lbx` for P-touch Editor, or PNGs) or a printable sheet, for recorded drawers, with links to Brick Architect's own label for each part (their artwork isn't built in, as it isn't licensed for reuse). **Pick list for a build** takes a set number, a parts file or a pasted list, and lists the drawers to open and how many of each part to take, with the colours the build needs. **Export CSV** lists every drawer's contents, recorded and suggested.
-   - **File in Brick Work** (with Brick Work set up): makes Brick Work's storage match the recorded drawers, as cabinets, drawers, and a bin for each pocket of a divided drawer, then files Brick Work's loose parts in them, so its Part Runner walks your drawers in order. **See what would change** shows what it would make, rename and move first; **Apply in Brick Work** does it, and each change can be undone in Brick Work. It only changes storages it made (marked "Brick Stash …" in their note) and only moves parts that aren't stored or are in one of those: parts you've filed in your own Brick Work places, or that are in a lot, are left unless you tick the box. A part recorded in more than one pocket is filed in the one holding most of it, as Brick Work keeps each part and colour in one place. The parts of sets you own stay with their sets.
    - **Colour key** explains the family colours (click one to highlight its drawers), and **Plan settings** set how finely the suggestions sort and how full they fill each drawer.
    - Each section folds to one line; **Open all**, **Close all** and the **Where is…?** search are at the top.
 
@@ -86,8 +82,6 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - `src/components/CollectionTab.tsx`, `StorageTab.tsx`, `PickList.tsx`, `Labels.tsx`, `TapeLabels.tsx`, `Versions.tsx`, `PartImage.tsx` — the other tabs and views
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `server/api.mjs` — the shared project and its daily versions; `server/index.mjs` — runs the built app for the network
-- `server/brickwork.mjs`, `src/components/BrickWorkImport.tsx` — Brick Work's REST API: importing the collection, and writing storages and filing stock
-- `src/lib/brickworkSync.ts`, `src/components/storage/BrickWorkSync.tsx` — working out how Brick Work's storage should match the drawers, previewed before it's applied
 - `Dockerfile`, `.github/workflows/docker.yml` — the image Unraid runs, built and published from `main`
 
 ## Data & resources
