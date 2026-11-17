@@ -12,6 +12,8 @@ A LEGO storage planner (Vite, React, TypeScript, Vitest, a dependency-free Node 
 - **On the PC**, `npm run serve` serves the built `dist/` on 5173 from `data/`.
 - Code is changed in Claude Code sessions on the repository (often in the cloud, with no access to the NAS or its data) or on the PC.
 
+- **Brick Work** (https://github.com/Ulef1005/brick-work) also runs on the NAS: the user's collection manager. Brick Stash reads the collection from its REST API (`/api/v2`, contract in its `docs/brickwork/openapi-v2.yaml`) with a token set on the Brick Stash container (`BRICK_WORK_URL`, `BRICK_WORK_TOKEN`). Plan: next, write recorded drawers back as Brick Work storages. Brick Work files storage per stock line (part + colour), so a part split across pockets can only point at one.
+
 ## Rules
 - Never change the live data while developing. Test on another port with `BRICK_DATA_DIR` pointed at a scratch folder.
 - On the PC, never build into `dist/`, as that changes the page the user's running server sends out. Check builds with `npx vite build --outDir <scratch folder>`.

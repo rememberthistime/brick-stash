@@ -18,6 +18,8 @@ npm run fetch-data # refresh the Rebrickable part catalogue (public/data/parts.j
 - **Port** 5173.
 - **Path** `/data` → `/mnt/user/data/projects/lego`. Everything of yours is in there: `project.json`, and `backups/`. Anything else there, such as `photos/` and `.brick-stash/` from earlier versions of the app, is no longer used and can be deleted. It isn't in the appdata backup, so back that folder up separately. Updating the container never touches it.
 
+- **Variables** (optional, to read the collection from Brick Work): `BRICK_WORK_URL`, Brick Work's address as the Brick Stash container can reach it (such as `http://<NAS address>:3333`), and `BRICK_WORK_TOKEN`, a read-only token created in Brick Work under **Admin › API tokens**. The token stays on the server; the browser never sees it. Once set, `/api/brickwork` on Brick Stash says whether Brick Work is answering, and as which token.
+
 HTTPS comes from the reverse proxy (SWAG, on the home network only) at `https://lego.brindo.de`. There's no password, so keep it on your home network; Tailscale is fine for reaching it while you're out.
 
 **Your project** is kept on the server, with a copy in your browser. If the server's off, edits wait in the browser and are sent when it's back. If two devices change it at once, the second is told rather than overwriting the first. The server also keeps the project as it stood before the first change of each day, for 30 days, in `backups/`: **Earlier versions…** at the top of the app lists them and brings one back. **Save project** writes a JSON file, and **Open…** replaces the project with one (it asks first).
@@ -27,6 +29,7 @@ HTTPS comes from the reverse proxy (SWAG, on the home network only) at `https://
 ## Using it
 
 1. **Collection** — import a CSV (any spreadsheet with a part-number column, ideally quantity), a Rebrickable parts export, or BrickLink XML. Or paste rows, or pull whole sets from Rebrickable with your own API key.
+   - **From Brick Work**: with Brick Work set up on the server (see above), **Import my collection from Brick Work** reads your loose parts and the parts of every set you own there (less any recorded missing). Brick Work doesn't say which sets are kept built, so **Sets you keep built** takes those off, as it does for a Rebrickable export. Your drawers, sets kept built and parts kept out are untouched.
    - **Sets you keep built**: enter them, drop in a set's parts file, or upload Rebrickable's set list export, and their parts come off before anything is stored. Spares stay in, since they're loose in your boxes. The list is kept separately, so a fresh full export can be re-imported and the same sets still come off. Untick a set to put its parts back.
    - **Kept out**: untick a whole family (minifigs, baseplates) or a single part, or turn on *bulky one-offs*. These parts stay listed but aren't stored in drawers.
 2. **Storage** — the units you own: pick products from the catalogue (Officeworks, Spotlight, Howards Storage World, IKEA, small-parts cabinets…) and how many, paste a list like `8x <product link>`, or add custom units with **internal** mm sizes. Identical units show as one row; expand it to edit sizes, reach, or outside size. Use **÷2** on a compartment to model fitting a fixed divider.
@@ -82,6 +85,7 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - `src/components/CollectionTab.tsx`, `StorageTab.tsx`, `PickList.tsx`, `Labels.tsx`, `TapeLabels.tsx`, `Versions.tsx`, `PartImage.tsx` — the other tabs and views
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `server/api.mjs` — the shared project and its daily versions; `server/index.mjs` — runs the built app for the network
+- `server/brickwork.mjs`, `src/components/BrickWorkImport.tsx` — reading the collection from Brick Work's REST API
 - `Dockerfile`, `.github/workflows/docker.yml` — the image Unraid runs, built and published from `main`
 
 ## Data & resources
