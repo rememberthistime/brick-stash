@@ -76,3 +76,90 @@ describe('reading the collection from Brick Work', () => {
     expect(await createBrickWork({ url: base, token: 'good' }).status()).toMatchObject({ ok: true, token: 'brick-stash', scopes: ['read'] });
   });
 });
+
+describe('filing parts in Brick Work by drawer', () => {
+  // A stand-in that keeps storages and stock in memory, as Brick Work would
+  let bw, srv, calls;
+  beforeEach(async () => {
+    calls = [];
+    bw = {
+      storages: [{ id: 'mine', name: 'My sorting tub', type: 'Bin', parent_id: null, note: null, archived_at: null }],
+      stock: [
+        { id: 's1', item: item('3001', 'Brick 2 x 4'), color: colour('Red'), quantity: 5, storage_id: null, lot_id: null, archived_at: null },
+        { id: 's2', item: item('3001', 'Brick 2 x 4'), color: colour('Blue'), quantity: 5, storage_id: 'mine', lot_id: null, archived_at: null },
+      ],
+      next: 1,
+    };
+    srv = http.createServer(async (req, res) => {
+      const url = new URL(req.url, 'http://x');
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null;
+      calls.push({ method: req.method, path: url.pathname, key: req.headers['idempotency-key'], body });
+      const send = (status, b) => res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(b));
+      if (req.method === 'GET' && url.pathname === '/api/v2/storages') return send(200, { data: [{ id: null, name: 'Not stored' }, ...bw.storages], page: { next_cursor: null, limit: 200 } });
+      if (req.method === 'GET' && url.pathname === '/api/v2/stock') return send(200, { data: bw.stock, page: { next_cursor: null, limit: 200 } });
+      if (req.method === 'POST' && url.pathname === '/api/v2/storages') {
+        const made = { id: `st${bw.next++}`, ...body, archived_at: null };
+        bw.storages.push(made);
+        return send(201, { data: made, event_id: 1 });
+      }
+      const patch = url.pathname.match(/^\/api\/v2\/storages\/([^/]+)$/);
+      if (req.method === 'PATCH' && patch) {
+        const s = bw.storages.find((x) => x.id === patch[1]);
+        Object.assign(s, body);
+        return send(200, { data: s, event_id: 2 });
+      }
+      const move = url.pathname.match(/^\/api\/v2\/storages\/([^/]+)\/contents$/);
+      if (req.method === 'POST' && move) {
+        for (const sel of body.selections) bw.stock.find((x) => x.id === sel.id).storage_id = move[1];
+        return send(200, { data: {}, event_id: 3 });
+      }
+      send(404, { title: 'not found' });
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  });
+  afterEach(async () => {
+    srv.closeAllConnections();
+    await new Promise((r) => srv.close(r));
+  });
+  const client = () => createBrickWork({ url: `http://127.0.0.1:${srv.address().port}`, token: 'good' });
+  const plan = (unitName) => ({
+    storages: [
+      { key: 'unit:a', name: unitName, type: 'Cabinet', parentKey: null },
+      { key: 'space:a:c:0', name: 'A1', type: 'Drawer', parentKey: 'unit:a' },
+    ],
+    moves: [{ key: 'space:a:c:0', stockIds: ['s1'] }],
+  });
+
+  it('makes the storages, marked as its own, and files the lines it was given', async () => {
+    const r = await client().apply(plan('A: Sterilite Medium'));
+    expect(r).toMatchObject({ created: 2, updated: 0, moved: 1, errors: [] });
+    const unit = bw.storages.find((x) => x.note === 'Brick Stash unit:a');
+    expect(bw.storages.find((x) => x.note === 'Brick Stash space:a:c:0')).toMatchObject({ name: 'A1', type: 'Drawer', parent_id: unit.id });
+    expect(bw.stock.find((x) => x.id === 's1').storage_id).toBe(r.ids['space:a:c:0']);
+    // Every write carries its own key
+    const writes = calls.filter((c) => c.method !== 'GET');
+    expect(new Set(writes.map((c) => c.key)).size).toBe(writes.length);
+  });
+
+  it('updates its own storages on a second run rather than making more, and never touches the user’s', async () => {
+    await client().apply(plan('A: Sterilite Medium'));
+    const r = await client().apply(plan('A: Bricks'));
+    expect(r).toMatchObject({ created: 0, updated: 1 });
+    expect(bw.storages.filter((x) => x.note?.startsWith('Brick Stash'))).toHaveLength(2);
+    expect(bw.storages.find((x) => x.id === 'mine')).toMatchObject({ name: 'My sorting tub', note: null });
+    expect(calls.some((c) => c.path.includes('/mine'))).toBe(false);
+  });
+
+  it('lists stock lines with where they’re filed, and storages with Brick Stash’s mark', async () => {
+    await client().apply(plan('A'));
+    const { lines } = await client().stock();
+    expect(lines.map((l) => [l.id, l.partNum, l.colour, l.storageId])).toEqual([
+      ['s1', '3001', 'Red', expect.stringMatching(/^st/)],
+      ['s2', '3001', 'Blue', 'mine'],
+    ]);
+    const { storages } = await client().storages();
+    expect(storages.map((x) => x.mark)).toEqual([null, 'unit:a', 'space:a:c:0']);
+  });
+});
