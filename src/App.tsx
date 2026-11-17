@@ -14,6 +14,7 @@ import { PlanSettings } from './components/storage/PlanSettings';
 import { L, pct } from './components/storage/format';
 import { PageHead, Sidebar, usePage, type Page } from './components/Shell';
 import Versions from './components/Versions';
+import { PartZoom } from './components/PartImage';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
@@ -198,6 +199,7 @@ export default function App() {
         </div>
       )}
 
+      <PartZoom />
       <div className="shell">
         <Sidebar page={page} setPage={setPage} counts={counts} open={menu} setOpen={setMenu} />
         <main>

@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { homeSkipId, type RecordedHome } from '../../lib/gaps';
 import { familyFor } from '../../lib/taxonomy';
-import { familyLabel, type TreeNode } from '../../lib/planner';
+import { familyLabel, leaves, type TreeNode } from '../../lib/planner';
+import { PartStrip } from './Improvements';
 import {
   addContainers,
   addToPocket,
@@ -96,6 +97,7 @@ export default function DrawerEditor({
   const rankedBy = useMemo(() => inDrawers, [query]);
   const results = useMemo(() => searchParts(tree, query, rankedBy, resolve), [tree, query, rankedBy, resolve]);
   const groupOf = useMemo(() => groupsOf(tree), [tree]);
+  const byNum = useMemo(() => new Map(leaves(tree).flatMap((l) => (l.part ? [[l.part.partNum, l.part] as const] : []))), [tree]);
   const nextUp = useMemo(() => (lastAdded && !query ? unplacedNeighbours(tree, lastAdded, inDrawers) : []), [tree, lastAdded, query, inDrawers]);
 
   useEffect(() => {
@@ -202,6 +204,7 @@ export default function DrawerEditor({
             moves={moves}
             divided={current.length > 1}
             titleOf={titleOf}
+            byNum={byNum}
             onAdd={(items) => onChange(items.reduce((list, h) => addToPocket(list, Math.min(h.pocket, list.length - 1), [h.part.partNum]), current))}
             onNotHere={(h) => current[h.pocket] && onSkip(homeSkipId(h.part.partNum, current[h.pocket].id))}
             onAccept={onAccept}
@@ -441,12 +444,22 @@ function PartChoice({
 
 const MOVES_SHOWN = 3;
 
+/** A part's name, opening its Rebrickable page (pictures from every side, sets it's in) in a new tab */
+function PartLink({ part }: { part: Part }) {
+  return (
+    <a className="part-link" href={`https://rebrickable.com/parts/${encodeURIComponent(part.partNum)}/`} target="_blank" rel="noreferrer" title={`${part.partNum} on Rebrickable`} onClick={(e) => e.stopPropagation()}>
+      {part.name}
+    </a>
+  );
+}
+
 /** What's waiting for this drawer: parts not in a drawer that suit a pocket here, and suggested moves */
 function Waiting({
   homes,
   moves,
   divided,
   titleOf,
+  byNum,
   onAdd,
   onNotHere,
   onAccept,
@@ -456,6 +469,7 @@ function Waiting({
   moves: Suggestion[];
   divided: boolean;
   titleOf: (i: number) => string;
+  byNum: Map<string, Part>;
   onAdd: (items: (RecordedHome & { part: Part })[]) => void;
   onNotHere: (h: RecordedHome & { part: Part }) => void;
   onAccept: (s: Suggestion) => void;
@@ -487,9 +501,9 @@ function Waiting({
               <ul className="waiting-list">
                 {homes.slice(0, SHOWN).map((h) => (
                   <li key={h.part.partNum}>
-                    <PartImage partNum={h.part.partNum} size={40} title={h.part.name} />
+                    <PartImage partNum={h.part.partNum} size={48} title={h.part.name} />
                     <span className="move-name">
-                      {h.part.name}
+                      <PartLink part={h.part} />
                       <span className="part-meta">
                         <span className="mono">{h.part.partNum}</span> · {h.part.qty.toLocaleString()} pcs{divided ? ` · pocket ${h.pocket + 1}: ${titleOf(h.pocket)}` : ''}
                       </span>
@@ -515,6 +529,7 @@ function Waiting({
                   {m.why}
                   {m.estimated && <span className="warn-text"> Based on an estimated fill.</span>}
                 </span>
+                <PartStrip nums={m.moves.map((x) => x.part)} byNum={byNum} max={4} />
               </span>
               <button className="small-btn accept-btn" onClick={() => onAccept(m)}>
                 Accept
@@ -661,9 +676,9 @@ function PocketRow({
             const elsewhere = [...new Set(whereIs.get(x.part.partNum) ?? [])].filter((c) => c !== code);
             return (
               <li key={x.part.partNum}>
-                <PartImage partNum={x.part.partNum} size={32} title={x.part.name} />
+                <PartImage partNum={x.part.partNum} size={40} title={x.part.name} />
                 <span>
-                  {x.part.name}
+                  <PartLink part={x.part} />
                   {elsewhere.length > 0 && <span className="muted small"> · also {elsewhere.slice(0, 2).join(', ')}</span>}
                   {x.tooBig && <span className="warn-text small"> · looks too big for this</span>}
                 </span>
