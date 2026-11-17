@@ -21,6 +21,7 @@ import DrawerEditor from './DrawerEditor';
 import { EstimateCheck, Findings, Suggestions, times } from './Improvements';
 import NotSorted from './NotSorted';
 import Rearrange from './Rearrange';
+import BrickWorkSync, { useBrickWorkStatus } from './BrickWorkSync';
 import { ColourKey, PlanSettings } from './PlanSettings';
 import SuggestedDrawer from './Suggested';
 import { L, pct } from './format';
@@ -49,6 +50,7 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
   const [perBox, setPerBox] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const folds = useFolds();
+  const brickWork = useBrickWorkStatus();
   const setup = project.setup;
   const setSetup = (f: (s: Setup) => Setup) => update((p) => ({ setup: f(p.setup) }));
   const scale = project.settings.volumeScale;
@@ -274,6 +276,12 @@ export default function StorageView({ project, update, parts, keptOut, catalog, 
       <Fold id="storage:layout" folds={folds} title="Tidy the layout" summary={layoutMoves.length ? layoutMoves.map((r) => `${r.kind}: ${r.cycles.length} ${r.cycles.length === 1 ? 'swap' : 'swaps'}`).join(', ') : 'each family is together'}>
         <Rearrange plans={layoutMoves} comps={comps} onSwap={(swaps) => update((p) => swaps.reduce<Partial<Project>>((acc, { cycle, text }) => applyCycle({ ...p, ...acc } as Project, cycle, text), {}))} />
       </Fold>
+
+      {brickWork?.configured && (
+        <Fold id="storage:brickwork" folds={folds} title="File in Brick Work" summary="match Brick Work’s storage to these drawers">
+          <BrickWorkSync units={project.units} comps={comps} setup={setup} pockets={analysis.pockets} catalog={catalog} status={brickWork} />
+        </Fold>
+      )}
 
       <Fold id="storage:estimates" folds={folds} title="Estimates against your drawers" summary={check.pockets ? `real size ${times(check.total)} of the estimate` : 'enter a fill to compare'}>
         <EstimateCheck setup={setup} setSetup={setSetup} analysis={analysis} />
