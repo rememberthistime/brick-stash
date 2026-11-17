@@ -98,9 +98,9 @@ export function Suggestions({ setup, setSetup, analysis, onUndo }: { setup: Setu
       <p className="muted small">
         {analysis.suggestions.length > 0 && 'Accepting updates your record here and adds it to Moves to make. '}
         {analysis.moreSuggestions > 0 && `${analysis.moreSuggestions} more possible, shown as you work through these. `}
-        {setup.skipped.length > 0 && (
-          <button className="link small" onClick={() => setSetup((s) => ({ ...s, skipped: [] }))}>
-            Bring back {setup.skipped.length} skipped
+        {setup.skipped.some((id) => !id.startsWith('home:')) && (
+          <button className="link small" onClick={() => setSetup((s) => ({ ...s, skipped: s.skipped.filter((id) => id.startsWith('home:')) }))}>
+            Bring back {setup.skipped.filter((id) => !id.startsWith('home:')).length} skipped
           </button>
         )}
       </p>

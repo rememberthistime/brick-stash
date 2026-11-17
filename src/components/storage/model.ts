@@ -1,10 +1,11 @@
 // Everything the storage pages work out from the project, once, for whichever page is showing: the drawers as
 // recorded, the review of them, room for unsorted parts beside their own sort, the plan for the rest, and the layout swaps.
 import { useMemo } from 'react';
-import { homesInRecorded, planGaps } from '../../lib/gaps';
+import { baseMould } from '../../lib/collection';
+import { homesInRecorded, planGaps, type RecordedHome } from '../../lib/gaps';
 import { buildTree, expandCompartments } from '../../lib/planner';
 import { rearrangements } from '../../lib/rearrange';
-import { analyseSetup, containerChoices, groupsOf, openableUnits, setupComps } from '../../lib/setup';
+import { analyseSetup, containerChoices, groupsOf, openableUnits, setupComps, type Suggestion } from '../../lib/setup';
 import type { Catalog, Part, Project } from '../../lib/types';
 
 const NO_CATEGORIES: Record<string, string> = {};
@@ -34,7 +35,32 @@ export function useStorageModel(project: Project, parts: Part[], catalog: Catalo
     for (const p of analysis.pockets) for (const x of p.parts) out.set(x.part.partNum, [...(out.get(x.part.partNum) ?? []), p.comp.code]);
     return out;
   }, [analysis.pockets]);
-  return { tree, base, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs };
+  // What's waiting for each recorded drawer: parts with room beside their own sort, and moves in or out of it
+  const homesIn = useMemo(() => {
+    const byNum = new Map(analysis.unplaced.map((p) => [p.partNum, p]));
+    const out = new Map<string, (RecordedHome & { part: Part })[]>();
+    for (const [num, h] of recordedHomes) out.set(h.key, [...(out.get(h.key) ?? []), { ...h, part: byNum.get(num)! }]);
+    return out;
+  }, [recordedHomes, analysis.unplaced]);
+  const movesIn = useMemo(() => {
+    const drawerOf = new Map(analysis.pockets.map((p) => [p.id, p.comp.key]));
+    const out = new Map<string, Suggestion[]>();
+    for (const s of analysis.allSuggestions) {
+      const keys = new Set(s.moves.flatMap((m) => [drawerOf.get(m.from), drawerOf.get(m.to)]));
+      for (const k of keys) if (k) out.set(k, [...(out.get(k) ?? []), s]);
+    }
+    return out;
+  }, [analysis]);
+  // The moves the Suggested moves page lists, by drawer: the best ones, no two touching the same pocket
+  const topMovesIn = useMemo(() => {
+    const drawerOf = new Map(analysis.pockets.map((p) => [p.id, p.comp.key]));
+    const out = new Map<string, number>();
+    for (const s of analysis.suggestions) for (const k of new Set(s.moves.flatMap((m) => [drawerOf.get(m.from), drawerOf.get(m.to)]))) if (k) out.set(k, (out.get(k) ?? 0) + 1);
+    return out;
+  }, [analysis]);
+  /** a part number as typed or pasted, as the collection files it */
+  const resolvePart = useMemo(() => (n: string) => baseMould(n, catalog), [catalog]);
+  return { tree, base, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart };
 }
 
 export type StorageModel = ReturnType<typeof useStorageModel>;

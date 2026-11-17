@@ -83,7 +83,7 @@ describe('what is where', () => {
     const [a, b] = placePockets(setupOf({ A1: [pocket('a', [], undefined, 0.6), pocket('b', [], undefined, 0.6)] }), comps, parts, 1);
     expect(a.capacity).toBeCloseTo(volume / 2);
     expect(b.capacity).toBeCloseTo(volume / 2);
-    expect(a.name).toBe('A1 pocket 1');
+    expect(a.name).toBe('A1.1');
   });
 
   it('shares a part in several places by how much room it has in each', () => {
@@ -268,6 +268,20 @@ describe('finding parts to add', () => {
 
   it('finds a part by number', () => {
     expect(searchParts(tree, 'p2', new Set()).parts.map((p) => p.partNum)).toContain('p2');
+  });
+
+  it('finds a part number among other words, as Google Lens gives it', () => {
+    expect(searchParts(tree, 'LEGO #p2 Plate', new Set()).parts.map((p) => p.partNum)[0]).toBe('p2');
+  });
+
+  it('finds a part filed under another number', () => {
+    const resolve = (n: string) => (n === '3069' ? 'p2' : n);
+    expect(searchParts(tree, '3069', new Set(), resolve).parts.map((p) => p.partNum)).toEqual(['p2']);
+  });
+
+  it('takes a number as the start of one when nothing has it whole', () => {
+    const t = buildTree([part('3069b', 'Tile 1 x 2 with Groove', 10, PLATES), part('973c01', 'Torso', 2, PLATES)], {});
+    expect(searchParts(t, '3069', new Set()).parts.map((p) => p.partNum)).toEqual(['3069b']);
   });
 
   it('offers whole groups, and counts what is not placed yet', () => {

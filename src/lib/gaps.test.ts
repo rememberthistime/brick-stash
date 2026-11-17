@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { homesInRecorded, planGaps } from './gaps';
+import { homeSkipId, homesInRecorded, planGaps } from './gaps';
 import { buildTree, expandCompartments } from './planner';
 import { analyseSetup, groupsOf, setupComps } from './setup';
 import { DEFAULT_SETTINGS, EMPTY_SETUP, type Part, type Setup, type StorageUnit } from './types';
@@ -41,6 +41,20 @@ describe('filling the gaps', () => {
     expect([...homes.keys()].sort()).toEqual(['b2', 'b4', 'b5']);
     // The labelled pocket only takes parts of its own group
     for (const h of homes.values()) expect(h.code).toMatch(/^A1\.[12]$/);
+  });
+
+  it('leaves out a pocket you turned down for a part', () => {
+    const all = [...bricks, part('b4', 'Brick 1 x 1', 10, 11)];
+    const base: Setup = { ...EMPTY_SETUP, drawers: { [key(0)]: [{ id: 'p', share: 1, parts: ['b3'] }] } };
+    const comps = setupComps(expandCompartments(units, s), base.open);
+    const tree = buildTree(all, {}, 1);
+    const groups = groupsOf(tree);
+    const homes = (setup: Setup) => {
+      const a = analyseSetup(setup, comps, all, s, tree);
+      return homesInRecorded(a.unplaced, a.pockets, setup, (n) => groups.get(n)?.key, s);
+    };
+    expect(homes(base).has('b4')).toBe(true);
+    expect(homes({ ...base, skipped: [homeSkipId('b4', 'p')] }).has('b4')).toBe(false);
   });
 
   it('tips a near-empty suggested drawer into another of the same group where it fits', () => {

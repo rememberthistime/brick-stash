@@ -1,9 +1,13 @@
 // Recording one drawer as it really is: its pockets, how full each is, and what's in them.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { homeSkipId, type RecordedHome } from '../../lib/gaps';
+import { familyFor } from '../../lib/taxonomy';
 import { familyLabel, type TreeNode } from '../../lib/planner';
 import {
   addContainers,
   addToPocket,
+  contentsName,
+  groupsOf,
   floorLeft,
   howManyFit,
   newPocket,
@@ -16,6 +20,7 @@ import {
   type ContainerChoice,
   type PlacedPocket,
   type SetupComp,
+  type Suggestion,
 } from '../../lib/setup';
 import type { LooseContainer, OpenedUnit, Part, SetupPocket } from '../../lib/types';
 import { uid } from '../../state';
@@ -44,6 +49,11 @@ export default function DrawerEditor({
   onNext,
   onClose,
   onName,
+  homes,
+  moves,
+  resolve,
+  onAccept,
+  onSkip,
 }: {
   comp: SetupComp;
   pockets: SetupPocket[] | null;
@@ -63,6 +73,15 @@ export default function DrawerEditor({
   onNext: () => void;
   onClose: () => void;
   onName: (name: string) => void;
+  /** unsorted parts with room beside their own sort in this drawer */
+  homes: (RecordedHome & { part: Part })[];
+  /** suggested moves into or out of this drawer */
+  moves: Suggestion[];
+  /** a part number as typed, as the collection files it */
+  resolve: (n: string) => string;
+  onAccept: (s: Suggestion) => void;
+  /** turn down a suggestion, by its id */
+  onSkip: (id: string) => void;
 }) {
   const [first] = useState(uid);
   const [active, setActive] = useState(0);
@@ -72,20 +91,39 @@ export default function DrawerEditor({
   const current = pockets ?? [newPocket(first)];
   const activeIndex = Math.min(active, current.length - 1);
   const inDrawers = useMemo(() => new Set(whereIs.keys()), [whereIs]);
-  const results = useMemo(() => searchParts(tree, query, inDrawers), [tree, query, inDrawers]);
+  // Ranked by what was in a drawer when the search was typed, so adding a part doesn't reshuffle the list under you
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rankedBy = useMemo(() => inDrawers, [query]);
+  const results = useMemo(() => searchParts(tree, query, rankedBy, resolve), [tree, query, rankedBy, resolve]);
+  const groupOf = useMemo(() => groupsOf(tree), [tree]);
   const nextUp = useMemo(() => (lastAdded && !query ? unplacedNeighbours(tree, lastAdded, inDrawers) : []), [tree, lastAdded, query, inDrawers]);
 
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
 
-  const add = (nums: string[]) => {
+  /** The search stays as typed, so several of what it found can be added one after another */
+  const add = (nums: string[], pocket = activeIndex) => {
     if (!nums.length) return;
-    onChange(addToPocket(current, activeIndex, nums));
+    onChange(addToPocket(current, pocket, nums));
     setLastAdded(nums[nums.length - 1]);
-    setQuery('');
     searchRef.current?.focus();
   };
+  const titleOf = (i: number) => {
+    const p = current[i];
+    const pp = placed.find((x) => x.id === p?.id);
+    return p?.label?.trim() || (pp ? contentsName(pp) : 'empty');
+  };
+  /** The pocket here that best suits a part: one holding its own group, then its own family */
+  const bestPocket = (part: Part): number | null => {
+    const group = groupOf.get(part.partNum)?.key;
+    const fam = familyFor(part.catId).key;
+    const at = (f: (pp: PlacedPocket) => boolean) => current.findIndex((p) => placed.some((pp) => pp.id === p.id && pp.parts.length > 0 && f(pp)));
+    const i = group ? at((pp) => pp.parts.some((x) => x.group === group)) : -1;
+    const j = i >= 0 ? i : at((pp) => pp.family === fam);
+    return j >= 0 ? j : null;
+  };
+  const inPocket = (num: string) => current.findIndex((p) => p.parts.includes(num));
   // Enter takes the closest single part. A whole group is a bigger step, so that's always a click.
   const addFirst = () => results.parts[0] && add([results.parts[0].partNum]);
   const plain = current.filter((p) => !p.container);
@@ -96,7 +134,7 @@ export default function DrawerEditor({
   const minPockets = hasContainers && plain.every((p) => !p.parts.length) ? 0 : 1;
 
   return (
-    <div className="move-backdrop" onClick={onClose}>
+    <div className="move-backdrop" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
       <div className="move-picker card setup-editor" role="dialog" aria-label={`Drawer ${comp.code}`} onClick={(e) => e.stopPropagation()}>
         <div className="detail-head">
           <h3>
@@ -111,7 +149,7 @@ export default function DrawerEditor({
           <NameInput
             className="setup-editor-name-input"
             value={(comp.sections ? comp.unitTitle : comp.name) ?? ''}
-            placeholder={comp.sections ? 'Name this box' : comp.unitTitle ? `Name this drawer (or it shows “${comp.unitTitle}”)` : 'Name this drawer, e.g. Technic'}
+            placeholder={comp.sections ? 'Name this box' : comp.unitTitle ? `Name this drawer (or it shows “${comp.unitTitle}”)` : placed.length === 1 && placed[0].parts.length ? `Name this drawer (now shown as “${contentsName(placed[0])}”)` : 'Name this drawer, e.g. Technic'}
             label={`Name for ${comp.code}`}
             onChange={onName}
           />
@@ -158,6 +196,19 @@ export default function DrawerEditor({
         )}
 
 
+        {(homes.length > 0 || moves.length > 0) && pockets && (
+          <Waiting
+            homes={homes}
+            moves={moves}
+            divided={current.length > 1}
+            titleOf={titleOf}
+            onAdd={(items) => onChange(items.reduce((list, h) => addToPocket(list, Math.min(h.pocket, list.length - 1), [h.part.partNum]), current))}
+            onNotHere={(h) => current[h.pocket] && onSkip(homeSkipId(h.part.partNum, current[h.pocket].id))}
+            onAccept={onAccept}
+            onSkip={onSkip}
+          />
+        )}
+
         <div className="setup-count">
           <span>Pockets</span>
           <button className="ghost small-btn" aria-label="Fewer pockets" disabled={plain.length <= minPockets} onClick={() => onChange(resizePockets(current, plain.length - 1, uid))}>
@@ -195,33 +246,36 @@ export default function DrawerEditor({
           />
         ))}
 
-        <h4>Add to {current.length > 1 ? `pocket ${activeIndex + 1}` : 'this drawer'}</h4>
-        <input
-          ref={searchRef}
-          className="search keep-search"
-          placeholder="Search parts or groups, e.g. plate 2 x 4, technic pins"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addFirst()}
-        />
+        <h4>Add to {current.length > 1 ? `pocket ${activeIndex + 1} (${titleOf(activeIndex)})` : 'this drawer'}</h4>
+        <div className="setup-search">
+          <input
+            ref={searchRef}
+            type="search"
+            className="search keep-search"
+            placeholder="Search by name or part number, e.g. plate 2 x 4, 3023, technic pins"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addFirst();
+              if (e.key === 'Escape' && query) {
+                e.stopPropagation();
+                setQuery('');
+              }
+            }}
+          />
+        </div>
         <div className="move-list setup-results">
           {results.groups.map((g) => (
-            <button key={g.id} className="move-choice" disabled={!g.unplaced} onClick={() => add(g.parts.filter((p) => !inDrawers.has(p.partNum)).map((p) => p.partNum))}>
-              <span className={`setup-group-mark fam-border-${g.family}`} />
-              <span className="move-name">
-                <b>{g.label}</b> <span className="muted small">{familyLabel(g.family)}</span>
-              </span>
-              <span className="muted small nowrap">{g.unplaced ? `add ${g.unplaced} of ${g.parts.length} parts` : 'all placed'}</span>
-            </button>
+            <GroupChoice key={g.id} g={g} unplaced={g.parts.filter((p) => !inDrawers.has(p.partNum)).map((p) => p.partNum)} onAdd={(nums) => add(nums)} />
           ))}
           {results.parts.map((p) => (
-            <PartChoice key={p.partNum} part={p} whereIs={whereIs} onAdd={() => add([p.partNum])} />
+            <PartChoice key={p.partNum} part={p} whereIs={whereIs} here={inPocket(p.partNum)} pockets={current.length} active={activeIndex} best={bestPocket(p)} titleOf={titleOf} code={comp.code} onAdd={(i) => add([p.partNum], i)} />
           ))}
           {nextUp.length > 0 && <p className="muted small">Next in that group, not in a drawer yet:</p>}
           {nextUp.map((p) => (
-            <PartChoice key={p.partNum} part={p} whereIs={whereIs} onAdd={() => add([p.partNum])} />
+            <PartChoice key={p.partNum} part={p} whereIs={whereIs} here={inPocket(p.partNum)} pockets={current.length} active={activeIndex} best={bestPocket(p)} titleOf={titleOf} code={comp.code} onAdd={(i) => add([p.partNum], i)} />
           ))}
-          {query && !results.groups.length && !results.parts.length && <p className="muted small">No match. It may be kept out of the plan, or built into a set.</p>}
+          {query && !results.groups.length && !results.parts.length && <p className="muted small">Nothing in your collection matches. It may be kept out of storage, in a set you keep built, or not in your parts list.</p>}
         </div>
 
         <div className="setup-editor-foot">
@@ -312,14 +366,167 @@ function ContainerAdder({ comp, current, choices, onAdd, onNew }: { comp: SetupC
   );
 }
 
-function PartChoice({ part, whereIs, onAdd }: { part: Part; whereIs: Map<string, string[]>; onAdd: () => void }) {
-  const where = whereIs.get(part.partNum);
+function GroupChoice({ g, unplaced, onAdd }: { g: { id: string; label: string; family: string; parts: Part[] }; unplaced: string[]; onAdd: (nums: string[]) => void }) {
   return (
-    <button className="move-choice" onClick={onAdd}>
-      <PartImage partNum={part.partNum} size={26} title={part.name} />
-      <span className="move-name">{part.name}</span>
-      <span className="muted small nowrap">{where ? `also in ${[...new Set(where)].slice(0, 2).join(', ')}` : `× ${part.qty.toLocaleString()}`}</span>
+    <button className="move-choice" disabled={!unplaced.length} onClick={() => onAdd(unplaced)}>
+      <span className={`setup-group-mark fam-border-${g.family}`} />
+      <span className="move-name">
+        <b>{g.label}</b> <span className="muted small">{familyLabel(g.family)}, a group</span>
+      </span>
+      <span className="muted small nowrap">{unplaced.length ? `add the ${unplaced.length} of ${g.parts.length} not in a drawer` : 'all in a drawer'}</span>
     </button>
+  );
+}
+
+/** A part the search found: click to add it to the pocket being worked on, or a pocket number to put it in that one */
+function PartChoice({
+  part,
+  whereIs,
+  here,
+  pockets,
+  active,
+  best,
+  titleOf,
+  code,
+  onAdd,
+}: {
+  part: Part;
+  whereIs: Map<string, string[]>;
+  /** the pocket here it's already in, or -1 */
+  here: number;
+  pockets: number;
+  active: number;
+  /** the pocket here holding its own sort, if any */
+  best: number | null;
+  titleOf: (i: number) => string;
+  code: string;
+  onAdd: (pocket: number) => void;
+}) {
+  const elsewhere = [...new Set(whereIs.get(part.partNum) ?? [])].filter((c) => c !== code);
+  const suggest = best !== null && best !== active && here < 0 ? best : null;
+  return (
+    <div className={`part-choice ${here >= 0 ? 'added' : ''}`}>
+      <button className="part-choice-main" onClick={() => onAdd(active)} title={pockets > 1 ? `Add to pocket ${active + 1}` : 'Add to this drawer'}>
+        <PartImage partNum={part.partNum} size={44} title={part.name} />
+        <span className="move-name">
+          {part.name}
+          <span className="part-meta">
+            <span className="mono">{part.partNum}</span> · {part.qty.toLocaleString()} pcs
+            {here >= 0 && <b className="good-text"> · ✓ in {pockets > 1 ? `pocket ${here + 1}` : 'this drawer'}</b>}
+            {elsewhere.length > 0 && ` · also in ${elsewhere.slice(0, 2).join(', ')}`}
+          </span>
+        </span>
+        <span className="part-choice-add">{here >= 0 ? '' : pockets > 1 ? `+ ${active + 1}` : '+ Add'}</span>
+      </button>
+      {pockets > 1 && (
+        <span className="pocket-chips" aria-label={`Other pockets for ${part.name}`}>
+          {suggest !== null && (
+            <button className="small-btn chip-best" title={`Add to pocket ${suggest + 1}, which holds the same sort of parts`} onClick={() => onAdd(suggest)}>
+              + {suggest + 1}: {titleOf(suggest)}
+            </button>
+          )}
+          {pockets <= 12 &&
+            Array.from({ length: pockets }, (_, i) => i)
+              .filter((i) => i !== active && i !== suggest)
+              .map((i) => (
+                <button key={i} className={`ghost chip ${i === here ? 'on' : ''}`} title={`Add to pocket ${i + 1}: ${titleOf(i)}`} onClick={() => onAdd(i)}>
+                  {i + 1}
+                </button>
+              ))}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const MOVES_SHOWN = 3;
+
+/** What's waiting for this drawer: parts not in a drawer that suit a pocket here, and suggested moves */
+function Waiting({
+  homes,
+  moves,
+  divided,
+  titleOf,
+  onAdd,
+  onNotHere,
+  onAccept,
+  onSkip,
+}: {
+  homes: (RecordedHome & { part: Part })[];
+  moves: Suggestion[];
+  divided: boolean;
+  titleOf: (i: number) => string;
+  onAdd: (items: (RecordedHome & { part: Part })[]) => void;
+  onNotHere: (h: RecordedHome & { part: Part }) => void;
+  onAccept: (s: Suggestion) => void;
+  onSkip: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const SHOWN = 12;
+  return (
+    <section className="waiting">
+      <button className="waiting-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="fold-caret">{open ? '▾' : '▸'}</span>
+        <b>Suggested for this drawer</b>
+        <span className="muted small">
+          {[homes.length ? `${homes.length} ${homes.length === 1 ? 'part' : 'parts'} to put in` : '', moves.length ? (moves.length === 1 ? '1 move' : `${Math.min(moves.length, MOVES_SHOWN)} best moves`) : ''].filter(Boolean).join(' · ')}
+        </span>
+      </button>
+      {open && (
+        <>
+          {homes.length > 0 && (
+            <>
+              <div className="waiting-sub">
+                <span className="muted small">Not in a drawer yet, with room here beside the same sort of parts.</span>
+                {homes.length > 1 && (
+                  <button className="small-btn" onClick={() => onAdd(homes)}>
+                    Add all {homes.length}
+                  </button>
+                )}
+              </div>
+              <ul className="waiting-list">
+                {homes.slice(0, SHOWN).map((h) => (
+                  <li key={h.part.partNum}>
+                    <PartImage partNum={h.part.partNum} size={40} title={h.part.name} />
+                    <span className="move-name">
+                      {h.part.name}
+                      <span className="part-meta">
+                        <span className="mono">{h.part.partNum}</span> · {h.part.qty.toLocaleString()} pcs{divided ? ` · pocket ${h.pocket + 1}: ${titleOf(h.pocket)}` : ''}
+                      </span>
+                    </span>
+                    <button className="small-btn accept-btn" title="Put it here" onClick={() => onAdd([h])}>
+                      Add
+                    </button>
+                    <button className="icon" title="Not here: don't suggest this pocket for it again" aria-label={`Not here: ${h.part.name}`} onClick={() => onNotHere(h)}>
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {homes.length > SHOWN && <p className="muted small">and {homes.length - SHOWN} more, added with Add all.</p>}
+            </>
+          )}
+          {moves.slice(0, MOVES_SHOWN).map((m) => (
+            <div key={m.id} className="waiting-move">
+              <span className="move-name">
+                <b className="small">{m.title}</b>
+                <span className="muted small">
+                  {' '}
+                  {m.why}
+                  {m.estimated && <span className="warn-text"> Based on an estimated fill.</span>}
+                </span>
+              </span>
+              <button className="small-btn accept-btn" onClick={() => onAccept(m)}>
+                Accept
+              </button>
+              <button className="ghost small-btn" onClick={() => onSkip(m.id)}>
+                Skip
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -363,7 +570,7 @@ function PocketRow({
       <button className="setup-pocket folded" aria-expanded={false} onClick={onActivate}>
         <span className="fold-caret">▸</span>
         <b>Pocket {index + 1}</b>
-        {pocket.label && <span>{pocket.label}</span>}
+        <span className={pocket.label ? '' : 'muted'}>{pocket.label || (placed ? contentsName(placed) : '')}</span>
         {pocket.container && <span className="muted small">{pocket.container.name}</span>}
         <span className="muted small setup-pocket-summary">
           {pocket.parts.length ? `${pocket.parts.length} ${pocket.parts.length === 1 ? 'part' : 'parts'}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}` : 'nothing yet'}
@@ -428,8 +635,8 @@ function PocketRow({
         <input
           className="setup-label-input"
           list={`${pocket.id}-names`}
-          placeholder="Label, e.g. Fences"
-          aria-label={`Label for ${divided ? `pocket ${index + 1}` : 'this drawer'}`}
+          placeholder={placed?.parts.length ? `Name it (now “${contentsName(placed)}”)` : 'Name it, e.g. Fences'}
+          aria-label={`Name for pocket ${index + 1}`}
           value={pocket.label ?? ''}
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onChange({ label: e.target.value || undefined })}
@@ -454,7 +661,7 @@ function PocketRow({
             const elsewhere = [...new Set(whereIs.get(x.part.partNum) ?? [])].filter((c) => c !== code);
             return (
               <li key={x.part.partNum}>
-                <PartImage partNum={x.part.partNum} size={22} title={x.part.name} />
+                <PartImage partNum={x.part.partNum} size={32} title={x.part.name} />
                 <span>
                   {x.part.name}
                   {elsewhere.length > 0 && <span className="muted small"> · also {elsewhere.slice(0, 2).join(', ')}</span>}

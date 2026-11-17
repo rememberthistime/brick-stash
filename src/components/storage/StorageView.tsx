@@ -9,7 +9,7 @@ import { applyCycle, undoLast } from '../../lib/rearrange';
 import { setupLabels } from '../../lib/labels';
 import { planPlaces, setupPlaces } from '../../lib/pickList';
 import { leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner';
-import { closeUnit, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
+import { acceptSuggestion, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { stem } from '../../lib/storageList';
 import { shortName } from '../../lib/tapeLabel';
 import type { Catalog, OpenedUnit, Part, Project, Setup } from '../../lib/types';
@@ -61,7 +61,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const setup = project.setup;
   const setSetup = (f: (s: Setup) => Setup) => update((p) => ({ setup: f(p.setup) }));
   const scale = project.settings.volumeScale;
-  const { tree, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs } = model;
+  const { tree, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart } = model;
 
   if (!parts.length || !project.units.length) {
     return (
@@ -81,7 +81,8 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const kinds = new Map<string, SetupComp[]>();
   for (const c of comps) kinds.set(stem(c.unitName), [...(kinds.get(stem(c.unitName)) ?? []), c]);
   const q = filter.trim().toLowerCase();
-  const matchesPart = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
+  const matcher = partMatcher(filter, resolvePart);
+  const matchesPart = (p: Part) => matcher.test(p) || p.name.toLowerCase().includes(q);
   const suggestionParts = (s: Suggestion) => s.sections.flatMap((sec) => leaves(sec.node).flatMap((l) => (l.part ? [l.part] : [])));
   const matchesFilter = (c: SetupComp) => {
     if (!q) return true;
@@ -127,11 +128,6 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const search = (placeholder: string) => (
     <div className="page-tools no-print">
       <input className="search" type="search" placeholder={placeholder} value={filter} onChange={(e) => setFilter(e.target.value)} />
-      {filter && (
-        <button className="link small" onClick={() => setFilter('')}>
-          Clear
-        </button>
-      )}
     </div>
   );
 
@@ -221,7 +217,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
                   const dim = (!!q && !matchesFilter(c)) || (!!highlight && !familiesIn(c).includes(highlight));
                   const s = gaps.suggested.get(c.key);
                   return setup.drawers[c.key]?.length || !s ? (
-                    <DrawerTile key={c.key} comp={c} recorded={!!setup.drawers[c.key]?.length} pockets={placed.get(c.key) ?? []} dim={dim} onClick={() => setEditing(c.key)} />
+                    <DrawerTile key={c.key} comp={c} recorded={!!setup.drawers[c.key]?.length} pockets={placed.get(c.key) ?? []} toAdd={homesIn.get(c.key)?.length ?? 0} moves={topMovesIn.get(c.key) ?? 0} dim={dim} onClick={() => setEditing(c.key)} />
                   ) : (
                     <SuggestedTile key={c.key} comp={c} s={s} dim={dim} onClick={() => setShowing(c.key)} />
                   );
@@ -237,6 +233,16 @@ export default function StorageView({ page, model, project, update, parts, keptO
     body = (
       <>
         {analysis.unplaced.length > 0 && search('Find a part: name or number')}
+        {q && !analysis.unplaced.some(matchesPart) && (
+          <p className="banner">
+            Nothing that isn’t in a drawer matches “{filter}”.
+            {(() => {
+              const hits = analysis.pockets.flatMap((p) => p.parts.filter((x) => matchesPart(x.part)).map((x) => ({ part: x.part, where: p.name })));
+              const shown = [...new Map(hits.map((h) => [h.part.partNum, h])).values()].slice(0, 4);
+              return shown.length ? <> Already in a drawer: {shown.map((h) => `${h.part.name} (${h.part.partNum}) in ${hits.filter((x) => x.part.partNum === h.part.partNum).map((x) => x.where).join(', ')}`).join('; ')}.</> : ' It may be kept out of storage, in a set kept built, or not in your parts list.';
+            })()}
+          </p>
+        )}
         <NotSorted
           unsorted={analysis.unplaced}
           comps={comps}
@@ -247,6 +253,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
           recordedHomes={recordedHomes}
           scale={scale}
           query={filter}
+          resolve={resolvePart}
           folds={folds}
           onShowDrawer={setShowing}
         />
@@ -328,20 +335,25 @@ export default function StorageView({ page, model, project, update, parts, keptO
           onNext={() => stepTo(1)}
           onClose={() => setEditing(null)}
           onName={(name) => update((p) => ({ units: setPlaceName(p.units, current.unitId, current.sections ? null : drawerKeyOf(current.key), name) }))}
+          homes={homesIn.get(current.key) ?? []}
+          moves={movesIn.get(current.key) ?? []}
+          resolve={resolvePart}
+          onAccept={(s) => setSetup((x) => acceptSuggestion(x, s, analysis.pockets))}
+          onSkip={(id) => setSetup((x) => ({ ...x, skipped: [...x.skipped, id] }))}
         />
       )}
     </div>
   );
 }
 
-function DrawerTile({ comp, recorded, pockets, dim, onClick }: { comp: SetupComp; recorded: boolean; pockets: PlacedPocket[]; dim: boolean; onClick: () => void }) {
+function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, onClick }: { comp: SetupComp; recorded: boolean; pockets: PlacedPocket[]; toAdd: number; moves: number; dim: boolean; onClick: () => void }) {
   const capacity = pockets.reduce((t, p) => t + p.capacity, 0);
   const used = pockets.reduce((t, p) => t + p.used, 0);
   const inUse = pockets.filter((p) => p.parts.length);
   const family = [...inUse].sort((a, b) => b.used - a.used)[0]?.family;
   const measured = inUse.length > 0 && inUse.every((p) => p.fill !== undefined);
   // One part on its own is named by the part, shortened; anything else by its label or group
-  const names = [...new Set(inUse.map((p) => p.label || (p.mixed ? 'Mixed on purpose' : p.parts.length === 1 ? shortName(p.parts[0].part.name) : p.groupLabel)))];
+  const names = [...new Set(inUse.map((p) => p.label?.trim() || contentsName(p)))];
   // The parts with the most pieces, so the pictures show what you'd see opening it
   const pics = inUse.flatMap((p) => p.parts.map((x) => x.part)).sort((a, b) => b.qty - a.qty);
   return (
@@ -359,6 +371,12 @@ function DrawerTile({ comp, recorded, pockets, dim, onClick }: { comp: SetupComp
       </span>
       {pics.length > 0 && <TilePics parts={pics} />}
       <span className="small setup-tile-names">{recorded ? (names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` + ${names.length - 2}` : '') : 'Empty') : 'Not recorded, nothing suggested'}</span>
+      {(toAdd > 0 || moves > 0) && (
+        <span className="tile-todo small">
+          {toAdd > 0 && <span>+{toAdd} to put in</span>}
+          {moves > 0 && <span>{moves} {moves === 1 ? 'move' : 'moves'}</span>}
+        </span>
+      )}
     </button>
   );
 }

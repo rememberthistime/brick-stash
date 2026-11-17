@@ -1,8 +1,8 @@
 // Parts that aren't in any recorded drawer, by family: where the plan would put each, and ways to put them away now.
 import { useState } from 'react';
-import { codeWithName } from '../../lib/codes';
-import type { RecordedHome } from '../../lib/gaps';
-import { addToPocket, newPocket, removeFromPocket, unsortedByFamily, type PlacedPocket, type SetupComp, type UnsortedOrder } from '../../lib/setup';
+import { codeWithName, placeName } from '../../lib/codes';
+import { homeSkipId, type RecordedHome } from '../../lib/gaps';
+import { addToPocket, contentsName, newPocket, partMatcher, removeFromPocket, unsortedByFamily, type PlacedPocket, type SetupComp, type UnsortedOrder } from '../../lib/setup';
 import { familyFor, familyGroup } from '../../lib/taxonomy';
 import type { Part, Setup } from '../../lib/types';
 import { uid } from '../../state';
@@ -34,11 +34,13 @@ interface Props {
   recordedHomes: Map<string, RecordedHome>;
   scale: number;
   query: string;
+  /** a part number as typed, as the collection files it */
+  resolve: (n: string) => string;
   folds: Folds;
   onShowDrawer: (key: string) => void;
 }
 
-export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, folds, onShowDrawer }: Props) {
+export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, resolve, folds, onShowDrawer }: Props) {
   const [order, setOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** one drawer to put many parts in, a click each */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
@@ -46,7 +48,8 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
   const [lastPut, setLastPut] = useState<{ text: string; items: { partNum: string; key: string; pocket: number }[] } | null>(null);
   const families = unsortedByFamily(unsorted, scale, order);
   const q = query.trim().toLowerCase();
-  const matches = (p: Part) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q);
+  const matcher = partMatcher(query, resolve);
+  const matches = (p: Part) => matcher.test(p) || p.name.toLowerCase().includes(q);
   const hit = !!q && unsorted.some(matches);
   const byKey = new Map(comps.map((c) => [c.key, c]));
   const noRoom = unsorted.filter((p) => !homeOf.has(p.partNum) && !recordedHomes.has(p.partNum)).length;
@@ -60,13 +63,19 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
       /* only a convenience */
     }
   };
-  /** "A1.2: Technic": a pocket's code, with the drawer's name */
-  const pocketCode = (c: SetupComp, i: number) => codeWithName((setup.drawers[c.key]?.length ?? 0) > 1 ? `${c.code}.${i + 1}` : c.code, c);
-  const describe = (c: SetupComp, i: number) => {
-    const p = (setup.drawers[c.key] ?? [])[i];
-    const names = pockets.find((x) => x.id === p?.id)?.parts.map((x) => x.part.name) ?? [];
-    return `${pocketCode(c, i)}${p?.label ? ` · ${p.label}` : names.length ? ` · ${names.slice(0, 2).join(', ')}${names.length > 2 ? '…' : ''}` : ''}`;
+  /**
+   * "A1.2: Fences": a pocket's code and what it's called, the same everywhere: the name you gave the pocket, or for a
+   * drawer of one pocket the drawer's name, or else what's in it
+   */
+  const pocketCode = (c: SetupComp, i: number) => {
+    const list = setup.drawers[c.key] ?? [];
+    const code = list.length > 1 ? `${c.code}.${i + 1}` : c.code;
+    const named = list[i]?.label?.trim() || (list.length > 1 ? '' : placeName(c));
+    const pp = pockets.find((x) => x.id === list[i]?.id);
+    const title = named || (pp?.parts.length ? contentsName(pp) : '');
+    return title ? `${code}: ${title}` : code;
   };
+  const describe = pocketCode;
   const putIn = (p: Part, key: string, pocket: number) => {
     const comp = byKey.get(key);
     if (!comp) return;
@@ -166,6 +175,11 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
                 ))}
               </select>
             )}
+            {setup.skipped.some((id) => id.startsWith('home:')) && (
+              <button className="link small" onClick={() => setSetup((s) => ({ ...s, skipped: s.skipped.filter((id) => !id.startsWith('home:')) }))}>
+                Bring back {setup.skipped.filter((id) => id.startsWith('home:')).length} turned down
+              </button>
+            )}
             {lastPut && (
               <span className="small" aria-live="polite">
                 {lastPut.text}{' '}
@@ -201,9 +215,22 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
                     </span>
                     <span className="unsorted-actions">
                       {there && thereComp ? (
-                        <button className="small-btn" title={`Room beside ${there.sameGroup ? 'the same group of parts' : 'parts of the same family'} in ${codeWithName(there.code, thereComp)}`} onClick={() => putIn(p, there.key, there.pocket)}>
-                          Put in {codeWithName(there.code, thereComp)}
-                        </button>
+                        <span className="put-suggested">
+                          <button className="small-btn" title={`Room beside ${there.sameGroup ? 'the same group of parts' : 'parts of the same family'} in ${pocketCode(thereComp, there.pocket)}`} onClick={() => putIn(p, there.key, there.pocket)}>
+                            Put in {pocketCode(thereComp, there.pocket)}
+                          </button>
+                          <button
+                            className="icon"
+                            title="Not there: suggest somewhere else"
+                            aria-label={`Not in ${there.code}`}
+                            onClick={() => {
+                              const id = setup.drawers[there.key]?.[there.pocket]?.id;
+                              if (id) setSetup((s) => ({ ...s, skipped: [...s.skipped, homeSkipId(p.partNum, id)] }));
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </span>
                       ) : homeComp ? (
                         <button className="link small" title="See everything the plan suggests for that drawer" onClick={() => onShowDrawer(homeComp.key)}>
                           suggested: {codeWithName(homeComp.code, homeComp)}
