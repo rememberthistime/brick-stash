@@ -22,14 +22,14 @@ const SHOWN_FINDINGS = 6;
 const partsOf = (analysis: SetupAnalysis) => new Map(analysis.pockets.flatMap((p) => p.parts.map((x) => [x.part.partNum, x.part] as const)));
 
 /** The parts something is about: a picture, the name linking to Rebrickable, the part number and how many you have */
-function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map<string, Part>; max?: number }) {
+export function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map<string, Part>; max?: number }) {
   const parts = [...new Set(nums)].map((n) => byNum.get(n) ?? ({ partNum: n, name: n, qty: 0 } as Part));
   if (!parts.length) return null;
   return (
     <ul className="part-strip">
       {parts.slice(0, max).map((p) => (
         <li key={p.partNum}>
-          <PartImage partNum={p.partNum} size={40} title={p.name} />
+          <PartImage partNum={p.partNum} size={48} title={p.name} />
           <span>
             <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
               {p.name}

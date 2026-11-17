@@ -698,3 +698,13 @@ td.pic { width: 56px; padding: 3px 6px; }
 .good-text { color: var(--good); font-weight: 600; }
 .tile-todo { display: flex; gap: 8px; flex-wrap: wrap; color: var(--accent); font-weight: 600; }
 .put-suggested { display: inline-flex; align-items: center; gap: 0; }
+
+/* a part's picture, large, while it's pointed at */
+.part-zoom { position: fixed; z-index: 50; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+.part-zoom img { display: block; background: #fff; border-radius: 8px; object-fit: contain; }
+.part-zoom-name { font-weight: 600; font-size: 13px; margin-top: 8px; line-height: 1.3; }
+.part-zoom-num { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.part-img.zoomable { cursor: zoom-in; }
+.part-link { color: inherit; text-decoration: none; }
+.part-link:hover { color: var(--accent); text-decoration: underline; }
+.waiting-move .part-strip { margin-top: 6px; }

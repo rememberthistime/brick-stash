@@ -37,7 +37,7 @@ export default function Labels({ entries, note, options }: { entries: LabelEntry
                 {pictures && cell.images.length > 0 && (
                   <span className="label-imgs">
                     {cell.images.map((p) => (
-                      <PartImage key={p} partNum={p} size={40} />
+                      <PartImage key={p} partNum={p} size={40} zoomable={false} />
                     ))}
                   </span>
                 )}
