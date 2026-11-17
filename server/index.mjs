@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { createApi, defaultDirs, UPSTREAMS } from './api.mjs';
+import { brickWorkDefaults } from './brickwork.mjs';
 
 const DIST = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const PORT = Number(process.env.PORT ?? 5173);
@@ -74,4 +75,6 @@ server.listen(PORT, '0.0.0.0', () => {
     if (a && a.family === 'IPv4' && !a.internal && /^(192\.168|10)\./.test(a.address)) console.log(`  On your network:  http://${a.address}:${PORT}`);
   }
   console.log(`  Project: ${dirs.dataDir}`);
+  const bw = brickWorkDefaults();
+  console.log(bw.url && bw.token ? `  Brick Work: ${bw.url}` : '  Brick Work: not set up (BRICK_WORK_URL and BRICK_WORK_TOKEN)');
 });

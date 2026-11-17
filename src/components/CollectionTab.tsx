@@ -1,3 +1,4 @@
+import BrickWorkImport from './BrickWorkImport';
 import { useState } from 'react';
 import type { Catalog, InventoryRow, Part, Project } from '../lib/types';
 import { TEMPLATE_CSV, onePieceVolume, parseInventory, partVolume, type SubtractResult } from '../lib/collection';
@@ -148,6 +149,14 @@ export default function CollectionTab({ project, update, catalog, parts, totals,
             Any spreadsheet saved as CSV works — it needs a <b>part number</b> column and ideally a <b>quantity</b> column. Colour is optional (we store by type, not colour).
             Exports from <b>Rebrickable</b> (My Parts → Export), <b>BrickLink</b> (wanted list / inventory XML) and <b>Brickset</b> are recognised.
           </p>
+
+          <BrickWorkImport
+            hasRows={project.rows.length > 0}
+            onImport={(rows, note) => {
+              update({ rows });
+              setMessages([note]);
+            }}
+          />
 
           <div className="seg">
             <label>
