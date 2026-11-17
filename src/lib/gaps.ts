@@ -95,10 +95,14 @@ export interface RecordedHome {
  * pocket is only filled to the practical fill, allowing for what earlier parts took. Nothing is changed: these are
  * offered on Not sorted yet, and the parts without a place here are planned into the drawers with nothing recorded.
  */
+/** How "not in that pocket" is remembered, among the skipped suggestions */
+export const homeSkipId = (partNum: string, pocketId: string) => `home:${partNum}:${pocketId}`;
+
 export function homesInRecorded(unsorted: Part[], pockets: PlacedPocket[], setup: Setup, groupOf: (partNum: string) => string | undefined, s: Settings): Map<string, RecordedHome> {
   const out = new Map<string, RecordedHome>();
   const room = new Map(pockets.map((p) => [p.id, p.capacity * s.practicalFill - p.used]));
   const groupsIn = new Map(pockets.map((p) => [p.id, new Set(p.parts.map((x) => x.group))]));
+  const turnedDown = new Set(setup.skipped);
   const byVolume = [...unsorted].sort((a, b) => partVolume(b, s.volumeScale) - partVolume(a, s.volumeScale));
   for (const part of byVolume) {
     const fam = familyFor(part.catId).key;
@@ -106,7 +110,7 @@ export function homesInRecorded(unsorted: Part[], pockets: PlacedPocket[], setup
     const need = partVolume(part, s.volumeScale) * SHARE_OVERHEAD;
     let best: { p: PlacedPocket; sameGroup: boolean; free: number } | null = null;
     for (const p of pockets) {
-      if (!p.parts.length || p.family !== fam) continue;
+      if (!p.parts.length || p.family !== fam || turnedDown.has(homeSkipId(part.partNum, p.id))) continue;
       const sameGroup = !!group && groupsIn.get(p.id)!.has(group);
       // A pocket labelled "Fences" is for fences, not any part of its family
       if (!sameGroup && p.label?.trim()) continue;

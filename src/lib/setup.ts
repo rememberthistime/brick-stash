@@ -2,9 +2,10 @@
 // full each pocket is. It's reviewed as it is, and improved by a short list of moves, rather than being replaced
 // by a fresh plan.
 import { onePieceVolume, partVolume } from './collection';
-import { lettersFor, unitLetter } from './codes';
+import { lettersFor, placeName, unitLetter } from './codes';
 import { familyLabel, leaves, targetFill, type Compartment, type TreeNode } from './planner';
 import { stem } from './storageList';
+import { shortName } from './tapeLabel';
 import { familyFor } from './taxonomy';
 import type { LooseContainer, Measurement, OpenedUnit, Part, Settings, Setup, SetupPocket } from './types';
 import { compartmentVolume, partSizeMm } from './volume';
@@ -192,7 +193,9 @@ export interface Placed {
 export interface PlacedPocket {
   id: string;
   comp: SetupComp;
-  /** "A3", or "A3 pocket 2" where the drawer is divided */
+  /** "A3", or "A3.2" where the drawer is divided */
+  code: string;
+  /** how texts refer to it: the code, with the name you gave it, as in "A3.2 (Fences)" */
   name: string;
   capacity: number;
   fill?: number;
@@ -213,6 +216,25 @@ export interface PlacedPocket {
 interface Group {
   key: string;
   label: string;
+}
+
+/**
+ * What's in a pocket, in a few words, for when you haven't named it: one part by its name; parts of one group by the
+ * group ("Plates 1 × 2"); of one family by the family ("Slopes & Curves"); otherwise the two biggest families.
+ */
+export function contentsName(p: PlacedPocket): string {
+  if (!p.parts.length) return 'Empty';
+  if (p.parts.length === 1) return shortName(p.parts[0].part.name);
+  if (new Set(p.parts.map((x) => x.group)).size === 1) return p.groupLabel;
+  const byFamily = new Map<string, number>();
+  for (const x of p.parts) byFamily.set(x.family, (byFamily.get(x.family) ?? 0) + x.used);
+  const top = [...byFamily].sort((a, b) => b[1] - a[1]).map(([k]) => familyLabel(k));
+  return top.length === 1 ? top[0] : `${top[0]} & ${top[1]}${top.length > 2 ? ` + ${top.length - 2}` : ''}`;
+}
+
+/** What a pocket is called: the label you gave it, the drawer's own name where it's the only pocket, or what's in it */
+export function pocketTitle(p: PlacedPocket, onlyPocket: boolean): string {
+  return p.label?.trim() || (onlyPocket ? placeName(p.comp) : '') || contentsName(p);
 }
 
 /** Each part's nearest group in the part tree, e.g. Plate 2 x 12 → "Plates 2 × 9+" */
@@ -236,7 +258,7 @@ function tooBigFor(part: Part, space: { w: number; d: number; h: number }) {
 
 export function placePockets(setup: Setup, comps: SetupComp[], parts: Part[], volumeScale: number, groups = new Map<string, Group>()): PlacedPocket[] {
   const byNum = new Map(parts.map((p) => [p.partNum, p]));
-  const raw: { pocket: SetupPocket; comp: SetupComp; capacity: number; name: string; weight: number }[] = [];
+  const raw: { pocket: SetupPocket; comp: SetupComp; capacity: number; code: string; name: string; weight: number }[] = [];
   for (const comp of comps) {
     const pockets = setup.drawers[comp.key];
     if (!pockets?.length) continue;
@@ -245,7 +267,9 @@ export function placePockets(setup: Setup, comps: SetupComp[], parts: Part[], vo
     const left = Math.max(0, floorLeft(comp, pockets));
     pockets.forEach((pocket, i) => {
       const capacity = pocket.container ? compartmentVolume(pocket.container) : Math.max(1, (comp.volume * left * pocket.share) / totalShare);
-      raw.push({ pocket, comp, capacity, name: pockets.length > 1 ? `${comp.code} pocket ${i + 1}` : comp.code, weight: capacity * (pocket.fill ?? TYPICAL_FILL) });
+      const code = pockets.length > 1 ? `${comp.code}.${i + 1}` : comp.code;
+      const named = pocket.label?.trim() || placeName(comp);
+      raw.push({ pocket, comp, capacity, code, name: named ? `${code} (${named})` : code, weight: capacity * (pocket.fill ?? TYPICAL_FILL) });
     });
   }
   // A part in several places is assumed to be shared out in line with how much room it has in each
@@ -254,7 +278,7 @@ export function placePockets(setup: Setup, comps: SetupComp[], parts: Part[], vo
   const places = new Map<string, number>();
   for (const r of raw) for (const num of r.pocket.parts) places.set(num, (places.get(num) ?? 0) + 1);
 
-  return raw.map(({ pocket, comp, capacity, name, weight }) => {
+  return raw.map(({ pocket, comp, capacity, code, name, weight }) => {
     const placed: Placed[] = pocket.parts.flatMap((num) => {
       const part = byNum.get(num);
       if (!part) return [];
@@ -278,6 +302,7 @@ export function placePockets(setup: Setup, comps: SetupComp[], parts: Part[], vo
     return {
       id: pocket.id,
       comp,
+      code,
       name,
       capacity,
       fill: placed.length ? pocket.fill : undefined,
@@ -360,6 +385,8 @@ export interface SetupAnalysis {
   suggestions: Suggestion[];
   /** suggestions beyond those shown */
   moreSuggestions: number;
+  /** every suggestion not skipped, best first, including ones that overlap: for showing those about one drawer */
+  allSuggestions: Suggestion[];
 }
 
 const MAX_SHOWN_SUGGESTIONS = 15;
@@ -550,7 +577,7 @@ function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: st
     touched.add(from).add(to);
     shown.push(s);
   }
-  return { suggestions: shown, more };
+  return { suggestions: shown, more, all: found.filter((f) => !skip.has(f.s.id)).sort((a, b) => a.rank - b.rank || a.size - b.size).map((f) => f.s) };
 }
 
 export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], settings: Settings, tree: TreeNode | null): SetupAnalysis {
@@ -558,7 +585,7 @@ export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], se
   const placed = new Set(pockets.flatMap((p) => p.parts.map((x) => x.part.partNum)));
   const volumeOf = (p: Part) => partVolume(p, settings.volumeScale);
   const allVolume = parts.reduce((t, p) => t + volumeOf(p), 0);
-  const { suggestions, more } = suggestionsFor(pockets, settings, setup.skipped);
+  const { suggestions, more, all } = suggestionsFor(pockets, settings, setup.skipped);
   return {
     pockets,
     drawersRecorded: comps.filter((c) => setup.drawers[c.key]?.length).length,
@@ -573,6 +600,7 @@ export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], se
     findings: findingsFor(pockets, settings),
     suggestions,
     moreSuggestions: more,
+    allSuggestions: all,
   };
 }
 
@@ -625,16 +653,43 @@ function startsAWord(text: string, word: string) {
 }
 
 /** Parts and groups matching what was typed, however the words are ordered ("2 x 4 brick"), closest match first */
-export function searchParts(tree: TreeNode | null, query: string, placed: ReadonlySet<string>): SearchResults {
+/**
+ * The part numbers a search could mean. Anything with a digit in it might be one, as typed or as pasted from Google
+ * Lens or a website ("LEGO 3023 Plate 1 x 2", "#3069", "3001pr0001"), and `resolve` turns each into the number the
+ * collection files it under (3069 → 3069b, a print → its plain part, a BrickLink number → Rebrickable's).
+ */
+export function partNumbersIn(query: string, resolve: (n: string) => string = (n) => n): Set<string> {
+  const out = new Set<string>();
+  for (const w of query.toLowerCase().split(/[\s,;:#()[\]/]+/)) {
+    if (w.length < 2 || !/\d/.test(w) || !/^[a-z0-9.-]+$/.test(w)) continue;
+    out.add(w);
+    out.add(resolve(w).toLowerCase());
+  }
+  return out;
+}
+
+/** Whether a part answers a typed search: by part number (see partNumbersIn), or by every word starting a word of its name */
+export function partMatcher(query: string, resolve?: (n: string) => string) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const numbers = partNumbersIn(query, resolve);
+  return {
+    empty: !words.length,
+    byNumber: (p: Part) => numbers.has(p.partNum.toLowerCase()),
+    test: (p: Part) => numbers.has(p.partNum.toLowerCase()) || (words.length > 0 && words.every((w) => startsAWord(p.name.toLowerCase(), w))),
+  };
+}
+
+export function searchParts(tree: TreeNode | null, query: string, placed: ReadonlySet<string>, resolve?: (n: string) => string): SearchResults {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!tree || !words.length) return { groups: [], parts: [] };
   const phrase = words.join(' ');
+  const numbers = partNumbersIn(query, resolve);
   const matches = (text: string) => words.every((w) => startsAWord(text.toLowerCase(), w));
   const groups: SearchResults['groups'] = [];
   const parts: Part[] = [];
   const walk = (n: TreeNode) => {
     if (n.part) {
-      if (n.part.partNum.toLowerCase() === phrase || matches(n.part.name)) parts.push(n.part);
+      if (numbers.has(n.part.partNum.toLowerCase()) || matches(n.part.name)) parts.push(n.part);
       return;
     }
     // A category named the same as its family would just be listed twice
@@ -645,9 +700,12 @@ export function searchParts(tree: TreeNode | null, query: string, placed: Readon
     n.children.forEach(walk);
   };
   walk(tree);
+  // A number that isn't anyone's whole part number may be the start of one: 3069 for 3069b, 973c for 973c01h03
+  const single = words.length === 1 && /\d/.test(phrase) && phrase.length >= 3;
+  if (single && !parts.length) for (const l of leaves(tree)) if (l.part?.partNum.toLowerCase().startsWith(phrase)) parts.push(l.part);
   const closeness = (p: Part) => {
     const name = p.name.toLowerCase();
-    if (name === phrase || p.partNum.toLowerCase() === phrase) return 0;
+    if (name === phrase || numbers.has(p.partNum.toLowerCase())) return 0;
     if (name.startsWith(phrase)) return 1;
     return name.includes(phrase) ? 2 : 3;
   };

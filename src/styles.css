@@ -483,8 +483,8 @@ button.setup-pocket.folded:hover { border-color: var(--accent); }
 .setup-quick .on { outline: 2px solid var(--accent); }
 .setup-parts { list-style: none; margin: 8px 0 0; padding: 0; }
 .setup-parts li { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 13px; }
-.setup-parts li > span { flex: 1; min-width: 0; }
-.setup-results { max-height: 240px; overflow: auto; }
+.setup-parts li > span:not(.part-img) { flex: 1; min-width: 0; }
+.setup-results { max-height: 380px; overflow: auto; }
 .setup-group-mark { width: 26px; height: 26px; flex: none; border-radius: 4px; background: var(--fam, var(--line)); }
 .setup-editor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .setup-editor-foot .link { margin-left: auto; }
@@ -670,3 +670,31 @@ td.pic { width: 56px; padding: 3px 6px; }
 .setup-tile { padding: 10px; gap: 6px; }
 .unsorted-actions > button.small-btn:not(.ghost) { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
 .unsorted-actions > button.small-btn:not(.ghost):hover { background: var(--accent); color: var(--accent-ink); }
+
+/* drawer editor: what's waiting for the drawer, and the search */
+.waiting { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 4px 12px 10px; margin: 10px 0 12px; }
+.waiting-head { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; color: var(--ink); padding: 8px 0 4px; text-align: left; flex-wrap: wrap; }
+.waiting-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 2px 0 4px; }
+.waiting-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+.waiting-list li, .waiting-move { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0, 0, 0, 0.06); }
+.waiting-move { align-items: flex-start; }
+.waiting-move .move-name { display: block; }
+.waiting-list .move-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.accept-btn { flex: none; }
+.setup-search { display: flex; align-items: center; gap: 8px; position: sticky; top: -18px; background: var(--card); padding: 4px 0; z-index: 1; }
+.setup-search .search { flex: 1; }
+.setup-results { gap: 4px; }
+.part-choice { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: 2px 6px 2px 2px; flex-wrap: wrap; }
+.part-choice:hover { border-color: var(--accent); }
+.part-choice.added { background: var(--soft); }
+.part-choice-main { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: none; color: var(--ink); padding: 4px; text-align: left; }
+.part-choice-main .move-name { display: flex; flex-direction: column; gap: 1px; }
+.part-choice-add { flex: none; font-weight: 600; color: var(--accent); font-size: 12px; }
+.pocket-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chip { padding: 1px 8px; font-size: 12px; min-width: 28px; font-family: var(--mono); }
+.chip.on { border-color: var(--good); color: var(--good); }
+.chip-best { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-best:hover { background: var(--accent); color: var(--accent-ink); }
+.good-text { color: var(--good); font-weight: 600; }
+.tile-todo { display: flex; gap: 8px; flex-wrap: wrap; color: var(--accent); font-weight: 600; }
+.put-suggested { display: inline-flex; align-items: center; gap: 0; }

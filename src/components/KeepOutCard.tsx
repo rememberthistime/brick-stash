@@ -3,6 +3,7 @@ import type { KeepOut, Part, Project } from '../lib/types';
 import { familyLabel } from '../lib/planner';
 import { isBulky, noFitTest, pickPart, pieceVolume, toggleFamily, type KeptPart, type KeptSummary } from '../lib/keepOut';
 import PartImage from './PartImage';
+import { partMatcher } from '../lib/setup';
 
 interface Props {
   project: Project;
@@ -28,7 +29,7 @@ export default function KeepOutCard({ project, update, parts, kept, summary }: P
   const bulkyVolume = bulky.reduce((t, p) => t + pieceVolume(p) * p.qty, 0);
 
   const q = query.trim().toLowerCase();
-  const found = q ? parts.filter((p) => p.partNum.toLowerCase() === q || p.name.toLowerCase().includes(q)).slice(0, MAX_FOUND) : [];
+  const found = q ? parts.filter((p) => partMatcher(query).test(p) || p.name.toLowerCase().includes(q)).slice(0, MAX_FOUND) : [];
   const picked = kept.filter((x) => x.reason === 'picked');
 
   const row = (p: Part) => (

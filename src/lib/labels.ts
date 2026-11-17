@@ -1,9 +1,9 @@
 // What goes on each label, from the drawers as recorded, in one shape that both the tape labels and the printed
 // sheet draw from.
 import { placeName } from './codes';
-import type { PlacedPocket, SetupComp } from './setup';
+import { contentsName, type PlacedPocket, type SetupComp } from './setup';
 import { stem } from './storageList';
-import { shortName, type LabelCell } from './tapeLabel';
+import type { LabelCell } from './tapeLabel';
 
 export interface SheetCell extends LabelCell {
   /** colours the sheet label's edge */
@@ -41,12 +41,12 @@ export function setupLabels(pockets: PlacedPocket[], comps: SetupComp[], perBox:
       // A drawer with one pocket goes by its own name; pockets of a divided drawer by their labels
       const name = p.label?.trim() || (inDrawer.length === 1 ? (comp.sections ? comp.unitTitle : comp.name)?.trim() : undefined);
       const cell: SheetCell = {
-        title: name || (parts.length === 1 ? shortName(parts[0].part.name) : shortName(p.groupLabel)),
+        title: name || contentsName(p),
         detail: name && parts.length !== 1 ? (parts.length ? `${parts.length} types` : '') : parts.length === 1 ? parts[0].part.partNum : `${parts.length} types`,
         images: parts.slice(0, parts.length === 1 ? 1 : 2).map((x) => x.part.partNum),
         family: p.family || undefined,
         parts: parts.map((x) => x.part.partNum),
-        sheetTitle: name || (parts.length === 1 ? parts[0].part.name : p.groupLabel),
+        sheetTitle: name || (parts.length === 1 ? parts[0].part.name : contentsName(p)),
       };
       return { cell, show: !!name || parts.length > 0, links: parts.map((x) => ({ partNum: x.part.partNum, name: x.part.name })) };
     });
