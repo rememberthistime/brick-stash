@@ -62,10 +62,12 @@ interface Props {
   /** show what the plan suggests for a drawer with nothing recorded */
   onShowSuggested: (key: string) => void;
   hasSuggestion: (key: string) => boolean;
+  /** show the app's suggestions beside your own layout */
+  suggest: boolean;
 }
 
 export default function SortPage(props: Props) {
-  const { unsorted, comps, setup, setSetup, pockets, placed, recordedHomes, homeOf, scale, query, resolve, places, onMove, onMoveGroups, onMovePocket, onTakeOut, onEdit, onShowSuggested, hasSuggestion } = props;
+  const { unsorted, comps, setup, setSetup, pockets, placed, recordedHomes, homeOf, scale, query, resolve, places, onMove, onMoveGroups, onMovePocket, onTakeOut, onEdit, onShowSuggested, hasSuggestion, suggest } = props;
   const [order, setOrder] = useState<UnsortedOrder>(() => (recall(ORDER_STORE) === 'pieces' ? 'pieces' : 'volume'));
   const [openKey, setOpenKey] = useState<string | null>(() => recall(OPEN_STORE));
   const [activePocket, setActivePocket] = useState(0);
@@ -185,7 +187,7 @@ export default function SortPage(props: Props) {
           </select>
         </label>
       </div>
-      {withRoom.length > 0 && (
+      {suggest && withRoom.length > 0 && (
         <p className="small sort-tray-note">
           <button className="ghost small-btn" onClick={putAllWithRoom}>
             Put {withRoom.length} beside their own sort
@@ -221,8 +223,8 @@ export default function SortPage(props: Props) {
               <ul className="sort-parts">
                 {shown.slice(0, SHOWN).map((p) => {
                   const it: Pick = { part: p.partNum };
-                  const there = recordedHomes.get(p.partNum);
-                  const home = homeOf.get(p.partNum);
+                  const there = suggest ? recordedHomes.get(p.partNum) : undefined;
+                  const home = suggest ? homeOf.get(p.partNum) : undefined;
                   return (
                     <li key={p.partNum} draggable onDragStart={(e) => dragStart(e, it)} className={isPicked(it) ? 'picked' : ''}>
                       <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} aria-label={`Pick ${p.name}`} />
@@ -341,7 +343,7 @@ export default function SortPage(props: Props) {
         <div className={`sort-pocket empty-drawer ${over === `pocket:${open.key}|0` ? 'drop-over' : ''}`} {...dropTarget(`pocket:${open.key}|0`, (items) => moveTo(items, { key: open.key, pocket: 0 }))}>
           <p className="muted small">
             Nothing recorded here yet. Drop parts here, or use <b>Record this drawer…</b> to set its pockets.
-            {hasSuggestion(open.key) && (
+            {suggest && hasSuggestion(open.key) && (
               <>
                 {' '}
                 <button className="link small" onClick={() => onShowSuggested(open.key)}>

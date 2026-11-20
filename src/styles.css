@@ -672,7 +672,7 @@ td.pic { width: 56px; padding: 3px 6px; }
 .unsorted-actions > button.small-btn:not(.ghost):hover { background: var(--accent); color: var(--accent-ink); }
 
 /* drawer editor: what's waiting for the drawer, and the search */
-.waiting { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 4px 12px 10px; margin: 10px 0 12px; }
+.waiting { border: 1px dashed var(--line); background: var(--soft); border-radius: 10px; padding: 4px 12px 10px; margin: 10px 0 12px; }
 .waiting-head { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; color: var(--ink); padding: 8px 0 4px; text-align: left; flex-wrap: wrap; }
 .waiting-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 2px 0 4px; }
 .waiting-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
@@ -788,3 +788,15 @@ td.pic { width: 56px; padding: 3px 6px; }
   .sort-left { position: static; max-height: none; overflow: visible; }
 }
 body:has(.selection-bar) .undo-bar { bottom: 80px; }
+
+/* The suggestions switch */
+.switch { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 6px; font-size: 13px; }
+.switch-track { width: 30px; height: 18px; border-radius: 9px; background: var(--line); position: relative; transition: background 0.15s; }
+.switch-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: left 0.15s; }
+.switch.on .switch-track { background: var(--accent); }
+.switch.on .switch-knob { left: 14px; }
+.page-tools .switch { margin-left: auto; }
+.sub-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 0 14px; flex-wrap: wrap; }
+.sub-tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 8px 12px; }
+.sub-tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.sub-tabs .nav-count { margin-left: 6px; }

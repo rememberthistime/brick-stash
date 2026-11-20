@@ -240,19 +240,6 @@ export default function DrawerEditor({
         )}
 
 
-        {(homes.length > 0 || moves.length > 0) && pockets && (
-          <Waiting
-            homes={homes}
-            moves={moves}
-            divided={current.length > 1}
-            titleOf={titleOf}
-            byNum={byNum}
-            onAdd={(items) => onChange(items.reduce((list, h) => addToPocket(list, Math.min(h.pocket, list.length - 1), [h.part.partNum]), current))}
-            onNotHere={(h) => current[h.pocket] && onSkip(homeSkipId(h.part.partNum, current[h.pocket].id))}
-            onAccept={onAccept}
-            onSkip={onSkip}
-          />
-        )}
 
         <div className="setup-count">
           <span>Pockets</span>
@@ -296,6 +283,20 @@ export default function DrawerEditor({
             onRemovePocket={pocket.container ? () => onChange(removePocket(current, i, uid)) : undefined}
           />
         ))}
+
+        {(homes.length > 0 || moves.length > 0) && pockets && (
+          <Waiting
+            homes={homes}
+            moves={moves}
+            divided={current.length > 1}
+            titleOf={titleOf}
+            byNum={byNum}
+            onAdd={(items) => onChange(items.reduce((list, h) => addToPocket(list, Math.min(h.pocket, list.length - 1), [h.part.partNum]), current))}
+            onNotHere={(h) => current[h.pocket] && onSkip(homeSkipId(h.part.partNum, current[h.pocket].id))}
+            onAccept={onAccept}
+            onSkip={onSkip}
+          />
+        )}
 
         {pickedItems.length > 0 && (
           <div className="selection-bar">

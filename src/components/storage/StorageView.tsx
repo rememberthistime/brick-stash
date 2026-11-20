@@ -29,6 +29,7 @@ import { ColourKey } from './PlanSettings';
 import SuggestedDrawer from './Suggested';
 import { pct } from './format';
 import { history, useHistory } from './history';
+import { SuggestionsSwitch, useSuggestions } from './suggestionsSwitch';
 import { drawerOptions, placeOptions, spotTitle, spotsOf } from './places';
 
 export type StoragePage = 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'pick' | 'export';
@@ -57,6 +58,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const [highlight, setHighlight] = useState<string | null>(null);
   const folds = useFolds();
   const steps = useHistory();
+  const suggest = useSuggestions();
   const [undoHidden, setUndoHidden] = useState(-1);
   // A drawer opened on one page doesn't stay open over the next
   useEffect(() => {
@@ -205,6 +207,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const search = (placeholder: string) => (
     <div className="page-tools no-print">
       <input className="search" type="search" placeholder={placeholder} value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <SuggestionsSwitch />
     </div>
   );
 
@@ -252,6 +255,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
           <button className="link" onClick={() => folds.setAll(foldIds, false)}>
             Close all
           </button>
+          <SuggestionsSwitch />
         </div>
         {lifted.length > 0 && (
           <p className="muted small setup-lifted">
@@ -268,7 +272,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
           const each = (ids: string[]) => (ids.length > 1 ? ` of all ${ids.length}` : '');
           const range = list[0].code === list[list.length - 1].code ? list[0].code : `${list[0].code}–${list[list.length - 1].code}`;
           return (
-            <Fold key={kind} id={`storage:${kind}`} folds={folds} defaultOpen force={hits} title={<><span className="code">{range}</span> {kind}</>} summary={[`${recorded} of ${list.length} recorded`, suggested ? `${suggested} suggested` : ''].filter(Boolean).join(', ')}>
+            <Fold key={kind} id={`storage:${kind}`} folds={folds} defaultOpen force={hits} title={<><span className="code">{range}</span> {kind}</>} summary={[`${recorded} of ${list.length} recorded`, suggest && suggested ? `${suggested} suggested` : ''].filter(Boolean).join(', ')}>
               {unitIds.length > 0 && (
                 <div className="setup-layout small">
                   {closed.length > 0 && (
@@ -293,8 +297,8 @@ export default function StorageView({ page, model, project, update, parts, keptO
                 {list.map((c) => {
                   const dim = (!!q && !matchesFilter(c)) || (!!highlight && !familiesIn(c).includes(highlight));
                   const s = gaps.suggested.get(c.key);
-                  return setup.drawers[c.key]?.length || !s ? (
-                    <DrawerTile key={c.key} comp={c} recorded={!!setup.drawers[c.key]?.length} pockets={placed.get(c.key) ?? []} toAdd={homesIn.get(c.key)?.length ?? 0} moves={topMovesIn.get(c.key) ?? 0} dim={dim} onClick={() => setEditing(c.key)} />
+                  return setup.drawers[c.key]?.length || !s || !suggest ? (
+                    <DrawerTile key={c.key} comp={c} recorded={!!setup.drawers[c.key]?.length} pockets={placed.get(c.key) ?? []} toAdd={suggest ? homesIn.get(c.key)?.length ?? 0 : 0} moves={suggest ? topMovesIn.get(c.key) ?? 0 : 0} dim={dim} suggest={suggest} onClick={() => setEditing(c.key)} />
                   ) : (
                     <SuggestedTile key={c.key} comp={c} s={s} dim={dim} onClick={() => setShowing(c.key)} />
                   );
@@ -340,6 +344,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
           onEdit={setEditing}
           onShowSuggested={setShowing}
           hasSuggestion={(key) => gaps.suggested.has(key)}
+          suggest={suggest}
         />
       </>
     );
@@ -369,6 +374,29 @@ export default function StorageView({ page, model, project, update, parts, keptO
       </>
     );
 
+  const tabs = (
+    <div className="sub-tabs no-print" role="tablist">
+      {(
+        [
+          ['moves', 'Moves worth making', analysis.suggestions.length],
+          ['tidy', 'Tidy the layout', layoutMoves.reduce((t, r) => t + r.cycles.length, 0)],
+          ['review', 'Review', analysis.findings.length],
+        ] as const
+      ).map(([id, label, count]) => (
+        <button key={id} role="tab" aria-selected={page === id} className={page === id ? 'on' : ''} onClick={() => goTo(id)}>
+          {label}
+          {count > 0 && <span className="nav-count">{count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+  if (page === 'moves' || page === 'tidy' || page === 'review')
+    body = (
+      <>
+        {tabs}
+        {body}
+      </>
+    );
   const last = steps[steps.length - 1];
   return (
     <div className="setup">
@@ -432,8 +460,8 @@ export default function StorageView({ page, model, project, update, parts, keptO
           onNext={() => stepTo(1)}
           onClose={() => setEditing(null)}
           onName={(name) => update((p) => ({ units: setPlaceName(p.units, current.unitId, current.sections ? null : drawerKeyOf(current.key), name) }))}
-          homes={homesIn.get(current.key) ?? []}
-          moves={movesIn.get(current.key) ?? []}
+          homes={suggest ? homesIn.get(current.key) ?? [] : []}
+          moves={suggest ? movesIn.get(current.key) ?? [] : []}
           resolve={resolvePart}
           places={places}
           drawers={() => drawerOptions(comps, setup, analysis.pockets)}
@@ -453,7 +481,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   );
 }
 
-function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, onClick }: { comp: SetupComp; recorded: boolean; pockets: PlacedPocket[]; toAdd: number; moves: number; dim: boolean; onClick: () => void }) {
+function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, suggest, onClick }: { comp: SetupComp; recorded: boolean; pockets: PlacedPocket[]; toAdd: number; moves: number; dim: boolean; suggest: boolean; onClick: () => void }) {
   const capacity = pockets.reduce((t, p) => t + p.capacity, 0);
   const used = pockets.reduce((t, p) => t + p.used, 0);
   const inUse = pockets.filter((p) => p.parts.length);
@@ -477,7 +505,7 @@ function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, onClick }: { c
         )}
       </span>
       {pics.length > 0 && <TilePics parts={pics} />}
-      <span className="small setup-tile-names">{recorded ? (names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` + ${names.length - 2}` : '') : 'Empty') : 'Not recorded, nothing suggested'}</span>
+      <span className="small setup-tile-names">{recorded ? (names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` + ${names.length - 2}` : '') : 'Empty') : suggest ? 'Not recorded, nothing suggested' : 'Not recorded'}</span>
       {(toAdd > 0 || moves > 0) && (
         <span className="tile-todo small">
           {toAdd > 0 && <span>+{toAdd} to put in</span>}
