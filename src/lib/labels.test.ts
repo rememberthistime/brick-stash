@@ -26,7 +26,7 @@ describe('labels for the setup', () => {
   it('prints a single part by name and number, and leaves out empty unnamed boxes', () => {
     const [entry] = labels([pocket('a', ['3001']), pocket('b', []), pocket('c', [], 'Spare')]);
     expect(entry.cells.map((c) => [c.title, c.detail])).toEqual([
-      ['Brick 2 x 4', '3001'],
+      ['Brick 2×4', '3001'],
       ['Spare', ''],
     ]);
   });

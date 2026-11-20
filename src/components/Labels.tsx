@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import type { LabelEntry } from '../lib/labels';
 import PartImage from './PartImage';
 import TapeLabels from './TapeLabels';
+import { GroupDot, GroupKey } from './GroupDot';
 
 export default function Labels({ entries, note, options }: { entries: LabelEntry[]; note?: ReactNode; options?: ReactNode }) {
   const [pictures, setPictures] = useState(true);
@@ -23,13 +24,16 @@ export default function Labels({ entries, note, options }: { entries: LabelEntry
           {note} For more polished picture labels, <a href="https://brickarchitect.com/labels/" target="_blank" rel="noreferrer">Brick Architect</a> publishes a well-known set keyed by part number.
         </span>
       </div>
+      <div className="no-print">
+        <GroupKey />
+      </div>
       {!entries.length && <p className="muted">Nothing to label yet.</p>}
       <div className="labels">
         {entries.flatMap((e) =>
           e.cells.map((cell, i) => (
             <div key={`${e.code}-${i}`} className={`label ${cell.family ? `fam-border-${cell.family}` : ''}`}>
               <div className="label-code">
-                {e.code}
+                <GroupDot group={e.group} /> {e.code}
                 {e.cells.length > 1 ? `.${i + 1}` : ''}
                 {e.name && <span className="label-name"> {e.name}</span>}
               </div>

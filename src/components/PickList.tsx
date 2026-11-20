@@ -1,5 +1,7 @@
 // A pick list for a build, kept as a checklist: which drawers to open, and how many of each part to take in each
 // colour. Every list is saved with the project, so its ticks last and every device sees them.
+import { nameTitle, partPlainName } from '../lib/builderNames';
+import PartName from './PartName';
 import { useEffect, useMemo, useState } from 'react';
 import { collectionRows, parseInventory } from '../lib/collection';
 import { colourRgb, colourStock, colourTable, needsColourNames } from '../lib/colours';
@@ -153,11 +155,11 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
     const one = l.colours.length === 1;
     return (
       <li key={l.partNum} className={`pick-line ${done ? 'picked' : ''}`}>
-        <input type="checkbox" className="pick-box" checked={done} onChange={() => toggle(keysOf(l))} aria-label={`Picked all of ${l.name}`} />
-        <PartImage partNum={l.partNum} size={44} title={l.name} />
+        <input type="checkbox" className="pick-box" checked={done} onChange={() => toggle(keysOf(l))} aria-label={`Picked all of ${partPlainName(l)}`} />
+        <PartImage partNum={l.partNum} size={44} title={nameTitle(l)} />
         <span className="pick-name">
           <span className="pick-title">
-            <b className="pick-qty-inline">{l.want.toLocaleString()}×</b> {l.name} <small className="muted mono">{l.partNum}</small>
+            <b className="pick-qty-inline">{l.want.toLocaleString()}×</b> <PartName part={l} /> <small className="muted mono">{l.partNum}</small>
           </span>
           <small className="pick-detail">
             {showPlace && l.places.length > 0 && (
@@ -177,7 +179,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
                 const short = c.have !== undefined && c.have < c.qty;
                 return (
                   <label key={k} className={`pick-colour ${picked.has(k) ? 'ticked' : ''} ${short ? 'short' : ''}`}>
-                    {!one && <input type="checkbox" checked={picked.has(k)} onChange={() => toggle([k])} aria-label={`Picked ${c.qty} ${c.name || 'any colour'} ${l.name}`} />}
+                    {!one && <input type="checkbox" checked={picked.has(k)} onChange={() => toggle([k])} aria-label={`Picked ${c.qty} ${c.name || 'any colour'} ${partPlainName(l)}`} />}
                     {swatch(c.name)}
                     <span>
                       <b>{c.qty}</b> {c.name || 'any colour'}

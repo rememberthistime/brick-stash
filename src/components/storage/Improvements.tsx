@@ -1,6 +1,9 @@
 // What the app makes of the drawers as recorded: moves worth making, how the estimates compare, and what to look at.
+import { nameTitle } from '../../lib/builderNames';
+import PartName from '../PartName';
 import { acceptSuggestion, type EstimateRow, type Finding, type FindingKind, type SetupAnalysis } from '../../lib/setup';
 import type { Part, Setup } from '../../lib/types';
+import type { LayoutFinding, LayoutKind } from '../../lib/layoutCheck';
 import PartImage from '../PartImage';
 import { useState } from 'react';
 import { L, pct } from './format';
@@ -29,10 +32,10 @@ export function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map
     <ul className="part-strip">
       {parts.slice(0, max).map((p) => (
         <li key={p.partNum}>
-          <PartImage partNum={p.partNum} size={48} title={p.name} />
+          <PartImage partNum={p.partNum} size={48} title={nameTitle(p)} />
           <span>
             <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
-              {p.name}
+              <PartName part={p} />
             </a>
             <span className="muted small">
               {' '}
@@ -162,6 +165,50 @@ export function Findings({ findings, analysis }: { findings: Finding[]; analysis
   return (
     <div className="setup-findings">
       {FINDINGS.map(({ kind, title, hint }) => {
+        const list = findings.filter((f) => f.kind === kind);
+        if (!list.length) return null;
+        return (
+          <div key={kind}>
+            <h4>
+              {title} <span className="muted small">({list.length})</span>
+            </h4>
+            <p className="muted small">{hint}</p>
+            <ul className="change-list">
+              {(all === kind ? list : list.slice(0, SHOWN_FINDINGS)).map((f) => (
+                <li key={f.text}>
+                  {f.text}
+                  {f.parts && <PartStrip nums={f.parts} byNum={byNum} max={3} />}
+                </li>
+              ))}
+            </ul>
+            {list.length > SHOWN_FINDINGS && (
+              <button className="link small" onClick={() => setAll(all === kind ? null : kind)}>
+                {all === kind ? 'Show fewer' : `Show all ${list.length}`}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const LAYOUT: { kind: LayoutKind; title: string; hint: string }[] = [
+  { kind: 'twoJobs', title: 'Units doing two jobs', hint: 'Someone who finds one sort of part in a unit won’t think to look there for another. Give each unit one job on Units.' },
+  { kind: 'againstJob', title: 'Parts in another unit’s job', hint: 'Parts that don’t fit the job you gave their unit on Units.' },
+  { kind: 'spread', title: 'Families in many units', hint: 'The more units a family is in, the more places there are to look.' },
+  { kind: 'catchAll', title: 'Catch-all drawers', hint: 'Drawers holding parts from three or more groups, or a dozen pockets or more. Tick “Mixed on purpose” on a pocket to leave it out.' },
+  { kind: 'unnamed', title: 'Drawers without a name', hint: 'A name says what belongs there, including what isn’t in yet. Without one, the label lists what’s inside.' },
+];
+
+/** Could someone else find things? What the layout check found, most important first */
+export function LayoutCheck({ findings, analysis }: { findings: LayoutFinding[]; analysis: SetupAnalysis }) {
+  const [all, setAll] = useState<LayoutKind | null>(null);
+  const byNum = partsOf(analysis);
+  if (!findings.length) return <p className="muted small">{analysis.drawersRecorded ? 'Each unit does one job and every drawer says what it’s for. Someone else should find their way round.' : 'Record a few drawers and this checks whether someone else could find their way round them.'}</p>;
+  return (
+    <div className="setup-findings">
+      {LAYOUT.map(({ kind, title, hint }) => {
         const list = findings.filter((f) => f.kind === kind);
         if (!list.length) return null;
         return (

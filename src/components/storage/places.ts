@@ -4,6 +4,7 @@ import { codeWithName, placeName } from '../../lib/codes';
 import type { Spot } from '../../lib/move';
 import { contentsName, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { familyFor, familyGroup } from '../../lib/taxonomy';
+import { fitsJob, jobLabel } from '../../lib/unitJobs';
 import type { Part, Setup } from '../../lib/types';
 import { pct } from './format';
 
@@ -14,7 +15,7 @@ export interface PlaceOption extends Spot {
   title: string;
   /** what's there and how full, in a few words */
   detail: string;
-  /** holds the same family (2) or group of families (1) as the parts being moved, or neither (0) */
+  /** in a unit whose job the parts fit (3), holds the same family (2) or group of families (1) as the parts being moved, or none of those (0) */
   similar: number;
   /** the drawer's own name and unit, for searching */
   words: string;
@@ -45,20 +46,23 @@ export function placeOptions(comps: SetupComp[], setup: Setup, pockets: PlacedPo
   const fams = new Set(forParts.map((p) => familyFor(p.catId).key));
   const grps = new Set([...fams].map(familyGroup));
   const byId = new Map(pockets.map((p) => [p.id, p]));
+  // A unit whose job every part being moved fits is where they belong, whatever is in it so far
+  const jobFits = (c: SetupComp) => forParts.length > 0 && forParts.every((p) => fitsJob(c.unitJob, p) === true);
+  const jobNote = (c: SetupComp) => (jobFits(c) ? ` · for ${jobLabel(c.unitJob)}` : '');
   return comps.flatMap((c) => {
     const list = setup.drawers[c.key] ?? [];
-    const words = `${c.code} ${placeName(c)} ${c.unitName} ${c.label}`.toLowerCase();
-    if (!list.length) return [{ key: c.key, pocket: 0, code: c.code, title: codeWithName(c.code, c), detail: 'nothing recorded', similar: 0, words }];
+    const words = `${c.code} ${placeName(c)} ${c.unitName} ${c.label} ${jobLabel(c.unitJob)}`.toLowerCase();
+    if (!list.length) return [{ key: c.key, pocket: 0, code: c.code, title: codeWithName(c.code, c), detail: `nothing recorded${jobNote(c)}`, similar: jobFits(c) ? 3 : 0, words }];
     return list.map((p, i) => {
       const pp = byId.get(p.id);
       const used = pp && pp.capacity ? pp.used / pp.capacity : 0;
-      const similar = !pp?.parts.length ? 0 : fams.has(pp.family) ? 2 : grps.has(familyGroup(pp.family)) ? 1 : 0;
+      const similar = jobFits(c) ? 3 : !pp?.parts.length ? 0 : fams.has(pp.family) ? 2 : grps.has(familyGroup(pp.family)) ? 1 : 0;
       return {
         key: c.key,
         pocket: i,
         code: list.length > 1 ? `${c.code}.${i + 1}` : c.code,
         title: spotTitle(c, i, setup, pockets),
-        detail: pp?.parts.length ? `${pp.parts.length} ${pp.parts.length === 1 ? 'part' : 'parts'}, ${pp.fill === undefined ? '~' : ''}${pct(used)} full` : 'empty',
+        detail: (pp?.parts.length ? `${pp.parts.length} ${pp.parts.length === 1 ? 'part' : 'parts'}, ${pp.fill === undefined ? '~' : ''}${pct(used)} full` : 'empty') + jobNote(c),
         similar,
         words: `${words} ${p.label ?? ''} ${pp ? contentsName(pp) : ''}`.toLowerCase(),
       };
@@ -87,7 +91,7 @@ export function drawerOptions(comps: SetupComp[], setup: Setup, pockets: PlacedP
 /** Options matching what's typed: a drawer code typed whole ("a3", "a3.2") comes first, then any word in its name */
 export function filterPlaces(options: PlaceOption[], query: string): PlaceOption[] {
   const q = query.trim().toLowerCase();
-  if (!q) return [...options.filter((o) => o.similar === 2), ...options.filter((o) => o.similar === 1), ...options.filter((o) => !o.similar)];
+  if (!q) return [3, 2, 1, 0].flatMap((n) => options.filter((o) => o.similar === n));
   const code = options.filter((o) => o.code.toLowerCase().startsWith(q));
   const rest = options.filter((o) => !code.includes(o) && q.split(/\s+/).every((w) => o.words.includes(w) || o.title.toLowerCase().includes(w)));
   return [...code, ...rest];

@@ -17,14 +17,18 @@ const IMAGE_GAMMA = 1.5;
 
 /** Enough of a name to recognise a part on a small label */
 export function shortName(label: string): string {
-  return label
+  const bare = label
     .replace(/\s*\([^)]*\)/g, '')
     .replace(/\s*\[[^\]]*\]/g, '')
-    .replace(/ with .*$/i, '')
-    .replace(/,.*$/, '')
     .replace(/\s+/g, ' ')
     .trim();
+  // What follows "with" often says what the part is ("Plate 1×2 with clip"), so it stays where there's room
+  if (bare.length <= SHORT_ENOUGH) return bare;
+  return bare.replace(/ with .*$/i, '').replace(/,.*$/, '').trim();
 }
+
+/** Characters a short name can run to before its details are dropped */
+const SHORT_ENOUGH = 26;
 
 export interface LabelCell {
   title: string;

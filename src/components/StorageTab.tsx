@@ -4,6 +4,7 @@ import { PRESETS } from '../lib/presets';
 import { drawerKey, setPlaceName, setUnitCode, validUnitCode } from '../lib/codes';
 import { spaceUse } from '../lib/spaces';
 import NameInput from './NameInput';
+import UnitJobs from './UnitJobs';
 import { compartmentVolume } from '../lib/volume';
 import { expandCompartments } from '../lib/planner';
 import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPreset, type UnitGroup } from '../lib/storageList';
@@ -53,6 +54,7 @@ export default function StorageTab({ view, project, update }: Props) {
         // Its own name and drawer names are for the user to give it
         title: undefined,
         drawerNames: undefined,
+        job: undefined,
         id: uid(),
         name: `${g.name} #${Math.max(...numbers) + 1}`,
         external: last.external && { ...last.external },
@@ -208,6 +210,7 @@ export default function StorageTab({ view, project, update }: Props) {
         )}
       </section>
 
+      <UnitJobs units={units} setUnits={setUnits} />
     </>
   );
 }

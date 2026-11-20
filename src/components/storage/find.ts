@@ -1,5 +1,6 @@
 // When a search on Put away & move finds nothing in the list, say where the part is instead: already in a drawer,
 // kept out of storage, all in sets kept built, or not in the collection at all (with catalogue parts to add).
+import { searchName } from '../../lib/builderNames';
 import { findInCatalog } from '../../lib/collection';
 import type { KeptPart, KeptReason } from '../../lib/keepOut';
 import type { Spot } from '../../lib/move';
@@ -25,7 +26,7 @@ export function findElsewhere(query: string, opts: { owned: Part[]; toStore: Par
   const none: Elsewhere = { inDrawers: [], kept: [], built: [], catalog: [] };
   if (q.length < 2) return none;
   const m = partMatcher(query, opts.resolve);
-  const hit = (p: Part) => m.test(p) || p.name.toLowerCase().includes(q);
+  const hit = (p: Part) => m.test(p) || searchName(p).toLowerCase().includes(q);
   const stored = new Set(opts.toStore.map((p) => p.partNum));
   const keptNums = new Set(opts.kept.map((k) => k.part.partNum));
   const owned = opts.owned.filter(hit);

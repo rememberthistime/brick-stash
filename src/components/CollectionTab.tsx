@@ -1,3 +1,5 @@
+import { nameTitle, partPlainName } from '../lib/builderNames';
+import PartName from './PartName';
 import { useState } from 'react';
 import type { Catalog, InventoryRow, Part, Project } from '../lib/types';
 import { TEMPLATE_CSV, onePieceVolume, parseInventory, partVolume, type SubtractResult } from '../lib/collection';
@@ -349,7 +351,7 @@ function FamilyRows({
   const fam = node.familyKey;
   const keptHere = leaves.filter((l) => keptNums.has(l.part!.partNum)).length;
   const onePiece = (p: Part) => onePieceVolume(p, scale);
-  const value = (p: Part): number | string => ({ num: p.partNum, name: p.name, qty: p.qty, colours: p.colours, each: onePiece(p), total: onePiece(p) * p.qty })[sort.key];
+  const value = (p: Part): number | string => ({ num: p.partNum, name: partPlainName(p), qty: p.qty, colours: p.colours, each: onePiece(p), total: onePiece(p) * p.qty })[sort.key];
   const sorted = [...leaves].sort((a, b) => {
     const [x, y] = [value(a.part!), value(b.part!)];
     const order = typeof x === 'number' ? x - (y as number) : x.localeCompare(y as string, undefined, { numeric: true });
@@ -403,14 +405,14 @@ function FamilyRows({
                           <input type="checkbox" checked={!keptNums.has(p.partNum)} onChange={(e) => pick(p, !e.target.checked)} />
                         </td>
                         <td className="pic">
-                          <PartImage partNum={p.partNum} size={48} title={p.name} />
+                          <PartImage partNum={p.partNum} size={48} title={nameTitle(p)} />
                         </td>
                         <td className="mono">
                           <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer">
                             {p.partNum}
                           </a>
                         </td>
-                        <td>{p.name}</td>
+                        <td><PartName part={p} /></td>
                         <td className="num">{p.qty}</td>
                         <td className="num">{p.colours}</td>
                         <td className="num">

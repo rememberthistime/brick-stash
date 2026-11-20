@@ -1,5 +1,7 @@
 // Shown on Put away & move when a search is typed: where a part is if it isn't in the list (in a drawer, kept out,
 // all in sets kept built), and a way to add it, straight into a drawer if you like, when you don't have it at all.
+import { nameTitle, partPlainName } from '../../lib/builderNames';
+import PartName from '../PartName';
 import { useState } from 'react';
 import type { KeptReason } from '../../lib/keepOut';
 import type { Spot } from '../../lib/move';
@@ -73,9 +75,9 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
     <div className="not-in card-inset">
       {found.inDrawers.map(({ part, spots }) => (
         <div key={part.partNum} className="not-in-row">
-          <PartImage partNum={part.partNum} size={40} title={part.name} />
+          <PartImage partNum={part.partNum} size={40} title={nameTitle(part)} />
           <span className="not-in-what">
-            {part.name} <small className="muted mono">{part.partNum}</small>
+            <PartName part={part} /> <small className="muted mono">{part.partNum}</small>
             <small className="not-in-why">Already in {spots.map(codeOf).join(', ')}</small>
           </span>
           <button className="ghost small-btn" onClick={() => onOpen(spots[0].key)}>
@@ -85,9 +87,9 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
       ))}
       {found.kept.map(({ part, reason }) => (
         <div key={part.partNum} className="not-in-row">
-          <PartImage partNum={part.partNum} size={40} title={part.name} />
+          <PartImage partNum={part.partNum} size={40} title={nameTitle(part)} />
           <span className="not-in-what">
-            {part.name} <small className="muted mono">{part.partNum}</small>
+            <PartName part={part} /> <small className="muted mono">{part.partNum}</small>
             <small className="not-in-why">
               {part.qty === 1 ? "1 piece" : `${part.qty.toLocaleString()} pieces`}, not in this list because it’s {WHY[reason]}
             </small>
@@ -96,15 +98,15 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
             <button className="ghost small-btn" onClick={() => onKeepIn(part)}>
               Store it in a drawer
             </button>
-            <PlacePicker label="Put in…" title={`Store ${part.name} in…`} options={() => places([part])} onPick={(o) => onKeepIn(part, { key: o.key, pocket: o.pocket })} />
+            <PlacePicker label="Put in…" title={`Store ${partPlainName(part)} in…`} options={() => places([part])} onPick={(o) => onKeepIn(part, { key: o.key, pocket: o.pocket })} />
           </span>
         </div>
       ))}
       {found.built.map((part) => (
         <div key={part.partNum} className="not-in-row">
-          <PartImage partNum={part.partNum} size={40} title={part.name} />
+          <PartImage partNum={part.partNum} size={40} title={nameTitle(part)} />
           <span className="not-in-what">
-            {part.name} <small className="muted mono">{part.partNum}</small>
+            <PartName part={part} /> <small className="muted mono">{part.partNum}</small>
             <small className="not-in-why">All {part.qty.toLocaleString()} are in sets kept built, so none need a drawer. Untick a set on Sets kept built to put them back.</small>
           </span>
         </div>
@@ -117,9 +119,9 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
           {amount}
           {found.catalog.map((c) => (
             <div key={c.partNum} className="not-in-row">
-              <PartImage partNum={c.partNum} size={40} title={c.name} />
+              <PartImage partNum={c.partNum} size={40} title={nameTitle(c)} />
               <span className="not-in-what">
-                {c.name} <small className="muted mono">{c.partNum}</small>
+                <PartName part={c} /> <small className="muted mono">{c.partNum}</small>
               </span>
               {addButtons(extra(c), c.name)}
             </div>

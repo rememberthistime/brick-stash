@@ -85,7 +85,7 @@ export default function App() {
     // Suggestions are counted only with the switch on, so with it off nothing nags
     moves: storageReady && suggest ? `${n(moves)}${moves && analysis.moreSuggestions ? '+' : ''}` : '',
     tidy: storageReady && suggest ? n(swaps) : '',
-    review: storageReady && suggest ? n(analysis.findings.length) : '',
+    review: storageReady && suggest ? n(analysis.findings.length + analysis.layout.length) : '',
   };
 
   const heads: Record<Page, { headline: ReactNode; sub?: ReactNode }> = {
@@ -129,7 +129,7 @@ export default function App() {
       ? { headline: moves ? `${moves}${analysis.moreSuggestions ? '+' : ''} ${moves === 1 && !analysis.moreSuggestions ? 'move' : 'moves'} worth making` : analysis.drawersRecorded ? 'No moves to suggest' : 'Record some drawers first', sub: 'Each is optional. Accepting one only changes what’s recorded here, and adds it to a list of moves to make.' }
       : { headline: 'Suggested moves' },
     tidy: storageReady ? { headline: swaps ? `${plural(swaps, 'swap')} would bring each family together` : 'Each family is together', sub: 'Whole drawers swapped between units of the same kind, so similar parts sit side by side. Optional, and can be undone.' } : { headline: 'Tidy the layout' },
-    review: storageReady ? { headline: analysis.findings.length ? `${plural(analysis.findings.length, 'thing')} to look at` : 'Nothing to look at', sub: 'What stands out in the drawers as recorded, and how the size estimates compare with the fills you’ve entered.' } : { headline: 'Review' },
+    review: storageReady ? { headline: analysis.findings.length + analysis.layout.length ? `${plural(analysis.findings.length + analysis.layout.length, 'thing')} to look at` : 'Nothing to look at', sub: 'Whether someone else could find their way round, what stands out in the drawers as recorded, and how the size estimates compare with the fills you’ve entered.' } : { headline: 'Review' },
     labels: { headline: 'Labels for your drawers', sub: 'Brother tape labels, or a sheet of sticky labels, for every recorded drawer.' },
     map: { headline: 'Where everything is', sub: 'Each cupboard with its units shelf by shelf, and what’s in every drawer. Print it and stick it on the door.' },
     pick: { headline: 'Build a set from your drawers', sub: 'A checklist of the drawers to open and the parts to take, colour by colour, kept until you’re done.' },

@@ -81,7 +81,7 @@ function PickerList({ title, options, exclude, onClose, onPick }: { title: strin
       <ul className="picker-list" role="listbox">
         {shown.slice(0, SHOWN).map((o, i) => (
           <li key={`${o.key}|${o.pocket}`}>
-            {similar && i === 0 && <div className="picker-sub small muted">Beside similar parts</div>}
+            {similar && (i === 0 || shown[i - 1].similar !== o.similar) && (o.similar === 3 ? <div className="picker-sub small muted">Units for these parts</div> : o.similar && (i === 0 || shown[i - 1].similar === 3) ? <div className="picker-sub small muted">Beside similar parts</div> : null)}
             {similar && i > 0 && !o.similar && shown[i - 1].similar ? <div className="picker-sub small muted">Every drawer</div> : null}
             <button role="option" aria-selected={i === at} className={`picker-option ${i === at ? 'on' : ''}`} onMouseEnter={() => setAt(i)} onClick={() => onPick(o)}>
               <span className="picker-option-title">{o.title}</span>

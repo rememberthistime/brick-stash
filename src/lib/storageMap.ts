@@ -10,6 +10,8 @@ export interface MapDrawer {
   /** the user's own name for the drawer, or what's in it */
   title: string;
   recorded: boolean;
+  /** the group most of it is, for its colour dot */
+  group?: string;
 }
 
 export interface MapUnit {
