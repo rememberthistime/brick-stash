@@ -19,6 +19,7 @@ import Fold, { useFolds } from '../Fold';
 import Labels from '../Labels';
 import PartImage from '../PartImage';
 import PickListView from '../PickList';
+import StorageMap from './StorageMap';
 import type { Page } from '../Shell';
 import DrawerEditor from './DrawerEditor';
 import { EstimateCheck, Findings, Suggestions } from './Improvements';
@@ -32,8 +33,8 @@ import { history, useHistory } from './history';
 import { SuggestionsSwitch, useSuggestions } from './suggestionsSwitch';
 import { drawerOptions, placeOptions, spotTitle, spotsOf } from './places';
 
-export type StoragePage = 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'pick' | 'export';
-export const STORAGE_PAGES = new Set<Page>(['drawers', 'put-away', 'moves', 'tidy', 'review', 'labels', 'pick', 'export']);
+export type StoragePage = 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export';
+export const STORAGE_PAGES = new Set<Page>(['drawers', 'put-away', 'moves', 'tidy', 'review', 'labels', 'map', 'pick', 'export']);
 
 interface Props {
   page: StoragePage;
@@ -224,6 +225,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
         }
       />
     );
+  else if (page === 'map') body = <StorageMap project={project} update={update} comps={comps} placed={placed} />;
   else if (page === 'pick')
     body = (
       <PickListView

@@ -78,6 +78,8 @@ export interface StorageUnit {
   /** External footprint, mm — optional, used for space recommendations */
   external?: Dims;
   spaceId?: string;
+  /** Which shelf of its space it stands on, counted from the top (1), for the storage map */
+  shelf?: number;
 }
 
 /** A cupboard / shelf / area units live in. Internal mm. */
