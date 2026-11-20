@@ -28,6 +28,8 @@ HTTPS comes from the reverse proxy (SWAG, on the home network only) at `https://
 
 **Your layout comes first.** The drawers you record are the plan. The app's own ideas (room beside the same sort of parts, what it would put in drawers you haven't recorded, moves worth making) appear only with the **Suggestions** switch on, at the top of Drawers and Put away & move. It's remembered on each device and starts off. Nothing changes unless you press a button.
 
+**Look**, in the top bar, chooses how the app looks on that device: **Bright** (warm white with LEGO-style red, yellow and blue, the default), **Workshop** (cool grey with crisp white cards and one blue) or **Night** (deep navy with a yellow accent). The family colours on drawers are the same in all three.
+
 The sidebar lists every job the app does, in groups, with a count beside each (how many parts aren't in a drawer, how many moves are worth making, and so on). Each page does one thing and opens with a sentence saying where things stand. Each page has its own address (`#/put-away`), so bookmarks and the back button work. On a phone, ☰ opens the sidebar. With a project loaded, the app opens on **Put away & move**.
 
 **Collection**
@@ -102,6 +104,7 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - `src/components/Shell.tsx` — the sidebar, page addresses and page headlines; `src/App.tsx` works out each page's headline and count
 - `src/components/storage/` — the storage and sort pages: `model.ts` (everything they work out from the project, once), `StorageView.tsx` (Drawers, Put away & move, Suggestions and its tabs, Labels, Pick list, Export), `DrawerEditor.tsx` (recording a drawer), `Suggested.tsx` (a suggested drawer and its dividers), `SortPage.tsx` (Put away & move: the list beside the drawers, dragging and picking), `PlacePicker.tsx` and `places.ts` (Move to…), `history.ts` (undo), `suggestionsSwitch.tsx` (the Suggestions switch), `Improvements.tsx` (moves, estimates, findings), `Rearrange.tsx` (tidy the layout), `PlanSettings.tsx` (settings and colour key)
 - `src/components/CollectionTab.tsx` (Parts, Import, Sets kept built, Kept out), `StorageTab.tsx` (Units, Spaces), `PickList.tsx`, `Labels.tsx`, `TapeLabels.tsx`, `Versions.tsx`, `PartImage.tsx` — the other pages and views
+- `src/look.ts` and the top of `src/styles.css` — the three looks, as colour and type tokens
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `server/api.mjs` — the shared project and its daily versions; `server/index.mjs` — runs the built app for the network
 - `Dockerfile`, `.github/workflows/docker.yml` — the image Unraid runs, built and published from `main`
@@ -141,3 +144,4 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - [x] The search finds parts that belong in another pocket of the same drawer — *each result has a button for every pocket, with the one holding the same sort of parts named*
 - [x] Part names alone don't say what a part is, so suggested moves can't be judged, and small pictures aren't clear — *moves in a drawer now show their parts' pictures; any picture enlarges when pointed at, with name and number; names link to Rebrickable*
 - [x] Managing and rearranging storage by hand should be as simple as possible, with the app's suggestions an add-on to my own layout — *stage 1: Move… on every part (type a drawer code or name), several at once, whole pockets, swapping drawers, undo history; stage 2: Put away & move puts the unsorted parts beside your drawers, with drag and drop and tick-and-move for phones; stage 3: a Suggestions switch (off to start) shows the app's ideas only when you want them, and Suggested moves, Tidy the layout and Review are tabs of one Suggestions page*
+- [x] The whole site's colour scheme and design looks flat and dark — *three looks to choose from in the top bar: Bright (the default), Workshop and Night, with cards that sit up off the page and a display typeface for headings; the app no longer follows the computer's dark mode by itself*

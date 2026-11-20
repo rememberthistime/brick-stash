@@ -11,6 +11,7 @@ import StorageTab from './components/StorageTab';
 import StorageView, { STORAGE_PAGES, type StoragePage } from './components/storage/StorageView';
 import { useStorageModel } from './components/storage/model';
 import { useSuggestions } from './components/storage/suggestionsSwitch';
+import { LOOKS, setLook, useLook, type Look } from './look';
 import { PlanSettings } from './components/storage/PlanSettings';
 import { L, pct } from './components/storage/format';
 import { PageHead, Sidebar, usePage, type Page } from './components/Shell';
@@ -47,6 +48,7 @@ export default function App() {
   const model = useStorageModel(project, parts, catalog);
   const { analysis, gaps, recordedHomes, layoutMoves } = model;
   const suggest = useSuggestions();
+  const look = useLook();
 
   const importProject = async (f: File) => {
     try {
@@ -191,6 +193,16 @@ export default function App() {
         <span className="topbar-note muted small">
           {parts.length ? `${totals.pieces.toLocaleString()} pieces · ${plural(project.units.length, 'unit')}` : 'Storage planner for LEGO® collections'}
         </span>
+        <label className="look-pick no-print">
+          Look
+          <select value={look} onChange={(e) => setLook(e.target.value as Look)} aria-label="How the app looks on this device">
+            {LOOKS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
       {error && <div className="banner error">{error}</div>}
