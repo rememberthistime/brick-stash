@@ -775,7 +775,7 @@ td.pic { width: 56px; padding: 3px 6px; }
 .drop-over { outline: 3px dashed var(--accent) !important; outline-offset: 2px; background: var(--accent-soft) !important; }
 .sort-open-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px; }
 .sort-open-head h3 { margin: 0; font-size: 16px; }
-.sort-pockets { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.sort-pockets { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
 .sort-pocket { border: 1px solid var(--line); border-radius: 10px; padding: 8px; min-height: 90px; background: var(--card); }
 .sort-pocket.active { border-color: var(--accent); }
 .sort-pocket.empty-drawer { border-style: dashed; margin-bottom: 8px; }
@@ -800,3 +800,13 @@ body:has(.selection-bar) .undo-bar { bottom: 80px; }
 .sub-tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 8px 12px; }
 .sub-tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
 .sub-tabs .nav-count { margin-left: 6px; }
+main.wide { max-width: none; }
+main.wide .page-head { max-width: 1240px; }
+.grip { color: var(--muted); font-size: 14px; line-height: 1; cursor: grab; user-select: none; flex: none; }
+.drag-all { cursor: grab; }
+.drag-all:hover .grip, li[draggable]:hover > .grip { color: var(--accent); }
+.sort-open-head h3 { display: flex; align-items: center; gap: 6px; }
+.sort-page { grid-template-columns: minmax(340px, 2fr) minmax(0, 3fr); }
+@media (min-width: 1700px) { .sort-page { grid-template-columns: minmax(380px, 1fr) minmax(0, 2fr); } }
+.sort-pocket-head b { min-width: 120px; }
+.sort-pocket-parts .sort-part-name { min-width: 110px; }

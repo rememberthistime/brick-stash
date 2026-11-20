@@ -118,8 +118,9 @@ export default function SortPage(props: Props) {
 
   // ─── dragging ───
   /** What a drag carries: the part dragged, or every part picked if it's one of them */
-  const dragStart = (e: DragEvent, it: Pick) => {
-    const items = isPicked(it) ? pickedList : [it];
+  const dragStart = (e: DragEvent, it: Pick | null, all?: Pick[]) => {
+    const items = all ?? (it && isPicked(it) ? pickedList : it ? [it] : []);
+    if (!items.length) return e.preventDefault();
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(items));
     e.dataTransfer.setData('text/plain', items.map((x) => byNum.get(x.part)?.name ?? x.part).join(', '));
     e.dataTransfer.effectAllowed = 'move';
@@ -204,7 +205,7 @@ export default function SortPage(props: Props) {
         </p>
       )}
       {!unsorted.length && <p className="muted small">Every part is in a drawer. Drag a part here to take it out of its drawer.</p>}
-      {unsorted.length > 0 && <p className="muted small sort-tray-note">Drag a part onto a drawer or pocket, or tick several and use Move to…. Drag a part here to take it out of its drawer.</p>}
+      {unsorted.length > 0 && <p className="muted small sort-tray-note">Drag a part by its row onto a drawer or pocket, or tick several and use Move to…. Drag a pocket’s or drawer’s name to move everything in it. Drag a part here to take it out of its drawer.</p>}
       {families.map((f) => {
         const shown = f.parts.filter(matches);
         if (!shown.length) return null;
@@ -227,6 +228,7 @@ export default function SortPage(props: Props) {
                   const home = suggest ? homeOf.get(p.partNum) : undefined;
                   return (
                     <li key={p.partNum} draggable onDragStart={(e) => dragStart(e, it)} className={isPicked(it) ? 'picked' : ''}>
+                      <span className="grip" aria-hidden title="Drag to a drawer">⠿</span>
                       <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} aria-label={`Pick ${p.name}`} />
                       <PartImage partNum={p.partNum} size={48} title={p.name} />
                       <span className="sort-part-name">
@@ -329,10 +331,18 @@ export default function SortPage(props: Props) {
 
   // ─── the drawer open beside the list ───
   const openPlaced = placed.get(open.key) ?? [];
+  /** Every part in the open drawer, to drag all of it by the drawer's name */
+  const allInOpen: Pick[] = openList.flatMap((sp, i) => sp.parts.map((part) => ({ part, from: { key: open.key, pocket: i } })));
   const panel = (
     <section className="card sort-open" aria-label={`Drawer ${open.code}`}>
       <div className="sort-open-head">
-        <h3>
+        <h3
+          className={allInOpen.length ? 'drag-all' : ''}
+          draggable={allInOpen.length > 0}
+          title={allInOpen.length ? 'Drag the name to move everything in this drawer' : undefined}
+          onDragStart={(e) => dragStart(e, null, allInOpen)}
+        >
+          {allInOpen.length > 0 && <span className="grip" aria-hidden>⠿</span>}
           <span className="code">{open.code}</span> {placeName(open) || open.unitName} <span className="muted small">{open.sections ? 'whole box' : open.label}</span>
         </h3>
         <button className="ghost small-btn" onClick={() => onEdit(open.key)}>
@@ -362,7 +372,13 @@ export default function SortPage(props: Props) {
           const used = pp && pp.capacity ? pp.used / pp.capacity : 0;
           return (
             <div key={sp.id} className={`sort-pocket ${i === active && openList.length > 1 ? 'active' : ''} ${over === id ? 'drop-over' : ''}`} onClick={() => setActivePocket(i)} {...dropTarget(id, (items) => moveTo(items, here))}>
-              <div className="sort-pocket-head">
+              <div
+                className={`sort-pocket-head ${sp.parts.length ? 'drag-all' : ''}`}
+                draggable={sp.parts.length > 0}
+                title={sp.parts.length ? 'Drag the name to move everything in this pocket' : undefined}
+                onDragStart={(e) => dragStart(e, null, sp.parts.map((part) => ({ part, from: here })))}
+              >
+                {sp.parts.length > 0 && <span className="grip" aria-hidden>⠿</span>}
                 <b className="small">{title(open.key, i)}</b>
                 <span className="muted small">{pp?.parts.length ? `${sp.fill === undefined ? '~' : ''}${pct(used)} full` : 'empty'}</span>
                 {sp.parts.length > 0 && <PlacePicker label="Move all…" title={`Move everything in ${shortCode(open.key, i)} to…`} options={() => places((pp?.parts ?? []).map((x) => x.part))} exclude={here} onPick={(o) => onMovePocket(here, o)} />}
@@ -371,7 +387,8 @@ export default function SortPage(props: Props) {
                 {(pp?.parts ?? []).map((x) => {
                   const it: Pick = { part: x.part.partNum, from: here };
                   return (
-                    <li key={x.part.partNum} draggable onDragStart={(e) => dragStart(e, it)} className={isPicked(it) ? 'picked' : ''}>
+                    <li key={x.part.partNum} draggable onDragStart={(e) => (e.stopPropagation(), dragStart(e, it))} className={isPicked(it) ? 'picked' : ''}>
+                      <span className="grip" aria-hidden title="Drag to another pocket or drawer">⠿</span>
                       <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} onClick={(e) => e.stopPropagation()} aria-label={`Pick ${x.part.name}`} />
                       <PartImage partNum={x.part.partNum} size={40} title={x.part.name} />
                       <span className="sort-part-name small">

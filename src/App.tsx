@@ -207,7 +207,7 @@ export default function App() {
       <PartZoom />
       <div className="shell">
         <Sidebar page={page} setPage={setPage} counts={counts} open={menu} setOpen={setMenu} />
-        <main>
+        <main className={page === 'put-away' || page === 'drawers' ? 'wide' : ''}>
           <PageHead page={page} headline={head.headline}>
             {head.sub}
           </PageHead>
