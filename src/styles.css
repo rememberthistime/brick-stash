@@ -929,3 +929,18 @@ main.wide .page-head { max-width: 1240px; }
   .pick-colour { padding: 6px 12px 6px 8px; font-size: 14px; }
   .pick-colour input { width: 22px; height: 22px; }
 }
+
+/* Parts added by hand */
+.extra-form { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.extra-form label { display: inline-flex; align-items: center; gap: 6px; }
+.extra-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.extra-pick { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.extra-chosen { display: flex; align-items: center; gap: 10px; }
+.extra-qty { width: 100px; }
+.extra-colour { width: 180px; }
+.extra-name { width: 260px; max-width: 60vw; }
+.extra-num { width: 120px; }
+.extra-head { margin: 14px 0 4px; }
+.extra-list { list-style: none; margin: 0; padding: 0; }
+.extra-list li { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-top: 1px solid var(--line); }
+.extra-what { flex: 1; min-width: 0; }

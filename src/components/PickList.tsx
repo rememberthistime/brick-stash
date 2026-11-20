@@ -1,7 +1,7 @@
 // A pick list for a build, kept as a checklist: which drawers to open, and how many of each part to take in each
 // colour. Every list is saved with the project, so its ticks last and every device sees them.
 import { useEffect, useMemo, useState } from 'react';
-import { parseInventory } from '../lib/collection';
+import { collectionRows, parseInventory } from '../lib/collection';
 import { colourRgb, colourStock, colourTable, needsColourNames } from '../lib/colours';
 import { pickKey, pickList, placesWithFallback, shortCsv, type PickLine, type Places } from '../lib/pickList';
 import { BadKeyError, fetchColours, parseSetLines, pause, savedApiKey, setName, setParts } from '../lib/rebrickable';
@@ -63,7 +63,8 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
   };
 
   // Colour numbers from a Rebrickable export are named from Rebrickable's own list, fetched once with the key
-  const unnamed = useMemo(() => needsColourNames([...project.rows, ...(build?.rows ?? [])], table), [project.rows, build, table]);
+  const mine = useMemo(() => collectionRows(project), [project.rows, project.extraParts]);
+  const unnamed = useMemo(() => needsColourNames([...mine, ...(build?.rows ?? [])], table), [mine, build, table]);
   const getColours = async () => {
     setColourError('');
     try {
@@ -79,8 +80,8 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
   }, [unnamed, apiKey, table]);
 
   const built = useMemo(() => project.excluded.filter((x) => x.enabled).flatMap((x) => x.rows), [project.excluded]);
-  const stock = useMemo(() => colourStock(project.rows, built, catalog, table), [project.rows, built, catalog, table]);
-  const coloursKnown = project.rows.some((r) => r.colour);
+  const stock = useMemo(() => colourStock(mine, built, catalog, table), [mine, built, catalog, table]);
+  const coloursKnown = mine.some((r) => r.colour);
   const places = look === 'real' && fromSetup ? placesWithFallback(fromSetup, fromPlan) : fromPlan;
   const list = useMemo(() => (build ? pickList(build.rows, catalog, owned, places, keptOut, coloursKnown ? { stock, table } : { table }) : null), [build, catalog, owned, places, keptOut, stock, table, coloursKnown]);
 

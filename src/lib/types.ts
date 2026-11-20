@@ -15,6 +15,13 @@ export interface InventoryRow {
   name?: string;
   /** Spare part from a set inventory — when a set is kept built, its spares are still loose in storage */
   spare?: boolean;
+  /** Rebrickable category, for a part added by hand that isn't in the catalogue */
+  catId?: number;
+}
+
+/** A part added by hand, kept apart from the imported list so a fresh import leaves it alone */
+export interface ExtraPart extends InventoryRow {
+  id: string;
 }
 
 /** Parts to take off the collection — typically a set kept built, so its parts aren't in storage */
@@ -219,6 +226,8 @@ export interface Project {
   setup: Setup;
   /** Colour names by Rebrickable and BrickLink number, fetched once from Rebrickable */
   colours?: ColourTable;
+  /** Parts added by hand: ones missing from the imported list, or not in Rebrickable's catalogue at all */
+  extraParts?: ExtraPart[];
   /** Pick lists kept as checklists, newest first */
   builds?: Build[];
 }

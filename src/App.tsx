@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { download, useCatalog, useProject, withDefaults } from './state';
-import { mergeToParts, partVolume, subtractParts } from './lib/collection';
+import { collectionRows, mergeToParts, partVolume, subtractParts } from './lib/collection';
 import { splitKeptOut, summariseKept } from './lib/keepOut';
 import { calibrationFrom, withCalibration } from './lib/measure';
 import { setupComps, setupMeasurements } from './lib/setup';
@@ -23,12 +23,12 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString
 export default function App() {
   const { catalog, error } = useCatalog();
   const { project, update, replace, sync, takeServerCopy } = useProject();
-  const ready = project.units.length > 0 && project.rows.length > 0;
+  const ready = project.units.length > 0 && collectionRows(project).length > 0;
   const [page, setPage] = usePage(ready);
   const [menu, setMenu] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const owned = useMemo(() => mergeToParts(project.rows, catalog, project.volumeOverrides), [project.rows, catalog, project.volumeOverrides]);
+  const owned = useMemo(() => mergeToParts(collectionRows(project), catalog, project.volumeOverrides), [project.rows, project.extraParts, catalog, project.volumeOverrides]);
   const subtraction = useMemo(
     () => subtractParts(owned, project.excluded.filter((e) => e.enabled).flatMap((e) => e.rows), catalog),
     [owned, project.excluded, catalog],

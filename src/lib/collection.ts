@@ -115,10 +115,13 @@ function stripVariant(p: string, catalog: Catalog) {
 }
 
 export function mergeToParts(rows: InventoryRow[], catalog: Catalog | null, overrides: Record<string, number> = {}): Part[] {
-  const byMould = new Map<string, { qty: number; colours: Set<string>; variants: Map<string, number>; name?: string }>();
+  type Entry = { qty: number; colours: Set<string>; variants: Map<string, number>; name?: string; catId?: number };
+  const byMould = new Map<string, Entry>();
   for (const r of rows) {
     const key = baseMould(r.partNum, catalog);
-    const e = byMould.get(key) ?? { qty: 0, colours: new Set<string>(), variants: new Map(), name: r.name };
+    const e: Entry = byMould.get(key) ?? { qty: 0, colours: new Set<string>(), variants: new Map(), name: r.name };
+    e.name ??= r.name;
+    e.catId ??= r.catId;
     e.qty += r.qty;
     if (r.colour) e.colours.add(r.colour);
     const v = r.partNum.trim();
@@ -132,7 +135,7 @@ export function mergeToParts(rows: InventoryRow[], catalog: Catalog | null, over
     const topInfo = catalog?.parts[top];
     const pattern = info ? undefined : ID_PATTERNS.find(([re]) => re.test(partNum));
     const name = topInfo?.[0] ?? info?.[0] ?? e.name ?? (pattern ? `${pattern[2]} ${partNum}` : partNum);
-    const catId = info?.[1] ?? pattern?.[1] ?? null;
+    const catId = info?.[1] ?? e.catId ?? pattern?.[1] ?? null;
     return {
       partNum,
       name,
@@ -187,3 +190,32 @@ export const onePieceVolume = (p: Part, scale = 1) => p.volumeOverride ?? p.unit
 export const partVolume = (p: Part, scale = 1) => onePieceVolume(p, scale) * p.qty;
 
 export const TEMPLATE_CSV = 'Part,Color,Quantity,Name\n3001,Red,24,Brick 2 x 4\n3023,Light Bluish Gray,60,Plate 1 x 2\n3069b,Black,40,Tile 1 x 2 with Groove\n';
+
+/** The whole collection: the imported list and the parts added by hand */
+export const collectionRows = (p: { rows: InventoryRow[]; extraParts?: (InventoryRow & { id?: string })[] }): InventoryRow[] => (p.extraParts?.length ? [...p.rows, ...p.extraParts] : p.rows);
+
+const MAX_RESULTS = 8;
+
+/** Catalogue parts matching a number or the words of a name: an exact number first, then the closest names */
+export function findInCatalog(catalog: Catalog | null, query: string, max = MAX_RESULTS): { partNum: string; name: string }[] {
+  const q = query.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!catalog || q.length < 2) return [];
+  const words = q.split(' ');
+  // each word has to start a word of the name ("plate" finds Plate 1 x 2, not Baseplate)
+  const starts = (name: string, w: string) => name.startsWith(w) || name.includes(` ${w}`);
+  const found: { partNum: string; name: string; rank: number }[] = [];
+  for (const [num, [name]] of Object.entries(catalog.parts)) {
+    const n = name.toLowerCase();
+    const l = num.toLowerCase();
+    let rank = -1;
+    if (l === q) rank = 0;
+    else if (n === q) rank = 1;
+    else if (l.startsWith(q)) rank = 2 + l.length / 100;
+    else if (words.every((w) => starts(n, w))) rank = (n.startsWith(q) ? 3 : 4) + n.length / 1000;
+    if (rank >= 0) found.push({ partNum: num, name, rank });
+  }
+  return found
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, max)
+    .map(({ partNum, name }) => ({ partNum, name }));
+}
