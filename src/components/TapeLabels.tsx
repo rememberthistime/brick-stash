@@ -1,3 +1,5 @@
+import { GroupDot, GroupKey } from './GroupDot';
+import { nameTitle } from '../lib/builderNames';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { LabelEntry } from '../lib/labels';
 import { sameOriginPartImages } from '../lib/partImages';
@@ -141,6 +143,10 @@ export default function TapeLabels({ entries, showSheet, options }: { entries: L
             </button>
           </div>
         </div>
+        <GroupKey />
+        <p className="muted small">
+          Each label below shows the dot for its drawer, so you can stick a coloured dot beside the tape (or print it on that colour of tape).
+        </p>
         <p className="muted small">
           Prefer Brick Architect's own labels for single parts? Their artwork is theirs to share, so it can't be built into these, but each label below links to their page for that part, where you
           can print it. Their part numbers occasionally differ from Rebrickable's.
@@ -154,6 +160,7 @@ export default function TapeLabels({ entries, showSheet, options }: { entries: L
           return (
             <div key={e.code} className="tape-row">
               <div className="tape-head">
+                <GroupDot group={e.group} />
                 <span className="code">{e.code}</span>
                 {e.name && <span className="small place-name">{e.name}</span>}
                 <span className="muted small tape-where">{e.where}</span>
@@ -173,7 +180,7 @@ export default function TapeLabels({ entries, showSheet, options }: { entries: L
                 <div className="tape-links small muted">
                   Brick Architect:{' '}
                   {e.links.slice(0, MAX_LINKS).map((p) => (
-                    <a key={p.partNum} href={`https://brickarchitect.com/parts/${encodeURIComponent(p.partNum)}`} target="_blank" rel="noreferrer" title={p.name}>
+                    <a key={p.partNum} href={`https://brickarchitect.com/parts/${encodeURIComponent(p.partNum)}`} target="_blank" rel="noreferrer" title={nameTitle(p)}>
                       {p.partNum}
                     </a>
                   ))}

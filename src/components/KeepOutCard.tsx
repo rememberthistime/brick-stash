@@ -1,3 +1,5 @@
+import { nameTitle, searchName } from '../lib/builderNames';
+import PartName from './PartName';
 import { useMemo, useState } from 'react';
 import type { KeepOut, Part, Project } from '../lib/types';
 import { familyLabel } from '../lib/planner';
@@ -29,15 +31,15 @@ export default function KeepOutCard({ project, update, parts, kept, summary }: P
   const bulkyVolume = bulky.reduce((t, p) => t + pieceVolume(p) * p.qty, 0);
 
   const q = query.trim().toLowerCase();
-  const found = q ? parts.filter((p) => partMatcher(query).test(p) || p.name.toLowerCase().includes(q)).slice(0, MAX_FOUND) : [];
+  const found = q ? parts.filter((p) => partMatcher(query).test(p) || searchName(p).toLowerCase().includes(q)).slice(0, MAX_FOUND) : [];
   const picked = kept.filter((x) => x.reason === 'picked');
 
   const row = (p: Part) => (
     <label key={p.partNum} className={`keep-row ${keptNums.has(p.partNum) ? 'out' : ''}`}>
       <input type="checkbox" checked={keptNums.has(p.partNum)} onChange={(e) => pick(p, e.target.checked)} title="Keep out of the plan" />
-      <PartImage partNum={p.partNum} size={32} title={p.name} />
+      <PartImage partNum={p.partNum} size={32} title={nameTitle(p)} />
       <span className="keep-name">
-        {p.name}
+        <PartName part={p} />
         <small className="muted">
           {' '}
           {p.partNum}

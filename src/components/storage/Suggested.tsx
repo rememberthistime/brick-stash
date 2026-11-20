@@ -1,5 +1,7 @@
 // A drawer you haven't recorded, with what the plan suggests for it: the parts that would go there, how to divide it,
 // and a button to record it that way.
+import { nameTitle } from '../../lib/builderNames';
+import PartName from '../PartName';
 import { dividerLayout, type Divider, type DividerLayout, type Rect } from '../../lib/dividers';
 import { leaves, sectionLabel, targetFill, type PlannedCompartment, type Section } from '../../lib/planner';
 import { codeWithName } from '../../lib/codes';
@@ -50,11 +52,11 @@ export default function SuggestedDrawer({ c, comp, settings, onRecord, onRecordB
                   .map((p) => (
                     <tr key={p.partNum}>
                       <td className="img-cell">
-                        <PartImage partNum={p.partNum} size={36} title={p.name} />
+                        <PartImage partNum={p.partNum} size={36} title={nameTitle(p)} />
                       </td>
                       <td>
                         <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer">
-                          {p.name}
+                          <PartName part={p} />
                         </a>{' '}
                         <span className="muted small">{p.partNum}</span>
                       </td>

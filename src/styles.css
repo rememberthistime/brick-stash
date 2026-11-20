@@ -499,6 +499,7 @@ button.link.small { font-size: 12px; }
 .move-choice { display: flex; align-items: center; gap: 8px; background: var(--soft); color: var(--ink); border: 1px solid var(--line); padding: 4px 8px; text-align: left; font-size: 13px; }
 .move-choice:hover { border-color: var(--accent); }
 .move-name { flex: 1; min-width: 0; }
+.official-name { display: block; font-size: 11px; font-weight: 400; color: var(--muted); line-height: 1.25; }
 .move-comp { padding: 6px 0; border-top: 1px solid var(--line); }
 .move-comp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
 
@@ -977,3 +978,21 @@ main.wide .page-head { max-width: 1240px; }
 .not-in-amount label, .not-in-own label { display: inline-flex; align-items: center; gap: 6px; }
 .not-in-own { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .not-in-head { margin: 0; }
+
+/* What each unit is for */
+.unit-jobs { margin-top: 16px; }
+.unit-jobs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.unit-jobs-table th { text-align: left; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.unit-jobs-table td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.unit-jobs-table select, .unit-jobs-table input { max-width: 100%; }
+@media (max-width: 700px) {
+  .unit-jobs-table thead { display: none; }
+  .unit-jobs-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .unit-jobs-table td { border: 0; padding: 0; }
+}
+
+/* Group colours, as dot stickers on drawer fronts */
+.group-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.35); vertical-align: middle; flex: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.group-key { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin: 6px 0; }
+.group-key-item { display: inline-flex; align-items: center; gap: 4px; }
+.map-unit-job { display: block; font-size: 11px; color: var(--muted); }

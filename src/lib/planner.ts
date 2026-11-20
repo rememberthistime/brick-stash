@@ -1,10 +1,12 @@
-import type { Granularity, Part, Settings, StorageUnit } from './types';
-import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeGroupName } from './taxonomy';
+import type { Granularity, Part, Settings, StorageUnit, UnitJob } from './types';
+import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeClass, sizeGroupName } from './taxonomy';
+import { jobLabel, shapeOf } from './unitJobs';
 
 const familyLabelOf = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? 'Parts';
 import { compartmentVolume } from './volume';
 import { partVolume } from './collection';
 import { drawerKey, inReachOrder, withUnitCodes } from './codes';
+import { builderKind, plainName } from './builderNames';
 
 // ─── Tree ────────────────────────────────────────────────────────────────────
 
@@ -100,16 +102,33 @@ export function buildTree(parts: Part[], categories: Record<string, string>, vol
     const famNode = child(root, fam.key, fam.label, fam.key);
     const catName = catId == null ? 'Unknown parts' : categoryName(categories[catId] ?? `Category ${catId}`);
     const catNode = fam.cats.length === 1 || catId == null ? famNode : child(famNode, `${fam.key}/${catKey}`, catName, fam.key);
-    const buckets = new Set(catParts.map((p) => sizeBucket(p.name, fam.key)));
+    // Parts of one sort a builder would keep together (brackets, jumpers, plates with clips) group by that sort
+    // first, where the heading holds other sorts too; the rest group by size
+    const kindCount = new Map<string, number>();
     for (const p of catParts) {
+      const k = builderKind(p);
+      if (k) kindCount.set(k.key, (kindCount.get(k.key) ?? 0) + 1);
+    }
+    const kindOf = (p: Part) => {
+      const k = builderKind(p);
+      const n = k ? (kindCount.get(k.key) ?? 0) : 0;
+      return k && n >= 2 && n < catParts.length ? k : null;
+    };
+    const buckets = new Set(catParts.filter((p) => !kindOf(p)).map((p) => sizeBucket(p.name, fam.key)));
+    for (const p of catParts) {
+      const kind = kindOf(p);
       const b = sizeBucket(p.name, fam.key);
-      const parent = buckets.size > 1 && b ? child(catNode, `${catNode.id}/${b}`, sizeGroupName(catNode.label, b), fam.key) : catNode;
-      const leafOf = (x: Part): TreeNode => ({ id: `part:${x.partNum}`, label: x.name, familyKey: fam.key, children: [], part: x, pieces: x.qty, volume: partVolume(x, volumeScale), seq: 0 });
+      const parent = kind
+        ? child(catNode, `${catNode.id}/~${kind.key}`, kind.label, fam.key)
+        : buckets.size > 1 && b
+          ? child(catNode, `${catNode.id}/${b}`, sizeGroupName(catNode.label, b), fam.key)
+          : catNode;
+      const leafOf = (x: Part): TreeNode => ({ id: `part:${x.partNum}`, label: plainName(x.name, x.partNum), familyKey: fam.key, children: [], part: x, pieces: x.qty, volume: partVolume(x, volumeScale), seq: 0 });
       const added = (guests.get(p.partNum) ?? []).map(leafOf);
       parent.children.push(
         added.length
           ? // Parts stored together by hand plan as one group
-            { id: `together:${p.partNum}`, label: plusLabel(p.name, added), familyKey: fam.key, children: [leafOf(p), ...added], pieces: 0, volume: 0, seq: 0, lump: true, plus: { base: p.name, added }, sortAs: p }
+            { id: `together:${p.partNum}`, label: plusLabel(plainName(p.name, p.partNum), added), familyKey: fam.key, children: [leafOf(p), ...added], pieces: 0, volume: 0, seq: 0, lump: true, plus: { base: plainName(p.name, p.partNum), added }, sortAs: p }
           : leafOf(p),
       );
     }
@@ -148,8 +167,10 @@ function compareNodes(a: TreeNode, b: TreeNode): number {
   const ca = catOrder(Number(a.id.split('/')[1]));
   const cb = catOrder(Number(b.id.split('/')[1]));
   if (ca !== cb && a.id.split('/').length === 2) return ca - cb;
-  const ba = bucketOrder(a.id.split('/').pop() ?? null);
-  const bb = bucketOrder(b.id.split('/').pop() ?? null);
+  // Size groups first, then the builder's sorts within a heading
+  const orderOf = (id: string) => (id.includes('/~') ? 50 : bucketOrder(id.split('/').pop() ?? null));
+  const ba = orderOf(a.id);
+  const bb = orderOf(b.id);
   if (ba !== bb) return ba - bb;
   return a.label.localeCompare(b.label);
 }
@@ -166,6 +187,8 @@ export interface Compartment {
   unitCode?: string;
   /** the user's own names for the unit and for this drawer */
   unitTitle?: string;
+  /** what the unit is for */
+  unitJob?: UnitJob;
   name?: string;
   label: string;
   w: number;
@@ -197,6 +220,7 @@ export function expandCompartments(units: StorageUnit[], s: Settings): Compartme
           unitName: u.name,
           unitCode: u.code,
           ...(u.title?.trim() ? { unitTitle: u.title.trim() } : {}),
+          ...(u.job ? { unitJob: u.job } : {}),
           ...(u.drawerNames?.[drawerKey(spec.id, i)]?.trim() ? { name: u.drawerNames[drawerKey(spec.id, i)].trim() } : {}),
           label: spec.qty > 1 ? `${spec.label} ${i + 1}` : spec.label,
           w: spec.w,
@@ -298,8 +322,10 @@ export function buildZones(comps: Compartment[]): Zone[] {
   const zones = new Map<string, Zone>();
   for (const [unitId, cs] of byUnit) {
     const shape = cs.map((c) => c.classKey).join(',');
-    const key = `${stem(cs[0].unitName)}|${shape}`;
-    const z = zones.get(key) ?? { label: stem(cs[0].unitName), unitIds: [], boxes: [], cellVolume: 0 };
+    // Units given different jobs are different places to plan for, even when they're the same product
+    const job = jobLabel(cs[0].unitJob);
+    const key = `${stem(cs[0].unitName)}|${shape}|${job}`;
+    const z = zones.get(key) ?? { label: job ? `${stem(cs[0].unitName)} (${job})` : stem(cs[0].unitName), unitIds: [], boxes: [], cellVolume: 0 };
     z.unitIds.push(unitId);
     if (new Set(cs.map((c) => c.classKey)).size > 1) z.boxes.push({ cells: cs });
     else for (const c of cs) z.boxes.push({ cells: [c] });
@@ -538,7 +564,39 @@ function zoneCost(groups: TreeNode[], z: Zone, capOf: (c: Compartment) => number
   const total = groups.reduce((t, g) => t + g.volume, 0) || 1;
   const fitting = groups.reduce((t, g) => t + (fitsZone(g, z, maxCell) ? g.volume : 0), 0);
   const slot = median(cells.map((c) => capOf(c) / c.maxSections));
-  return Math.abs(Math.log((typicalGroup(groups) + 1) / (slot + 1))) + 10 * (1 - fitting / total);
+  return Math.abs(Math.log((typicalGroup(groups) + 1) / (slot + 1))) + 10 * (1 - fitting / total) + shapeCost(groups, z) + jobCost(groups, z);
+}
+
+/** A family is steered to units given its job, and away from units whose every job is something else */
+const JOB_WEIGHT = 2;
+
+function jobCost(groups: TreeNode[], z: Zone): number {
+  const jobs = [...new Map(zoneCells(z).map((c) => [c.unitId, c.unitJob?.what])).values()];
+  if (!groups.length || !jobs.some(Boolean)) return 0;
+  const fam = groups[0].familyKey;
+  const mine = (what: string | undefined) => !!what && (what.startsWith('group:') ? familyGroup(fam) === what.slice(6) : what === fam);
+  if (jobs.some(mine)) return -JOB_WEIGHT;
+  return jobs.every(Boolean) ? JOB_WEIGHT : 0;
+}
+
+/** How much a zone's shape counts for or against a family: flat parts suit shallow drawers, long parts long sections */
+const SHAPE_WEIGHT = 1.2;
+
+/** Shallow or long zones prefer the families mostly made of parts that shape suits, and put off the rest */
+function shapeCost(groups: TreeNode[], z: Zone): number {
+  const shapes = zoneCells(z).map(shapeOf);
+  const shape = ['flat', 'long'].find((k) => shapes.filter((x) => x === k).length > shapes.length / 2);
+  if (!shape) return 0;
+  let match = 0;
+  let all = 0;
+  for (const g of groups)
+    for (const l of leaves(g)) {
+      if (!l.part) continue;
+      all += l.volume;
+      if (sizeClass(l.part.name, l.part.catId) === shape) match += l.volume;
+    }
+  const share = all ? match / all : 0;
+  return SHAPE_WEIGHT * (1 - 2 * share);
 }
 
 /** A group fits a zone if some compartment holds it — or, for one mould, if it can run through consecutive single compartments */

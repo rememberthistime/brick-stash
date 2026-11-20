@@ -5,6 +5,9 @@ import { placeName } from '../../lib/codes';
 import { contentsName, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { MAX_SHELVES, nudgeUnit, storageMap, type MapDrawer } from '../../lib/storageMap';
 import type { Project, StorageUnit } from '../../lib/types';
+import { mainGroup } from '../../lib/labels';
+import { jobLabel } from '../../lib/unitJobs';
+import { GroupDot, GroupKey } from '../GroupDot';
 
 interface Props {
   project: Project;
@@ -26,7 +29,7 @@ export default function StorageMap({ project, update, comps, placed }: Props) {
         const names = [...new Set(inUse.map((p) => p.label?.trim() || contentsName(p)))];
         const contents = names.length > MAX_NAMES ? `${names.slice(0, MAX_NAMES).join(' · ')} +${names.length - MAX_NAMES}` : names.join(' · ');
         const recorded = !!project.setup.drawers[c.key]?.length;
-        return { code: c.code, title: placeName(c) || contents || (recorded ? 'Empty' : '—'), recorded };
+        return { code: c.code, title: placeName(c) || contents || (recorded ? 'Empty' : '—'), recorded, ...(mainGroup(inUse) ? { group: mainGroup(inUse) } : {}) };
       });
   const map = storageMap(project.spaces, project.units, drawersOf);
   const setUnit = (id: string, f: (u: StorageUnit) => StorageUnit) => update((p) => ({ units: p.units.map((u) => (u.id === id ? f(u) : u)) }));
@@ -41,6 +44,7 @@ export default function StorageMap({ project, update, comps, placed }: Props) {
           <input type="checkbox" checked={arranging} onChange={(e) => setArranging(e.target.checked)} /> Arrange: put units on their shelves and in order
         </label>
       </div>
+      <GroupKey />
       {!project.spaces.length && (
         <p className="muted small no-print">Add your cupboards and shelves on Spaces to get a map for each. Until then, every unit is shown together.</p>
       )}
@@ -60,12 +64,13 @@ export default function StorageMap({ project, update, comps, placed }: Props) {
                       <span className="map-letter">{unit.code}</span>
                       <span className="map-unit-name">
                         {unit.title && <b>{unit.title}</b>} <span className="muted small">{unit.name}</span>
+                        {jobLabel(unit.job) && jobLabel(unit.job) !== unit.title && <span className="map-unit-job">For {jobLabel(unit.job)}</span>}
                       </span>
                     </div>
                     <ul className="map-drawers">
                       {drawers.map((d) => (
                         <li key={d.code} className={d.recorded ? '' : 'muted'}>
-                          <span className="code">{d.code}</span> <span className="map-drawer-title">{d.title}</span>
+                          <GroupDot group={d.group} /> <span className="code">{d.code}</span> <span className="map-drawer-title">{d.title}</span>
                         </li>
                       ))}
                     </ul>

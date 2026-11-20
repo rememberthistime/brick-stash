@@ -1,6 +1,8 @@
 // Put away & move: the parts not in a drawer down one side, your drawers on the other, and the drawer you're working
 // on open beside them. Drag a part onto a drawer or a pocket, between pockets, or back to the list to take it out; or
 // tick parts and choose Move to…, which works on a phone too. Every step can be undone.
+import { nameTitle, partPlainName, searchName } from '../../lib/builderNames';
+import PartName from '../PartName';
 import { useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { RecordedHome } from '../../lib/gaps';
 import { homeSkipId } from '../../lib/gaps';
@@ -141,7 +143,7 @@ export default function SortPage(props: Props) {
     const items = all ?? (it && isPicked(it) ? pickedList : it ? [it] : []);
     if (!items.length) return e.preventDefault();
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(items));
-    e.dataTransfer.setData('text/plain', items.map((x) => byNum.get(x.part)?.name ?? x.part).join(', '));
+    e.dataTransfer.setData('text/plain', items.map((x) => (byNum.get(x.part) ? partPlainName(byNum.get(x.part)!) : x.part)).join(', '));
     e.dataTransfer.effectAllowed = 'move';
   };
   const dragItems = (e: DragEvent): Pick[] => {
@@ -173,7 +175,7 @@ export default function SortPage(props: Props) {
   // ─── the list of parts not in a drawer ───
   const q = query.trim().toLowerCase();
   const matcher = partMatcher(query, resolve);
-  const matches = (p: Part) => !q || matcher.test(p) || p.name.toLowerCase().includes(q);
+  const matches = (p: Part) => !q || matcher.test(p) || searchName(p).toLowerCase().includes(q);
   const families = unsortedByFamily(unsorted, scale, order);
   const withRoom = unsorted.filter((p) => recordedHomes.has(p.partNum));
   const putAllWithRoom = () => {
@@ -249,11 +251,11 @@ export default function SortPage(props: Props) {
                   return (
                     <li key={p.partNum} draggable onDragStart={(e) => dragStart(e, it)} className={isPicked(it) ? 'picked' : ''}>
                       <span className="grip" aria-hidden title="Drag to a drawer">⠿</span>
-                      <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} aria-label={`Pick ${p.name}`} />
-                      <PartImage partNum={p.partNum} size={48} title={p.name} />
+                      <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} aria-label={`Pick ${partPlainName(p)}`} />
+                      <PartImage partNum={p.partNum} size={48} title={nameTitle(p)} />
                       <span className="sort-part-name">
                         <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" draggable={false} title={`${p.partNum} on Rebrickable`}>
-                          {p.name}
+                          <PartName part={p} />
                         </a>
                         <span className="part-meta">
                           <span className="mono">{p.partNum}</span> · {p.qty.toLocaleString()} pcs
@@ -284,10 +286,10 @@ export default function SortPage(props: Props) {
                         ) : null}
                       </span>
                       <span className="sort-part-actions">
-                        <button className="ghost small-btn" title={`Put ${p.name} in ${title(open.key, active)}, the drawer open beside the list`} onClick={() => onMove([it], openTarget)}>
+                        <button className="ghost small-btn" title={`Put ${partPlainName(p)} in ${title(open.key, active)}, the drawer open beside the list`} onClick={() => onMove([it], openTarget)}>
                           + {shortCode(open.key, active)}
                         </button>
-                        <PlacePicker label="Put in…" title={`Put ${p.name} in…`} options={() => places([p])} onPick={(o) => onMove([it], o)} />
+                        <PlacePicker label="Put in…" title={`Put ${partPlainName(p)} in…`} options={() => places([p])} onPick={(o) => onMove([it], o)} />
                       </span>
                     </li>
                   );
@@ -371,7 +373,7 @@ export default function SortPage(props: Props) {
                   </span>
                   <span className="sort-tile-pics">
                     {[...new Map(pics.map((p) => [p.partNum, p])).values()].slice(0, 3).map((p) => (
-                      <PartImage key={p.partNum} partNum={p.partNum} size={26} title={p.name} />
+                      <PartImage key={p.partNum} partNum={p.partNum} size={26} title={nameTitle(p)} />
                     ))}
                   </span>
                   <span className="small sort-tile-name">{name || (recorded ? 'Empty' : 'Not recorded')}</span>
@@ -444,17 +446,17 @@ export default function SortPage(props: Props) {
                   return (
                     <li key={x.part.partNum} draggable onDragStart={(e) => (e.stopPropagation(), dragStart(e, it))} className={isPicked(it) ? 'picked' : ''}>
                       <span className="grip" aria-hidden title="Drag to another pocket or drawer">⠿</span>
-                      <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} onClick={(e) => e.stopPropagation()} aria-label={`Pick ${x.part.name}`} />
-                      <PartImage partNum={x.part.partNum} size={40} title={x.part.name} />
+                      <input type="checkbox" className="pick-box" checked={isPicked(it)} onChange={() => toggle(it)} onClick={(e) => e.stopPropagation()} aria-label={`Pick ${partPlainName(x.part)}`} />
+                      <PartImage partNum={x.part.partNum} size={40} title={nameTitle(x.part)} />
                       <span className="sort-part-name small">
-                        {x.part.name}
+                        <PartName part={x.part} />
                         <span className="part-meta">
                           <span className="mono">{x.part.partNum}</span> · {x.part.qty.toLocaleString()} pcs
                         </span>
                       </span>
                       <span className="part-actions">
-                        <PlacePicker label="Move…" title={`Move ${x.part.name} to…`} options={() => places([x.part])} exclude={here} onPick={(o) => onMove([it], o)} />
-                        <button className="icon" title="Take it out: back to the list" aria-label={`Take out ${x.part.name}`} onClick={(e) => (e.stopPropagation(), onTakeOut([{ part: x.part.partNum, from: here }]))}>
+                        <PlacePicker label="Move…" title={`Move ${partPlainName(x.part)} to…`} options={() => places([x.part])} exclude={here} onPick={(o) => onMove([it], o)} />
+                        <button className="icon" title="Take it out: back to the list" aria-label={`Take out ${partPlainName(x.part)}`} onClick={(e) => (e.stopPropagation(), onTakeOut([{ part: x.part.partNum, from: here }]))}>
                           ✕
                         </button>
                       </span>
@@ -479,11 +481,11 @@ export default function SortPage(props: Props) {
       </div>
       {pickedList.length > 0 && (
         <SelectionBar>
-          <b>{pickedList.length === 1 ? (pickedParts[0]?.name ?? '1 part') : `${pickedList.length} parts`} picked</b>
+          <b>{pickedList.length === 1 ? (pickedParts[0] ? partPlainName(pickedParts[0]) : '1 part') : `${pickedList.length} parts`} picked</b>
           <button className="ghost small-btn" onClick={() => moveTo(pickedList, openTarget)}>
             Into {shortCode(open.key, active)}
           </button>
-          <PlacePicker label="Move to…" className="small-btn" title={`Move ${pickedList.length === 1 ? (pickedParts[0]?.name ?? 'it') : `these ${pickedList.length} parts`} to…`} options={() => places(pickedParts)} onPick={(o) => moveTo(pickedList, o)} />
+          <PlacePicker label="Move to…" className="small-btn" title={`Move ${pickedList.length === 1 ? (pickedParts[0] ? partPlainName(pickedParts[0]) : 'it') : `these ${pickedList.length} parts`} to…`} options={() => places(pickedParts)} onPick={(o) => moveTo(pickedList, o)} />
           {pickedList.some((it) => it.from) && (
             <button className="ghost small-btn" onClick={() => takeOut(pickedList)}>
               Take out

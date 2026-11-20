@@ -1,4 +1,6 @@
 // Recording one drawer as it really is: its pockets, how full each is, and what's in them.
+import { nameTitle, partPlainName } from '../../lib/builderNames';
+import PartName from '../PartName';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { homeSkipId, type RecordedHome } from '../../lib/gaps';
 import { familyFor } from '../../lib/taxonomy';
@@ -300,11 +302,11 @@ export default function DrawerEditor({
 
         {pickedItems.length > 0 && (
           <div className="selection-bar">
-            <b>{pickedItems.length === 1 ? pickedParts[0]?.name ?? '1 part' : `${pickedItems.length} parts`} picked</b>
+            <b>{pickedItems.length === 1 ? (pickedParts[0] ? partPlainName(pickedParts[0]) : '1 part') : `${pickedItems.length} parts`} picked</b>
             <PlacePicker
               label="Move to…"
               className="small-btn"
-              title={`Move ${pickedItems.length === 1 ? pickedParts[0]?.name ?? 'it' : `these ${pickedItems.length} parts`} to…`}
+              title={`Move ${pickedItems.length === 1 ? (pickedParts[0] ? partPlainName(pickedParts[0]) : 'it') : `these ${pickedItems.length} parts`} to…`}
               options={() => places(pickedParts)}
               onPick={(o) => {
                 onMove(pickedItems, o);
@@ -481,9 +483,9 @@ function PartChoice({
   return (
     <div className={`part-choice ${here >= 0 ? 'added' : ''}`}>
       <button className="part-choice-main" onClick={() => onAdd(active)} title={pockets > 1 ? `Add to pocket ${active + 1}` : 'Add to this drawer'}>
-        <PartImage partNum={part.partNum} size={44} title={part.name} />
+        <PartImage partNum={part.partNum} size={44} title={nameTitle(part)} />
         <span className="move-name">
-          {part.name}
+          <PartName part={part} />
           <span className="part-meta">
             <span className="mono">{part.partNum}</span> · {part.qty.toLocaleString()} pcs
             {here >= 0 && <b className="good-text"> · ✓ in {pockets > 1 ? `pocket ${here + 1}` : 'this drawer'}</b>}
@@ -500,7 +502,7 @@ function PartChoice({
         </span>
       )}
       {pockets > 1 && (
-        <span className="pocket-chips" aria-label={`Other pockets for ${part.name}`}>
+        <span className="pocket-chips" aria-label={`Other pockets for ${partPlainName(part)}`}>
           {suggest !== null && (
             <button className="small-btn chip-best" title={`Add to pocket ${suggest + 1}, which holds the same sort of parts`} onClick={() => onAdd(suggest)}>
               + {suggest + 1}: {titleOf(suggest)}
@@ -526,7 +528,7 @@ const MOVES_SHOWN = 3;
 function PartLink({ part }: { part: Part }) {
   return (
     <a className="part-link" href={`https://rebrickable.com/parts/${encodeURIComponent(part.partNum)}/`} target="_blank" rel="noreferrer" title={`${part.partNum} on Rebrickable`} onClick={(e) => e.stopPropagation()}>
-      {part.name}
+      <PartName part={part} />
     </a>
   );
 }
@@ -579,7 +581,7 @@ function Waiting({
               <ul className="waiting-list">
                 {homes.slice(0, SHOWN).map((h) => (
                   <li key={h.part.partNum}>
-                    <PartImage partNum={h.part.partNum} size={48} title={h.part.name} />
+                    <PartImage partNum={h.part.partNum} size={48} title={nameTitle(h.part)} />
                     <span className="move-name">
                       <PartLink part={h.part} />
                       <span className="part-meta">
@@ -589,7 +591,7 @@ function Waiting({
                     <button className="small-btn accept-btn" title="Put it here" onClick={() => onAdd([h])}>
                       Add
                     </button>
-                    <button className="icon" title="Not here: don't suggest this pocket for it again" aria-label={`Not here: ${h.part.name}`} onClick={() => onNotHere(h)}>
+                    <button className="icon" title="Not here: don't suggest this pocket for it again" aria-label={`Not here: ${partPlainName(h.part)}`} onClick={() => onNotHere(h)}>
                       ✕
                     </button>
                   </li>
@@ -670,7 +672,7 @@ function PocketRow({
   // In a drawer of several pockets only the one being worked on is opened out, so the list stays short enough to
   // see the search box below it. The rest are a line each: click one to work on it.
   if (divided && !active) {
-    const names = (placed?.parts ?? []).map((x) => x.part.name);
+    const names = (placed?.parts ?? []).map((x) => partPlainName(x.part));
     return (
       <button className="setup-pocket folded" aria-expanded={false} onClick={onActivate}>
         <span className="fold-caret">▸</span>
@@ -775,16 +777,16 @@ function PocketRow({
             const elsewhere = [...new Set(whereIs.get(x.part.partNum) ?? [])].filter((c) => c !== code);
             return (
               <li key={x.part.partNum}>
-                <input type="checkbox" className="pick-box" checked={picked.has(`${index}|${x.part.partNum}`)} onChange={() => onPick(x.part.partNum)} onClick={(e) => e.stopPropagation()} aria-label={`Pick ${x.part.name}, to move several together`} />
-                <PartImage partNum={x.part.partNum} size={40} title={x.part.name} />
+                <input type="checkbox" className="pick-box" checked={picked.has(`${index}|${x.part.partNum}`)} onChange={() => onPick(x.part.partNum)} onClick={(e) => e.stopPropagation()} aria-label={`Pick ${partPlainName(x.part)}, to move several together`} />
+                <PartImage partNum={x.part.partNum} size={40} title={nameTitle(x.part)} />
                 <span>
                   <PartLink part={x.part} />
                   {elsewhere.length > 0 && <span className="muted small"> · also {elsewhere.slice(0, 2).join(', ')}</span>}
                   {x.tooBig && <span className="warn-text small"> · looks too big for this</span>}
                 </span>
                 <span className="part-actions">
-                  <PlacePicker label="Move…" title={`Move ${x.part.name} to…`} options={() => places([x.part])} exclude={here} onPick={(o) => onMove(x.part.partNum, o)} />
-                  <button className="icon" title="Take it out: it goes back to Put away & move" aria-label={`Take out ${x.part.name}`} onClick={() => onRemove(x.part.partNum)}>
+                  <PlacePicker label="Move…" title={`Move ${partPlainName(x.part)} to…`} options={() => places([x.part])} exclude={here} onPick={(o) => onMove(x.part.partNum, o)} />
+                  <button className="icon" title="Take it out: it goes back to Put away & move" aria-label={`Take out ${partPlainName(x.part)}`} onClick={() => onRemove(x.part.partNum)}>
                     ✕
                   </button>
                 </span>

@@ -63,6 +63,16 @@ export interface CompartmentSpec extends Dims {
   noDividers?: boolean;
 }
 
+/** How big or what shape of part a unit is for: flat parts in shallow drawers, long parts in long sections */
+export type SizeClass = 'ordinary' | 'flat' | 'long' | 'tiny' | 'big';
+
+/** What a unit is for. Both halves are optional: "Technic", "Long parts", or "Plates & Tiles, big parts". */
+export interface UnitJob {
+  /** a family key ("plates"), or a group of families as "group:plates" */
+  what?: string;
+  size?: SizeClass;
+}
+
 export interface StorageUnit {
   id: string;
   name: string;
@@ -80,6 +90,8 @@ export interface StorageUnit {
   spaceId?: string;
   /** Which shelf of its space it stands on, counted from the top (1), for the storage map */
   shelf?: number;
+  /** What it's for, so moves and the layout check can offer and expect the right parts here */
+  job?: UnitJob;
 }
 
 /** A cupboard / shelf / area units live in. Internal mm. */

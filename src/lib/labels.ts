@@ -1,8 +1,10 @@
 // What goes on each label, from the drawers as recorded, in one shape that both the tape labels and the printed
 // sheet draw from.
+import { partPlainName } from './builderNames';
 import { placeName } from './codes';
 import { contentsName, type PlacedPocket, type SetupComp } from './setup';
 import { stem } from './storageList';
+import { familyGroup } from './taxonomy';
 import type { LabelCell } from './tapeLabel';
 
 export interface SheetCell extends LabelCell {
@@ -26,6 +28,15 @@ export interface LabelEntry {
   cells: SheetCell[];
   /** parts to link to Brick Architect */
   links: { partNum: string; name: string }[];
+  /** the group most of it is, for its colour dot */
+  group?: string;
+}
+
+/** The group taking up most room among some pockets, for a colour dot */
+export function mainGroup(pockets: PlacedPocket[]): string | undefined {
+  const totals = new Map<string, number>();
+  for (const p of pockets) for (const x of p.parts) totals.set(familyGroup(x.family), (totals.get(familyGroup(x.family)) ?? 0) + x.used);
+  return [...totals].sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
 /**
@@ -46,13 +57,13 @@ export function setupLabels(pockets: PlacedPocket[], comps: SetupComp[], perBox:
         images: parts.slice(0, parts.length === 1 ? 1 : 2).map((x) => x.part.partNum),
         family: p.family || undefined,
         parts: parts.map((x) => x.part.partNum),
-        sheetTitle: name || (parts.length === 1 ? parts[0].part.name : contentsName(p)),
+        sheetTitle: name || (parts.length === 1 ? partPlainName(parts[0].part) : contentsName(p)),
       };
       return { cell, show: !!name || parts.length > 0, links: parts.map((x) => ({ partNum: x.part.partNum, name: x.part.name })) };
     });
     const where = `${comp.unitName} › ${comp.label}`;
     const kind = stem(comp.unitName);
-    const named = placeName(comp) ? { name: placeName(comp) } : {};
+    const named = { ...(placeName(comp) ? { name: placeName(comp) } : {}), ...(mainGroup(inDrawer) ? { group: mainGroup(inDrawer) } : {}) };
     if (perBox) {
       cells.forEach((c, i) => {
         if (c.show) out.push({ code: inDrawer.length > 1 ? `${comp.code}.${i + 1}` : comp.code, where: inDrawer.length > 1 ? `${where}, box ${i + 1}` : where, kind, ...named, cells: [c.cell], links: c.links });

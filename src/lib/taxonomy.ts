@@ -1,3 +1,5 @@
+import type { SizeClass } from './types';
+
 // Storage taxonomy: Group → Family → Rebrickable category → size bucket → mould.
 // Families are ordered roughly by how often builders reach for them, which drives physical layout
 // (earlier families get the most accessible compartments). Families in the same group are related
@@ -39,6 +41,18 @@ export const FAMILIES: Family[] = [
   { key: 'other-systems', label: 'Duplo & Other Systems', cats: [4, 42, 43, 48, 50, 57, 66], group: 'figures' },
   { key: 'unknown', label: 'Uncategorised', cats: [], group: 'figures' },
 ];
+
+/**
+ * A colour for each group, for dot stickers or coloured tape on drawer fronts: five colours anyone can tell apart,
+ * matching Brother's coloured 12 mm tapes.
+ */
+export const GROUP_COLOURS: Record<string, { name: string; hex: string }> = {
+  bricks: { name: 'red', hex: '#d6301f' },
+  plates: { name: 'yellow', hex: '#f2b705' },
+  technic: { name: 'blue', hex: '#1f6fd6' },
+  vehicles: { name: 'green', hex: '#2f9e44' },
+  figures: { name: 'white', hex: '#ffffff' },
+};
 
 const groupOf = new Map(FAMILIES.map((f) => [f.key, f.group]));
 /** The group a family belongs to */
@@ -95,6 +109,24 @@ export function parseSize(name: string): ParsedSize | null {
 }
 
 const TECHNIC_FAMILIES = new Set(['technic-struct', 'technic-conn']);
+
+const FLAT_FAMILIES = new Set(['plates', 'plate-special', 'tiles']);
+const TINY_FAMILIES = new Set(['technic-conn', 'minifig-acc']);
+
+/**
+ * The size or shape of a part, as it decides what kind of storage suits it: long (6 or more long and no more than 2
+ * wide: long bricks and plates, axles, beams), big (3 wide and more both ways, or a large part), flat (plates and
+ * tiles), tiny (Technic pins and connectors, minifig accessories, 1×1s) or ordinary.
+ */
+export function sizeClass(name: string, catId: number | null): SizeClass {
+  const fam = familyFor(catId).key;
+  const s = parseSize(name);
+  if (s && s.a <= 2 && s.b >= 6) return 'long';
+  if (fam === 'large' || (s && s.a >= 3 && s.b >= 3)) return 'big';
+  if (FLAT_FAMILIES.has(fam)) return 'flat';
+  if (TINY_FAMILIES.has(fam) || (s && s.a <= 1 && s.b <= 1)) return 'tiny';
+  return 'ordinary';
+}
 
 /** Size bucket used as the level between category and individual mould */
 export function sizeBucket(name: string, familyKey: string): string | null {

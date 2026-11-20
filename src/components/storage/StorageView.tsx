@@ -2,6 +2,7 @@
 // drawer yet, moves worth making, tidying the layout, the review, labels, the pick list and the export. The plan only
 // ever fills the gaps: parts already in a recorded drawer stay there, and the rest are laid out in the drawers with
 // nothing recorded. The drawer editor and the suggested drawer open over whichever page asked for them.
+import { nameTitle, partPlainName, searchName } from '../../lib/builderNames';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { baseMould, collectionRows, mergeToParts } from '../../lib/collection';
 import { colourName } from '../../lib/colours';
@@ -27,7 +28,7 @@ import PickListView from '../PickList';
 import StorageMap from './StorageMap';
 import type { Page } from '../Shell';
 import DrawerEditor from './DrawerEditor';
-import { EstimateCheck, Findings, Suggestions } from './Improvements';
+import { EstimateCheck, Findings, LayoutCheck, Suggestions } from './Improvements';
 import type { StorageModel } from './model';
 import SortPage from './SortPage';
 import Rearrange from './Rearrange';
@@ -199,7 +200,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   for (const c of comps) kinds.set(stem(c.unitName), [...(kinds.get(stem(c.unitName)) ?? []), c]);
   const q = filter.trim().toLowerCase();
   const matcher = partMatcher(filter, resolvePart);
-  const matchesPart = (p: Part) => matcher.test(p) || p.name.toLowerCase().includes(q);
+  const matchesPart = (p: Part) => matcher.test(p) || searchName(p).toLowerCase().includes(q);
   const suggestionParts = (s: Suggestion) => s.sections.flatMap((sec) => leaves(sec.node).flatMap((l) => (l.part ? [l.part] : [])));
   const matchesFilter = (c: SetupComp) => {
     if (!q) return true;
@@ -361,7 +362,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
             {(() => {
               const hits = analysis.pockets.flatMap((p) => p.parts.filter((x) => matchesPart(x.part)).map((x) => ({ part: x.part, where: p.name })));
               const shown = [...new Map(hits.map((h) => [h.part.partNum, h])).values()].slice(0, 4);
-              return shown.length ? <> Already in a drawer: {shown.map((h) => `${h.part.name} (${h.part.partNum}) in ${hits.filter((x) => x.part.partNum === h.part.partNum).map((x) => x.where).join(', ')}`).join('; ')}.</> : ' It may be kept out of storage, in a set kept built, or not in your parts list.';
+              return shown.length ? <> Already in a drawer: {shown.map((h) => `${partPlainName(h.part)} (${h.part.partNum}) in ${hits.filter((x) => x.part.partNum === h.part.partNum).map((x) => x.where).join(', ')}`).join('; ')}.</> : ' It may be kept out of storage, in a set kept built, or not in your parts list.';
             })()}
           </p>
         )}
@@ -423,6 +424,10 @@ export default function StorageView({ page, model, project, update, parts, keptO
     body = (
       <>
         <section className="card">
+          <h3 className="card-title">Could someone else find things?</h3>
+          <LayoutCheck findings={analysis.layout} analysis={analysis} />
+        </section>
+        <section className="card">
           <h3 className="card-title">What the review found</h3>
           <Findings findings={analysis.findings} analysis={analysis} />
         </section>
@@ -439,7 +444,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
         [
           ['moves', 'Moves worth making', analysis.suggestions.length],
           ['tidy', 'Tidy the layout', layoutMoves.reduce((t, r) => t + r.cycles.length, 0)],
-          ['review', 'Review', analysis.findings.length],
+          ['review', 'Review', analysis.findings.length + analysis.layout.length],
         ] as const
       ).map(([id, label, count]) => (
         <button key={id} role="tab" aria-selected={page === id} className={page === id ? 'on' : ''} onClick={() => goTo(id)}>
@@ -599,7 +604,7 @@ function TilePics({ parts }: { parts: Part[] }) {
   return (
     <span className="tile-pics">
       {[...new Map(parts.map((p) => [p.partNum, p])).values()].slice(0, 4).map((p) => (
-        <PartImage key={p.partNum} partNum={p.partNum} size={34} title={p.name} />
+        <PartImage key={p.partNum} partNum={p.partNum} size={34} title={nameTitle(p)} />
       ))}
     </span>
   );
