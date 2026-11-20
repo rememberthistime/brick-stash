@@ -9,6 +9,8 @@ import { download } from '../state';
 import BuiltSets from './BuiltSets';
 import KeepOutCard from './KeepOutCard';
 import ExtraParts from './ExtraParts';
+import type { Spot } from '../lib/move';
+import type { PlaceOption } from './storage/places';
 import PartImage from './PartImage';
 
 export type CollectionPage = 'import' | 'parts' | 'built' | 'kept';
@@ -25,6 +27,8 @@ interface Props {
   subtraction: SubtractResult;
   kept: KeptPart[];
   keptSummary: KeptSummary;
+  placesFor?: (p: Part) => PlaceOption[];
+  putIn?: (partNum: string, to: Spot, name: string) => void;
 }
 
 type PartSortKey = 'num' | 'name' | 'qty' | 'colours' | 'each' | 'total';
@@ -45,7 +49,7 @@ const readKey = () => {
   }
 };
 
-export default function CollectionTab({ view, goTo, project, update, catalog, parts, everything, subtraction, kept, keptSummary }: Props) {
+export default function CollectionTab({ view, goTo, project, update, catalog, parts, everything, subtraction, kept, keptSummary, placesFor, putIn }: Props) {
   const [mode, setMode] = useState<'append' | 'replace'>('replace');
   const [messages, setMessages] = useState<string[]>([]);
   const [paste, setPaste] = useState('');
@@ -241,7 +245,7 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
             </div>
           ))}
         </section>
-        <ExtraParts project={project} update={update} catalog={catalog} />
+        <ExtraParts project={project} update={update} catalog={catalog} placesFor={placesFor} putIn={putIn} />
       </div>
     );
   return (
