@@ -1,7 +1,7 @@
 // Put away & move: the parts not in a drawer down one side, your drawers on the other, and the drawer you're working
 // on open beside them. Drag a part onto a drawer or a pocket, between pockets, or back to the list to take it out; or
 // tick parts and choose Move to…, which works on a phone too. Every step can be undone.
-import { useState, type DragEvent, type ReactNode } from 'react';
+import { useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { RecordedHome } from '../../lib/gaps';
 import { homeSkipId } from '../../lib/gaps';
 import type { MoveItem, Spot } from '../../lib/move';
@@ -19,6 +19,7 @@ const SHOWN = 150;
 const DRAG_TYPE = 'application/x-brick-stash-parts';
 const OPEN_STORE = 'brick-stash-sort-open';
 const ORDER_STORE = 'brick-stash-unsorted-order';
+const FOLD_STORE = 'brick-stash-sort-folded';
 const recall = (k: string) => {
   try {
     return localStorage.getItem(k);
@@ -71,6 +72,13 @@ export default function SortPage(props: Props) {
   const [order, setOrder] = useState<UnsortedOrder>(() => (recall(ORDER_STORE) === 'pieces' ? 'pieces' : 'volume'));
   const [openKey, setOpenKey] = useState<string | null>(() => recall(OPEN_STORE));
   const [activePocket, setActivePocket] = useState(0);
+  /** The drawer tiles fold away once a drawer is opened, so its contents sit at the top */
+  const [folded, setFoldedState] = useState(() => recall(FOLD_STORE) === '1' && !!recall(OPEN_STORE));
+  const setFolded = (f: boolean) => {
+    setFoldedState(f);
+    remember(FOLD_STORE, f ? '1' : '0');
+  };
+  const panelRef = useRef<HTMLElement>(null);
   const [picked, setPicked] = useState<Map<string, Pick>>(new Map());
   const [closedFams, setClosedFams] = useState<Set<string>>(new Set());
   const [over, setOver] = useState<string | null>(null);
@@ -84,6 +92,15 @@ export default function SortPage(props: Props) {
     setOpenKey(key);
     setActivePocket(0);
     remember(OPEN_STORE, key);
+  };
+  /** Open a drawer from the tiles: fold them away and bring its contents into view */
+  const chooseDrawer = (key: string) => {
+    openDrawer(key);
+    setFolded(true);
+    requestAnimationFrame(() => {
+      const el = panelRef.current;
+      if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
   };
   const title = (key: string, pocket: number) => {
     const c = byKey.get(key);
@@ -284,8 +301,43 @@ export default function SortPage(props: Props) {
   // ─── your drawers, as small tiles to drop on or open ───
   const kinds = new Map<string, SetupComp[]>();
   for (const c of comps) kinds.set(stem(c.unitName), [...(kinds.get(stem(c.unitName)) ?? []), c]);
-  const tiles = (
+  const at = comps.findIndex((c) => c.key === open.key);
+  const step = (d: number) => comps[(at + d + comps.length) % comps.length];
+  const foldedBar = (
+    <section
+      className="card sort-drawers folded"
+      aria-label="Your drawers, folded away"
+      onDragOver={(e) => {
+        // dragging parts over the folded list opens it, so they can go in any drawer
+        if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+        e.preventDefault();
+        setFolded(false);
+      }}
+    >
+      <button className="ghost small-btn" title={`Previous drawer: ${step(-1).code}`} aria-label="Previous drawer" onClick={() => openDrawer(step(-1).key)}>
+        ‹
+      </button>
+      <span className="small">
+        Showing <span className="code">{open.code}</span> <span className="muted">of {comps.length} drawers</span>
+      </span>
+      <button className="ghost small-btn" title={`Next drawer: ${step(1).code}`} aria-label="Next drawer" onClick={() => openDrawer(step(1).key)}>
+        ›
+      </button>
+      <button className="small-btn fold-toggle" onClick={() => setFolded(false)} aria-expanded={false}>
+        Choose another drawer ▾
+      </button>
+    </section>
+  );
+  const tiles = folded ? (
+    foldedBar
+  ) : (
     <section className="card sort-drawers" aria-label="Your drawers">
+      <div className="sort-drawers-head">
+        <span className="small muted">Click a drawer to open it, or drop parts on one to put them in.</span>
+        <button className="ghost small-btn fold-toggle" onClick={() => setFolded(true)} aria-expanded>
+          Fold away ▴
+        </button>
+      </div>
       {[...kinds].map(([kind, list]) => (
         <div key={kind} className="sort-unit">
           <div className="sort-unit-name small">
@@ -307,7 +359,7 @@ export default function SortPage(props: Props) {
                   key={c.key}
                   className={`sort-tile ${recorded ? '' : 'todo'} ${c.key === open.key ? 'open' : ''} ${over === id ? 'drop-over' : ''} ${family ? `fam-border-${family}` : ''}`}
                   title={`${codeWithName(c.code, c)}: ${recorded ? 'click to open it beside the list' : 'nothing recorded yet'}. Drop parts here to put them in.`}
-                  onClick={() => openDrawer(c.key)}
+                  onClick={() => chooseDrawer(c.key)}
                   {...dropTarget(id, (items) => moveTo(items, { key: c.key, pocket: c.key === open.key ? active : 0 }))}
                 >
                   <span className="sort-tile-head">
@@ -334,7 +386,7 @@ export default function SortPage(props: Props) {
   /** Every part in the open drawer, to drag all of it by the drawer's name */
   const allInOpen: Pick[] = openList.flatMap((sp, i) => sp.parts.map((part) => ({ part, from: { key: open.key, pocket: i } })));
   const panel = (
-    <section className="card sort-open" aria-label={`Drawer ${open.code}`}>
+    <section ref={panelRef} className="card sort-open" aria-label={`Drawer ${open.code}`}>
       <div className="sort-open-head">
         <h3
           className={allInOpen.length ? 'drag-all' : ''}

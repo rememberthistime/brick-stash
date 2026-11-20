@@ -895,3 +895,9 @@ main.wide .page-head { max-width: 1240px; }
 .sort-tile, .setup-tile { border-radius: calc(var(--radius) - 6px); }
 .sort-tile.open { box-shadow: 0 0 0 2px var(--accent); }
 .selection-bar, .picker-pop, .undo-bar { border-radius: calc(var(--radius) - 4px); }
+
+/* Put away & move: the drawer tiles fold away once a drawer is open */
+.sort-drawers-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px; }
+.sort-drawers.folded { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+.sort-drawers.folded .fold-toggle { margin-left: auto; }
+.fold-toggle { white-space: nowrap; }
