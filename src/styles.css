@@ -586,7 +586,7 @@ button.snap-code { position: relative; font-weight: 600; padding: 10px 4px; back
 .snap-box-field { display: grid; gap: 4px; margin-top: 8px; text-align: left; }
 .snap-box-field input { width: 100%; font-size: 16px; padding: 10px; }
 .snap-shot.marking img { outline: 3px solid var(--accent); }
-.setup-label-input { width: 160px; }
+.setup-label-input { flex: 1 1 220px; min-width: 160px; }
 
 /* Checking drafts (/review) */
 .review-drafts { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin: 12px 0; }
@@ -708,3 +708,35 @@ td.pic { width: 56px; padding: 3px 6px; }
 .part-link { color: inherit; text-decoration: none; }
 .part-link:hover { color: var(--accent); text-decoration: underline; }
 .waiting-move .part-strip { margin-top: 6px; }
+
+/* Move to… picker */
+.place-picker { position: relative; display: inline-block; }
+.picker-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: min(360px, 86vw); background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16); padding: 8px; text-align: left; color: var(--ink); font-weight: 400; }
+.picker-title { font-weight: 600; margin: 2px 4px 6px; }
+.picker-search { width: 100%; box-sizing: border-box; }
+.picker-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 320px; overflow: auto; }
+.picker-sub { padding: 6px 6px 2px; }
+.picker-option { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; background: none; border: none; color: var(--ink); text-align: left; padding: 6px 8px; border-radius: 6px; }
+.picker-option.on { background: var(--accent-soft); }
+.picker-option-title { font-size: 13px; }
+.picker-none { padding: 6px 8px; }
+
+/* Picking parts to move together */
+.pick-box { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.selection-bar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--card); border: 2px solid var(--accent); border-radius: 10px; padding: 8px 12px; margin: 10px 0; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.selection-bar .picker-pop { top: auto; bottom: calc(100% + 6px); right: auto; left: 0; }
+.selection-bar b { margin-right: auto; }
+
+/* Undo for steps taken by hand */
+.undo-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 25; display: flex; align-items: center; gap: 10px; max-width: min(640px, calc(100vw - 32px)); background: var(--ink); color: var(--bg); border-radius: 10px; padding: 8px 10px 8px 14px; font-size: 13px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2); }
+.undo-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-bar button { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
+.undo-bar button.icon { border: none; }
+.part-actions { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.drawer-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.picker-list li { display: block; padding: 0; border: none; }
+.selection-bar .picker-pop { left: auto; right: 0; }
+@media (max-width: 640px) {
+  .picker-pop, .selection-bar .picker-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; }
+  .picker-list { max-height: 50vh; }
+}

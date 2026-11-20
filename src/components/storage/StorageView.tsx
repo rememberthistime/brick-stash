@@ -3,6 +3,7 @@
 // ever fills the gaps: parts already in a recorded drawer stay there, and the rest are laid out in the drawers with
 // nothing recorded. The drawer editor and the suggested drawer open over whichever page asked for them.
 import { useEffect, useState, type ReactNode } from 'react';
+import { moveParts, movePocket, swapDrawers, takeOut, undoStep, type MoveItem, type Spot } from '../../lib/move';
 import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../../lib/codes';
 import { pocketsFromSuggestion } from '../../lib/gaps';
 import { applyCycle, undoLast } from '../../lib/rearrange';
@@ -12,7 +13,7 @@ import { leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner
 import { acceptSuggestion, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { stem } from '../../lib/storageList';
 import { shortName } from '../../lib/tapeLabel';
-import type { Catalog, OpenedUnit, Part, Project, Setup } from '../../lib/types';
+import type { Catalog, OpenedUnit, Part, Project, Setup, SetupPocket } from '../../lib/types';
 import { download, uid } from '../../state';
 import Fold, { useFolds } from '../Fold';
 import Labels from '../Labels';
@@ -27,6 +28,8 @@ import Rearrange from './Rearrange';
 import { ColourKey } from './PlanSettings';
 import SuggestedDrawer from './Suggested';
 import { pct } from './format';
+import { history, useHistory } from './history';
+import { drawerOptions, placeOptions, spotTitle, spotsOf } from './places';
 
 export type StoragePage = 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'pick' | 'export';
 export const STORAGE_PAGES = new Set<Page>(['drawers', 'put-away', 'moves', 'tidy', 'review', 'labels', 'pick', 'export']);
@@ -53,6 +56,8 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const [perBox, setPerBox] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
   const folds = useFolds();
+  const steps = useHistory();
+  const [undoHidden, setUndoHidden] = useState(-1);
   // A drawer opened on one page doesn't stay open over the next
   useEffect(() => {
     setEditing(null);
@@ -62,6 +67,76 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const setSetup = (f: (s: Setup) => Setup) => update((p) => ({ setup: f(p.setup) }));
   const scale = project.settings.volumeScale;
   const { tree, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart } = model;
+
+  // ─── Steps taken by hand: each one can be undone ───
+  const nameOf = (num: string) => parts.find((p) => p.partNum === num)?.name ?? num;
+  const titleAt = (spot: Spot) => {
+    const c = comps.find((x) => x.key === spot.key);
+    return c ? spotTitle(c, spot.pocket, setup, analysis.pockets) : spot.key;
+  };
+  const describeMove = (items: MoveItem[], to: Spot) => {
+    const verb = items.every((it) => !it.from) ? 'Put' : 'Moved';
+    const what = items.length === 1 ? nameOf(items[0].part) : `${items.length} parts`;
+    return `${verb} ${what} in ${titleAt(to)}`;
+  };
+  const move = (items: MoveItem[], to: Spot, text = describeMove(items, to)) => {
+    const r = moveParts(setup, items, to, uid);
+    if (r.setup === setup) return;
+    update({ setup: r.setup });
+    history.push({ text, drawers: r.before });
+  };
+  /** Several moves as one step, undone together */
+  const moveGroups = (groups: { items: MoveItem[]; to: Spot }[], text: string) => {
+    let next = setup;
+    const before: Record<string, SetupPocket[] | undefined> = {};
+    for (const g of groups) {
+      const r = moveParts(next, g.items, g.to, uid);
+      for (const [k, v] of Object.entries(r.before)) if (!(k in before)) before[k] = v;
+      next = r.setup;
+    }
+    if (next === setup) return;
+    update({ setup: next });
+    history.push({ text, drawers: before });
+  };
+  const movePocketTo = (from: Spot, to: Spot) => {
+    const r = movePocket(setup, from, to, uid);
+    if (r.setup === setup) return;
+    update({ setup: r.setup });
+    history.push({ text: `Moved everything in ${titleAt(from)} to ${titleAt(to)}`, drawers: r.before });
+  };
+  const swap = (a: string, b: string) => {
+    const r = swapDrawers(project, a, b);
+    update({ setup: r.setup, units: r.units });
+    const code = (k: string) => comps.find((c) => c.key === k)?.code ?? k;
+    history.push({ text: `Swapped ${code(a)} and ${code(b)}`, drawers: r.before, names: r.names });
+  };
+  /** Move a part here from every other pocket it's in */
+  const moveHere = (num: string, to: Spot) =>
+    move(
+      spotsOf(num, setup).map((from) => ({ part: num, from })),
+      to,
+    );
+  const takeOutOf = (num: string, from: Spot) => {
+    const r = takeOut(setup, [{ part: num, from }]);
+    update({ setup: r.setup });
+    history.push({ text: `Took ${nameOf(num)} out of ${titleAt(from)}`, drawers: r.before });
+  };
+  const undo = () => {
+    const last = history.pop();
+    if (last) update((p) => undoStep(p, last));
+  };
+  const places = (forParts: Part[]) => placeOptions(comps, setup, analysis.pockets, forParts);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && !typing && steps.length) {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   if (!parts.length || !project.units.length) {
     return (
@@ -256,6 +331,9 @@ export default function StorageView({ page, model, project, update, parts, keptO
           resolve={resolvePart}
           folds={folds}
           onShowDrawer={setShowing}
+          places={places}
+          onMove={move}
+          onMoveGroups={moveGroups}
         />
       </>
     );
@@ -285,9 +363,22 @@ export default function StorageView({ page, model, project, update, parts, keptO
       </>
     );
 
+  const last = steps[steps.length - 1];
   return (
     <div className="setup">
       {body}
+
+      {last && undoHidden !== steps.length && (page === 'drawers' || page === 'put-away') && (
+        <div className="undo-bar no-print" role="status" aria-live="polite">
+          <span>{last.text}</span>
+          <button className="small-btn" onClick={undo} title="Ctrl+Z">
+            Undo{steps.length > 1 ? ` (${steps.length})` : ''}
+          </button>
+          <button className="icon" aria-label="Hide" onClick={() => setUndoHidden(steps.length)}>
+            ✕
+          </button>
+        </div>
+      )}
 
       {shown && shownComp && (
         <SuggestedDrawer
@@ -338,6 +429,16 @@ export default function StorageView({ page, model, project, update, parts, keptO
           homes={homesIn.get(current.key) ?? []}
           moves={movesIn.get(current.key) ?? []}
           resolve={resolvePart}
+          places={places}
+          drawers={() => drawerOptions(comps, setup, analysis.pockets)}
+          onMove={move}
+          onMovePocket={movePocketTo}
+          onSwap={(other) => {
+            swap(current.key, other);
+            setEditing(other);
+          }}
+          onMoveHere={moveHere}
+          onTakeOut={takeOutOf}
           onAccept={(s) => setSetup((x) => acceptSuggestion(x, s, analysis.pockets))}
           onSkip={(id) => setSetup((x) => ({ ...x, skipped: [...x.skipped, id] }))}
         />

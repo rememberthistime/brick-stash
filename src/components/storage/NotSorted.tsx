@@ -1,14 +1,15 @@
 // Parts that aren't in any recorded drawer, by family: where the plan would put each, and ways to put them away now.
 import { useState } from 'react';
-import { codeWithName, placeName } from '../../lib/codes';
+import { codeWithName } from '../../lib/codes';
 import { homeSkipId, type RecordedHome } from '../../lib/gaps';
-import { addToPocket, contentsName, newPocket, partMatcher, removeFromPocket, unsortedByFamily, type PlacedPocket, type SetupComp, type UnsortedOrder } from '../../lib/setup';
-import { familyFor, familyGroup } from '../../lib/taxonomy';
+import type { MoveItem, Spot } from '../../lib/move';
+import { partMatcher, unsortedByFamily, type PlacedPocket, type SetupComp, type UnsortedOrder } from '../../lib/setup';
 import type { Part, Setup } from '../../lib/types';
-import { uid } from '../../state';
 import Fold, { type Folds } from '../Fold';
 import PartImage from '../PartImage';
-import { L, pct } from './format';
+import { L } from './format';
+import PlacePicker from './PlacePicker';
+import { spotTitle, type PlaceOption } from './places';
 
 /** Parts listed per family */
 const SHOWN = 150;
@@ -38,14 +39,20 @@ interface Props {
   resolve: (n: string) => string;
   folds: Folds;
   onShowDrawer: (key: string) => void;
+  /** every place a part could go, those beside similar parts marked */
+  places: (forParts: Part[]) => PlaceOption[];
+  /** put parts in a pocket, as a step that can be undone */
+  onMove: (items: MoveItem[], to: Spot, text?: string) => void;
+  /** several moves as one step */
+  onMoveGroups: (groups: { items: MoveItem[]; to: Spot }[], text: string) => void;
 }
 
-export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, resolve, folds, onShowDrawer }: Props) {
+export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, homeOf, recordedHomes, scale, query, resolve, folds, onShowDrawer, places, onMove, onMoveGroups }: Props) {
   const [order, setOrder] = useState<UnsortedOrder>(rememberedOrder);
   /** one drawer to put many parts in, a click each */
   const [target, setTarget] = useState<{ key: string; pocket: number } | null>(null);
-  /** what was just put away, to undo: one part, or every part with room in a recorded drawer at once */
-  const [lastPut, setLastPut] = useState<{ text: string; items: { partNum: string; key: string; pocket: number }[] } | null>(null);
+  /** parts ticked, to put in one place together */
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const families = unsortedByFamily(unsorted, scale, order);
   const q = query.trim().toLowerCase();
   const matcher = partMatcher(query, resolve);
@@ -63,65 +70,33 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
       /* only a convenience */
     }
   };
-  /**
-   * "A1.2: Fences": a pocket's code and what it's called, the same everywhere: the name you gave the pocket, or for a
-   * drawer of one pocket the drawer's name, or else what's in it
-   */
-  const pocketCode = (c: SetupComp, i: number) => {
-    const list = setup.drawers[c.key] ?? [];
-    const code = list.length > 1 ? `${c.code}.${i + 1}` : c.code;
-    const named = list[i]?.label?.trim() || (list.length > 1 ? '' : placeName(c));
-    const pp = pockets.find((x) => x.id === list[i]?.id);
-    const title = named || (pp?.parts.length ? contentsName(pp) : '');
-    return title ? `${code}: ${title}` : code;
-  };
+  const pocketCode = (c: SetupComp, i: number) => spotTitle(c, i, setup, pockets);
   const describe = pocketCode;
-  const putIn = (p: Part, key: string, pocket: number) => {
-    const comp = byKey.get(key);
-    if (!comp) return;
-    const index = Math.max(0, Math.min(pocket, (setup.drawers[key]?.length ?? 1) - 1));
-    setSetup((s) => {
-      const list = s.drawers[key] ?? [newPocket(uid())];
-      return { ...s, drawers: { ...s.drawers, [key]: addToPocket(list, Math.min(index, list.length - 1), [p.partNum]) } };
-    });
-    setLastPut({ text: `Added ${p.name} to ${pocketCode(comp, index)}.`, items: [{ partNum: p.partNum, key, pocket: index }] });
-  };
-  /** Every part that has room beside its own sort in a recorded drawer, into that pocket */
+  const putIn = (p: Part, key: string, pocket: number) => onMove([{ part: p.partNum }], { key, pocket });
+  /** Every part that has room beside its own sort in a recorded drawer, into that pocket: one step, undone as one */
   const putAllWithRoom = () => {
-    const items = withRoom.map((p) => ({ partNum: p.partNum, key: recordedHomes.get(p.partNum)!.key, pocket: recordedHomes.get(p.partNum)!.pocket }));
-    setSetup((s) => {
-      const drawers = { ...s.drawers };
-      for (const it of items) if (drawers[it.key]) drawers[it.key] = addToPocket(drawers[it.key], it.pocket, [it.partNum]);
-      return { ...s, drawers };
-    });
-    setLastPut({ text: `Added ${items.length} parts to ${new Set(items.map((i) => i.key)).size} drawers.`, items });
+    const byPocket = new Map<string, { to: Spot; parts: string[] }>();
+    for (const p of withRoom) {
+      const h = recordedHomes.get(p.partNum)!;
+      const id = `${h.key}|${h.pocket}`;
+      byPocket.set(id, { to: { key: h.key, pocket: h.pocket }, parts: [...(byPocket.get(id)?.parts ?? []), p.partNum] });
+    }
+    onMoveGroups(
+      [...byPocket.values()].map(({ to, parts }) => ({ to, items: parts.map((part) => ({ part })) })),
+      `Put ${withRoom.length} ${withRoom.length === 1 ? 'part' : 'parts'} beside their own sort`,
+    );
   };
-  const undoPut = () => {
-    if (!lastPut) return;
-    setSetup((s) => {
-      const drawers = { ...s.drawers };
-      for (const it of lastPut.items) if (drawers[it.key]) drawers[it.key] = removeFromPocket(drawers[it.key], it.pocket, it.partNum);
-      return { ...s, drawers };
+  const pickedParts = unsorted.filter((p) => picked.has(p.partNum));
+  const toggle = (num: string) =>
+    setPicked((s) => {
+      const next = new Set(s);
+      if (next.has(num)) next.delete(num);
+      else next.add(num);
+      return next;
     });
-    setLastPut(null);
-  };
-  /** Where a part could go: pockets already holding its family or group first, roomiest first, then every drawer */
-  const placesFor = (p: Part) => {
-    const fam = familyFor(p.catId).key;
-    const grp = familyGroup(fam);
-    const indexOf = (pp: PlacedPocket) => Math.max(0, (setup.drawers[pp.comp.key] ?? []).findIndex((x) => x.id === pp.id));
-    const free = (pp: PlacedPocket) => (pp.capacity ? 1 - pp.used / pp.capacity : 0);
-    const similar = pockets
-      .filter((pp) => pp.parts.length && (pp.family === fam || familyGroup(pp.family) === grp))
-      .sort((a, b) => Number(b.family === fam) - Number(a.family === fam) || free(b) - free(a))
-      .slice(0, 12)
-      .map((pp) => ({ value: `${pp.comp.key}|${indexOf(pp)}`, text: `${pocketCode(pp.comp, indexOf(pp))} — ${pp.label || pp.groupLabel}, ${pct(pp.used / Math.max(1, pp.capacity))} full` }));
-    const every = comps.flatMap((c) => {
-      const list = setup.drawers[c.key] ?? [];
-      if (list.length < 2) return [{ value: `${c.key}|0`, text: `${codeWithName(c.code, c)}${list.length ? '' : ' (nothing recorded)'}` }];
-      return list.map((_, i) => ({ value: `${c.key}|${i}`, text: describe(c, i) }));
-    });
-    return { similar, every };
+  const putPicked = (o: PlaceOption) => {
+    onMove(pickedParts.map((p) => ({ part: p.partNum })), o);
+    setPicked(new Set());
   };
 
   const targetComp = target ? byKey.get(target.key) : undefined;
@@ -135,7 +110,7 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
       {unsorted.length > 0 && (
         <>
           <p className="muted small page-note">
-            <b>Put in</b> adds a part beside the same sort of parts in a recorded drawer. <b>Suggested</b> shows the whole plan for an empty drawer. <b>Put in…</b> chooses any drawer.
+            <b>Put in…</b> chooses any drawer, typing its code or name; tick several parts to put them in one place together. <b>Put in A3.2</b> takes the suggestion of room beside the same sort of parts. Ctrl+Z undoes, a step at a time.
             {noRoom > 0 && ` ${noRoom} ${noRoom === 1 ? 'has' : 'have'} no room anywhere.`}
           </p>
           {withRoom.length > 0 && (
@@ -180,14 +155,6 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
                 Bring back {setup.skipped.filter((id) => id.startsWith('home:')).length} turned down
               </button>
             )}
-            {lastPut && (
-              <span className="small" aria-live="polite">
-                {lastPut.text}{' '}
-                <button className="link small" onClick={undoPut}>
-                  Undo
-                </button>
-              </span>
-            )}
           </div>
         </>
       )}
@@ -203,7 +170,8 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
                 const there = recordedHomes.get(p.partNum);
                 const thereComp = there ? byKey.get(there.key) : undefined;
                 return (
-                  <li key={p.partNum}>
+                  <li key={p.partNum} className={picked.has(p.partNum) ? 'picked' : ''}>
+                    <input type="checkbox" className="pick-box" checked={picked.has(p.partNum)} onChange={() => toggle(p.partNum)} aria-label={`Pick ${p.name}, to put several in one place`} />
                     <PartImage partNum={p.partNum} size={56} title={p.name} />
                     <span className="unsorted-name">
                       <a href={`https://rebrickable.com/parts/${encodeURIComponent(p.partNum)}/`} target="_blank" rel="noreferrer" title={`${p.partNum} on Rebrickable`}>
@@ -243,61 +211,32 @@ export default function NotSorted({ unsorted, comps, setup, setSetup, pockets, h
                           + {targetCode}
                         </button>
                       )}
-                      <PutIn part={p} places={() => placesFor(p)} onPut={(key, pocket) => putIn(p, key, pocket)} />
+                      <PlacePicker label="Put in…" title={`Put ${p.name} in…`} options={() => places([p])} onPick={(o) => putIn(p, o.key, o.pocket)} />
                     </span>
                   </li>
                 );
               })}
             </ul>
+            <p className="small">
+              <button className="link small" onClick={() => setPicked((s) => new Set([...s, ...shown.slice(0, SHOWN).map((p) => p.partNum)]))}>
+                Pick all {Math.min(shown.length, SHOWN)} {f.label.toLowerCase()}
+              </button>
+            </p>
             {shown.length > SHOWN && <p className="muted small">The {SHOWN} {order === 'pieces' ? 'with the most pieces' : 'biggest by volume'}, of {shown.length}. Search above to find a particular part.</p>}
           </Fold>
         );
       })}
-    </>
-  );
-}
-
-/** "Put in…": choose the drawer one part goes in. The list is only made when it's opened, as there's one per part. */
-function PutIn({ part, places, onPut }: { part: Part; places: () => { similar: { value: string; text: string }[]; every: { value: string; text: string }[] }; onPut: (key: string, pocket: number) => void }) {
-  const [open, setOpen] = useState(false);
-  if (!open)
-    return (
-      <button className="link small" title={`Choose where ${part.name} goes`} onClick={() => setOpen(true)}>
-        Put in…
-      </button>
-    );
-  const { similar, every } = places();
-  return (
-    <select
-      autoFocus
-      className="put-select"
-      aria-label={`Drawer for ${part.name}`}
-      value=""
-      onBlur={() => setOpen(false)}
-      onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-      onChange={(e) => {
-        const [key, pocket] = e.target.value.split('|');
-        setOpen(false);
-        if (key) onPut(key, Number(pocket));
-      }}
-    >
-      <option value="">Put {part.name} in…</option>
-      {similar.length > 0 && (
-        <optgroup label="Beside similar parts">
-          {similar.map((o) => (
-            <option key={`s-${o.value}`} value={o.value}>
-              {o.text}
-            </option>
-          ))}
-        </optgroup>
+      {pickedParts.length > 0 && (
+        <div className="selection-bar">
+          <b>
+            {pickedParts.length === 1 ? pickedParts[0].name : `${pickedParts.length} parts`} picked
+          </b>
+          <PlacePicker label="Put in…" className="small-btn" title={`Put ${pickedParts.length === 1 ? pickedParts[0].name : `these ${pickedParts.length} parts`} in…`} options={() => places(pickedParts)} onPick={putPicked} />
+          <button className="link small" onClick={() => setPicked(new Set())}>
+            Clear
+          </button>
+        </div>
       )}
-      <optgroup label="Any drawer">
-        {every.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.text}
-          </option>
-        ))}
-      </optgroup>
-    </select>
+    </>
   );
 }

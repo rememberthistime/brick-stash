@@ -113,13 +113,13 @@ export function rearrangements(comps: SetupComp[], pocketsOf: Map<string, Placed
 }
 
 /** A drawer's own name, wherever it's kept: on its unit for an opened-up box, else under the drawer */
-function nameAt(units: StorageUnit[], key: string): string {
+export function nameAt(units: StorageUnit[], key: string): string {
   if (key.startsWith('whole:')) return units.find((u) => u.id === key.slice('whole:'.length))?.title ?? '';
   const drawer = drawerKeyOf(key);
   return (drawer && units.find((u) => u.id === key.split(':')[0])?.drawerNames?.[drawer]) || '';
 }
 
-function withNameAt(units: StorageUnit[], key: string, name: string): StorageUnit[] {
+export function withNameAt(units: StorageUnit[], key: string, name: string): StorageUnit[] {
   const whole = key.startsWith('whole:');
   return setPlaceName(units, whole ? key.slice('whole:'.length) : key.split(':')[0], whole ? null : drawerKeyOf(key), name);
 }
