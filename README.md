@@ -34,7 +34,7 @@ The sidebar lists every job the app does, in groups, with a count beside each (h
 
 **Collection**
 - **Parts**: everything you have, by family, colours merged. Click a family for its parts, each with a picture, sortable by any column. Untick a family or a part to keep it out of storage, or type a part's own size (cm³ per piece) to override the estimate.
-- **Import**: a CSV (any spreadsheet with a part-number column, ideally quantity), a Rebrickable parts export or BrickLink XML. Or paste rows, or pull whole sets from Rebrickable with your own API key.
+- **Import**: a CSV (any spreadsheet with a part-number column, ideally quantity), a Rebrickable parts export or BrickLink XML. Or paste rows, or pull whole sets from Rebrickable with your own API key. **Add parts by hand** (on the same page) takes parts the imported list doesn't have: search the catalogue by number or name, or make your own part for one Rebrickable doesn't list (a name, an optional number, the kind of part it's most like, which decides its family, and an optional size). They're kept apart from the imported list, so importing a fresh list, even with Replace, leaves them.
 - **Sets kept built**: enter them, drop in a set's parts file, or upload Rebrickable's set list export, and their parts come off before anything is stored. Spares stay in, since they're loose in your boxes. The list is kept separately, so a fresh full export can be re-imported and the same sets still come off. Untick a set to put its parts back.
 - **Kept out**: minifigs, baseplates, *bulky one-offs* or any part you pick. These parts aren't stored in drawers but are still in the pick list.
 
@@ -59,8 +59,9 @@ The sidebar lists every job the app does, in groups, with a count beside each (h
   - **Review**: what's too full, split, spread out, mixed or half empty (tick **Mixed on purpose** on a pocket and it's left alone), and real fills against the estimates, by family and for the drawers furthest off. Tick **Use these fills** and every part's estimated size is corrected from them. Best left until most of the collection is recorded.
 
 **Print & lists**
-- **Labels**: Brother P-touch 12 mm tape labels (`.lbx` for P-touch Editor, or PNGs) or a printable sheet, for recorded drawers, with links to Brick Architect's own label for each part (their artwork isn't built in, as it isn't licensed for reuse).
-- **Pick list**: takes a set number, a parts file or a pasted list, and lists the drawers to open and how many of each part to take, with the colours the build needs.
+- **Labels**: Brother P-touch 12 mm tape labels (`.lbx` for P-touch Editor, or PNGs) or a printable sheet, for recorded drawers, with links to Brick Architect's own label for each part (their artwork isn't built in, as it isn't licensed for reuse). **One long strip** joins every tape label end to end, each still starting with its drawer code, with a dotted line to cut along between them, in lengths of up to 50 cm, 1 m or 2 m.
+- **Storage map**: each cupboard or shelf (from Spaces) with its units, shelf by shelf, and every drawer's code and what's in it, to print and stick on the door. Tick **Arrange** to put each unit on its shelf and move it left or right.
+- **Pick list**: choose a set (by number, with your Rebrickable key), a parts file or a pasted list, and get a checklist of the drawers to open and how many of each part to take. Each colour of a part is its own tick, with how many of that colour you have (sets kept built taken off), so you can see what's short before you start. Checklists are saved with the project, so ticks last and show on every device; **Hide ticked** keeps the list short on a phone. Colours you're short of are listed to find or buy, and download as a Rebrickable parts CSV. Rebrickable exports name colours by number: the first time, the app fetches Rebrickable's colour list with your key to name them (BrickLink's colour numbers too).
 - **Export**: a CSV of every drawer's contents, recorded and suggested.
 
 **Settings**
@@ -97,13 +98,14 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - `src/lib/codes.ts` — unit letters, drawer codes and names
 - `src/lib/spaces.ts` — how much of a cupboard or shelf its units take, and what else fits
 - `src/lib/dividers.ts` — pocket and divider layouts per compartment
-- `src/lib/pickList.ts` — pick list for a build
+- `src/lib/pickList.ts`, `src/lib/colours.ts` — pick list for a build, and colour names and counts by colour
+- `src/lib/storageMap.ts` — the storage map's shelves
 - `src/lib/labels.ts`, `src/lib/tapeLabel.ts`, `src/lib/zip.ts` — label contents, Brother 12 mm tape labels and `.lbx` packaging
 - `src/lib/presets.ts`, `src/lib/storageList.ts` — the storage catalogue (preset sizes are approximate) and pasted lists
 - `src/lib/rebrickable.ts` — Rebrickable API (proxied at `/rb-api`)
 - `src/components/Shell.tsx` — the sidebar, page addresses and page headlines; `src/App.tsx` works out each page's headline and count
-- `src/components/storage/` — the storage and sort pages: `model.ts` (everything they work out from the project, once), `StorageView.tsx` (Drawers, Put away & move, Suggestions and its tabs, Labels, Pick list, Export), `DrawerEditor.tsx` (recording a drawer), `Suggested.tsx` (a suggested drawer and its dividers), `SortPage.tsx` (Put away & move: the list beside the drawers, dragging and picking), `PlacePicker.tsx` and `places.ts` (Move to…), `history.ts` (undo), `suggestionsSwitch.tsx` (the Suggestions switch), `Improvements.tsx` (moves, estimates, findings), `Rearrange.tsx` (tidy the layout), `PlanSettings.tsx` (settings and colour key)
-- `src/components/CollectionTab.tsx` (Parts, Import, Sets kept built, Kept out), `StorageTab.tsx` (Units, Spaces), `PickList.tsx`, `Labels.tsx`, `TapeLabels.tsx`, `Versions.tsx`, `PartImage.tsx` — the other pages and views
+- `src/components/storage/` — the storage and sort pages: `model.ts` (everything they work out from the project, once), `StorageView.tsx` (Drawers, Put away & move, Suggestions and its tabs, Labels, Pick list, Export), `DrawerEditor.tsx` (recording a drawer), `Suggested.tsx` (a suggested drawer and its dividers), `SortPage.tsx` (Put away & move: the list beside the drawers, dragging and picking), `PlacePicker.tsx` and `places.ts` (Move to…), `history.ts` (undo), `suggestionsSwitch.tsx` (the Suggestions switch), `StorageMap.tsx` (the storage map), `Improvements.tsx` (moves, estimates, findings), `Rearrange.tsx` (tidy the layout), `PlanSettings.tsx` (settings and colour key)
+- `src/components/CollectionTab.tsx` (Parts, Import, Sets kept built, Kept out), `StorageTab.tsx` (Units, Spaces), `PickList.tsx`, `Labels.tsx`, `TapeLabels.tsx`, `ExtraParts.tsx` (parts added by hand), `Versions.tsx`, `PartImage.tsx` — the other pages and views
 - `src/look.ts` and the top of `src/styles.css` — the three looks, as colour and type tokens
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
 - `server/api.mjs` — the shared project and its daily versions; `server/index.mjs` — runs the built app for the network
@@ -146,3 +148,7 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - [x] Managing and rearranging storage by hand should be as simple as possible, with the app's suggestions an add-on to my own layout — *stage 1: Move… on every part (type a drawer code or name), several at once, whole pockets, swapping drawers, undo history; stage 2: Put away & move puts the unsorted parts beside your drawers, with drag and drop and tick-and-move for phones; stage 3: a Suggestions switch (off to start) shows the app's ideas only when you want them, and Suggested moves, Tidy the layout and Review are tabs of one Suggestions page*
 - [x] The whole site's colour scheme and design looks flat and dark — *three looks to choose from in the top bar: Bright (the default), Workshop and Night, with cards that sit up off the page and a display typeface for headings; the app no longer follows the computer's dark mode by itself*
 - [x] On Put away & move, the drawer tiles push the open drawer's contents down the page — *clicking a drawer folds the tiles into one line with ‹ › for the previous and next drawer; Choose another drawer unfolds them*
+- [x] A pick list linked to a set, as a checklist someone can follow; it needs the colours of each piece — *each colour is its own tick, with how many of that colour you own; checklists are saved with the project and show on every device; colours you're short of download as a Rebrickable CSV*
+- [x] Add pieces that aren't on the imported list, including ones Rebrickable doesn't have — *Add parts by hand on Import: from the catalogue, or your own part with a name and kind; a fresh import leaves them*
+- [x] A map of the storage to go with the drawer labels, for when the cupboards are closed — *Storage map, under Print & lists: each cupboard shelf by shelf, with every drawer's code and contents, to print*
+- [x] Print the tape labels as one continuous strip to cut up, still with the drawer codes — *One long strip on the tape labels page, with dotted cut lines*
