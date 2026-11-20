@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pickList, placesWithFallback, planPlaces, setupPlaces, type Place, type Places } from './pickList';
+import { colourName, colourStock } from './colours';
+import { pickList, placesWithFallback, planPlaces, setupPlaces, shortCsv, type Place, type Places } from './pickList';
 import type { PlannedCompartment, TreeNode } from './planner';
 import type { SetupComp } from './setup';
 import { EMPTY_SETUP, type Catalog, type Part } from './types';
@@ -61,5 +62,43 @@ describe('pick list', () => {
     expect(both.get('3001')![0].code).toBe('D1.1');
     expect(both.get('3023')![0]).toMatchObject({ code: 'D1.2', section: 'Small plates' });
     expect(both.get('3003')![0].code).toBe('B2');
+  });
+});
+
+describe('pick list by colour', () => {
+  const table = { fetched: '', byId: { '4': ['Red', 'C91A09'] as [string, string], '1': ['Blue', '0055BF'] as [string, string] }, bl: { '5': 'Red' } };
+  const wanted = [
+    { partNum: '3001', qty: 4, colour: 'Red' },
+    { partNum: '3001', qty: 6, colour: '1' },
+    { partNum: '3023', qty: 2 },
+  ];
+  const stock = colourStock(
+    [
+      { partNum: '3001', qty: 30, colour: '4' },
+      { partNum: '3001', qty: 5, colour: 'BL 5' },
+      { partNum: '3001', qty: 3, colour: 'Blue' },
+      { partNum: '3023', qty: 10, colour: 'White' },
+    ],
+    [{ partNum: '3001', qty: 20, colour: 'Red' }, { partNum: '3001', qty: 9, colour: 'Red', spare: true }],
+    catalog,
+    table,
+  );
+  const list = pickList(wanted, catalog, owned, places, new Set(), { stock, table });
+
+  it('names colours by number from Rebrickable and BrickLink, and counts each colour you have', () => {
+    expect(stock.get('3001')).toEqual(new Map([['Red', 15], ['Blue', 3]]));
+    const line = list.drawers.flatMap((d) => d.lines).find((l) => l.partNum === '3001')!;
+    expect(line.colours).toEqual([{ name: 'Blue', qty: 6, have: 3 }, { name: 'Red', qty: 4, have: 15 }]);
+  });
+
+  it('lists the colours you are short of, with a CSV that uses Rebrickable colour numbers', () => {
+    expect(list.colourShort).toEqual([{ partNum: '3001', name: 'Brick 2 x 4', colour: 'Blue', need: 6, have: 3 }]);
+    expect(shortCsv(list.colourShort, table)).toBe('Part,Color,Quantity\n3001,1,3\n');
+  });
+
+  it('keeps a line with no colour as one tick', () => {
+    expect(list.unplaced[0].colours).toEqual([{ name: '', qty: 2 }]);
+    expect(colourName('9', table)).toBe('Colour 9');
+    expect(colourName('BL 99', table)).toBe('BrickLink colour 99');
   });
 });

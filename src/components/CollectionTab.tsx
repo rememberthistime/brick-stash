@@ -8,6 +8,7 @@ import { pickPart, toggleFamily, type KeptPart, type KeptSummary } from '../lib/
 import { download } from '../state';
 import BuiltSets from './BuiltSets';
 import KeepOutCard from './KeepOutCard';
+import ExtraParts from './ExtraParts';
 import PartImage from './PartImage';
 
 export type CollectionPage = 'import' | 'parts' | 'built' | 'kept';
@@ -240,7 +241,7 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
             </div>
           ))}
         </section>
-
+        <ExtraParts project={project} update={update} catalog={catalog} />
       </div>
     );
   return (

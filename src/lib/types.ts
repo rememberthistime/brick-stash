@@ -15,6 +15,13 @@ export interface InventoryRow {
   name?: string;
   /** Spare part from a set inventory — when a set is kept built, its spares are still loose in storage */
   spare?: boolean;
+  /** Rebrickable category, for a part added by hand that isn't in the catalogue */
+  catId?: number;
+}
+
+/** A part added by hand, kept apart from the imported list so a fresh import leaves it alone */
+export interface ExtraPart extends InventoryRow {
+  id: string;
 }
 
 /** Parts to take off the collection — typically a set kept built, so its parts aren't in storage */
@@ -71,6 +78,8 @@ export interface StorageUnit {
   /** External footprint, mm — optional, used for space recommendations */
   external?: Dims;
   spaceId?: string;
+  /** Which shelf of its space it stands on, counted from the top (1), for the storage map */
+  shelf?: number;
 }
 
 /** A cupboard / shelf / area units live in. Internal mm. */
@@ -217,4 +226,30 @@ export interface Project {
   excluded: Exclusion[];
   keepOut: KeepOut;
   setup: Setup;
+  /** Colour names by Rebrickable and BrickLink number, fetched once from Rebrickable */
+  colours?: ColourTable;
+  /** Parts added by hand: ones missing from the imported list, or not in Rebrickable's catalogue at all */
+  extraParts?: ExtraPart[];
+  /** Pick lists kept as checklists, newest first */
+  builds?: Build[];
+}
+
+export interface ColourTable {
+  fetched: string;
+  /** Rebrickable colour number → [name, rgb hex without #] */
+  byId: Record<string, [string, string]>;
+  /** BrickLink colour number → Rebrickable's name for it */
+  bl: Record<string, string>;
+}
+
+/** A build's pick list, kept so its ticks last and every device sees them */
+export interface Build {
+  id: string;
+  title: string;
+  /** the parts the build needs */
+  rows: InventoryRow[];
+  /** lines ticked off, as "part|colour" */
+  picked: string[];
+  /** when it was made, ISO */
+  made: string;
 }

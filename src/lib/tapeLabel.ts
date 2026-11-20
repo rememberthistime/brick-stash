@@ -230,7 +230,7 @@ export function lbxLabelXml(widthDots: number, imageName: string): string {
     '<?xml version="1.0" encoding="UTF-8"?>' +
     '<pt:document xmlns:pt="http://schemas.brother.info/ptouch/2007/lbx/main" xmlns:style="http://schemas.brother.info/ptouch/2007/lbx/style" xmlns:text="http://schemas.brother.info/ptouch/2007/lbx/text" xmlns:draw="http://schemas.brother.info/ptouch/2007/lbx/draw" xmlns:image="http://schemas.brother.info/ptouch/2007/lbx/image" xmlns:barcode="http://schemas.brother.info/ptouch/2007/lbx/barcode" xmlns:database="http://schemas.brother.info/ptouch/2007/lbx/database" xmlns:table="http://schemas.brother.info/ptouch/2007/lbx/table" xmlns:cable="http://schemas.brother.info/ptouch/2007/lbx/cable" version="1.7" generator="P-touch Editor 5.4.014 Windows">' +
     '<pt:body currentSheet="Sheet 1" direction="LTR"><style:sheet name="Sheet 1">' +
-    '<style:paper media="0" width="33.6pt" height="850pt" marginLeft="4pt" marginTop="5.6pt" marginRight="4pt" marginBottom="5.6pt" orientation="landscape" autoLength="true" monochromeDisplay="true" printColorDisplay="false" printColorsID="0" paperColor="#FFFFFF" paperInk="#000000" split="1" format="259" backgroundTheme="0" printerID="22832" printerName="Brother PT-1230PC"/>' +
+    `<style:paper media="0" width="33.6pt" height="${pt(Math.max(850, w + 11.2))}" marginLeft="4pt" marginTop="5.6pt" marginRight="4pt" marginBottom="5.6pt" orientation="landscape" autoLength="true" monochromeDisplay="true" printColorDisplay="false" printColorsID="0" paperColor="#FFFFFF" paperInk="#000000" split="1" format="259" backgroundTheme="0" printerID="22832" printerName="Brother PT-1230PC"/>` +
     '<style:cutLine regularCut="0pt" freeCut=""/>' +
     `<style:backGround x="${x}" y="${y}" width="${pt(w)}" height="${pt(h)}" brushStyle="NULL" brushId="0" userPattern="NONE" userPatternId="0" color="#000000" printColorNumber="1" backColor="#FFFFFF" backPrintColorNumber="0"/>` +
     '<pt:objects><image:image>' +
@@ -258,4 +258,57 @@ export function makeLbx(label: { width: number; png: Uint8Array }): Promise<Uint
     { name: 'label.png', data: label.png },
     { name: 'label.xml', data: encoder.encode(lbxLabelXml(label.width, 'label.png')) },
   ]);
+}
+
+/** Gap left between labels on a continuous strip, with a dotted cut line down its middle */
+export const CUT_GAP = 24;
+
+/** Labels in order, split into strips no longer than `maxDots` (a label longer than that gets a strip of its own) */
+export function stripGroups(widths: number[], maxDots: number, gap = CUT_GAP): number[][] {
+  const out: number[][] = [];
+  let run: number[] = [];
+  let length = 0;
+  widths.forEach((w, i) => {
+    const added = run.length ? gap + w : w;
+    if (run.length && length + added > maxDots) {
+      out.push(run);
+      run = [];
+      length = 0;
+    }
+    length += run.length ? gap + w : w;
+    run.push(i);
+  });
+  if (run.length) out.push(run);
+  return out;
+}
+
+const loadDataUrl = (src: string) =>
+  new Promise<HTMLImageElement>((done, fail) => {
+    const i = new Image();
+    i.onload = () => done(i);
+    i.onerror = fail;
+    i.src = src;
+  });
+
+/** Labels joined end to end on one length of tape, with a dotted line to cut along between each */
+export async function joinLabels(labels: RenderedLabel[], gap = CUT_GAP): Promise<RenderedLabel> {
+  const width = labels.reduce((t, l) => t + l.width, 0) + gap * Math.max(0, labels.length - 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = TAPE_DOTS;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, width, TAPE_DOTS);
+  ctx.fillStyle = '#000';
+  let x = 0;
+  for (const [i, l] of labels.entries()) {
+    if (i) {
+      const mid = x - gap / 2 - 1;
+      for (let y = 0; y < TAPE_DOTS; y += 8) ctx.fillRect(mid, y, 2, 4);
+    }
+    ctx.drawImage(await loadDataUrl(l.dataUrl), x, 0);
+    x += l.width + gap;
+  }
+  const blob = await new Promise<Blob>((done) => canvas.toBlob((b) => done(b!), 'image/png'));
+  return { width, png: new Uint8Array(await blob.arrayBuffer()), dataUrl: canvas.toDataURL('image/png') };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inflateRawSync } from 'node:zlib';
-import { errorDiffuse, lbxLabelXml, makeLbx, shortName, TAPE_DOTS, wrapTitle } from './tapeLabel';
+import { errorDiffuse, lbxLabelXml, makeLbx, shortName, stripGroups, TAPE_DOTS, wrapTitle } from './tapeLabel';
 import { crc32, makeZip } from './zip';
 
 /** Read a zip back, checking its structure as a stranger would */
@@ -95,5 +95,13 @@ describe('errorDiffuse', () => {
 
   it('leaves solid black and white alone', () => {
     expect([...errorDiffuse([0, 0, 255, 255], 2, 2)]).toEqual([0, 0, 255, 255]);
+  });
+});
+
+describe('a continuous strip', () => {
+  it('keeps labels in order and starts a new strip before one would run too long', () => {
+    expect(stripGroups([100, 100, 100], 1000, 24)).toEqual([[0, 1, 2]]);
+    expect(stripGroups([400, 400, 400], 900, 24)).toEqual([[0, 1], [2]]);
+    expect(stripGroups([1200, 100], 1000, 24)).toEqual([[0], [1]]);
   });
 });

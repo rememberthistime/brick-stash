@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { LabelEntry } from '../lib/labels';
 import { sameOriginPartImages } from '../lib/partImages';
-import { makeLbx, renderLabel, type RenderedLabel } from '../lib/tapeLabel';
+import { joinLabels, makeLbx, renderLabel, stripGroups, type RenderedLabel } from '../lib/tapeLabel';
 import { makeZip } from '../lib/zip';
 import { download } from '../state';
 
 const CONCURRENT = 4;
+/** Tape is printed at 180 dots an inch */
+const DOTS_PER_CM = 180 / 2.54;
+const STRIP_LENGTHS = [50, 100, 200];
 const MAX_LINKS = 6;
 
 const images = new Map<string, Promise<HTMLImageElement | null>>();
@@ -36,6 +39,7 @@ export default function TapeLabels({ entries, showSheet, options }: { entries: L
   const [kind, setKind] = useState('');
   const [labels, setLabels] = useState<Record<string, RenderedLabel>>({});
   const [busy, setBusy] = useState('');
+  const [stripCm, setStripCm] = useState(100);
 
   useEffect(() => {
     let stopped = false;
@@ -63,6 +67,22 @@ export default function TapeLabels({ entries, showSheet, options }: { entries: L
     download(`brick-stash-labels-${format}.zip`, await makeZip(files), 'application/zip');
     setBusy('');
   };
+  /** Every label end to end, with cut lines between, split into strips no longer than the length chosen */
+  const downloadStrip = async (format: 'lbx' | 'png') => {
+    setBusy(`Joining ${ready.length} labels…`);
+    const groups = stripGroups(
+      ready.map((e) => labels[e.code].width),
+      Math.round(stripCm * DOTS_PER_CM),
+    );
+    const strips = await Promise.all(groups.map((g) => joinLabels(g.map((i) => labels[ready[i].code]))));
+    const name = (i: number) => `brick-stash-strip${strips.length > 1 ? `-${i + 1}-of-${strips.length}` : ''}-${ready[groups[i][0]].code}-to-${ready[groups[i][groups[i].length - 1]].code}`;
+    const files = await Promise.all(strips.map(async (s, i) => ({ name: `${name(i)}.${format}`, data: format === 'png' ? s.png : await makeLbx(s) })));
+    if (files.length === 1) download(files[0].name, files[0].data, format === 'png' ? 'image/png' : 'application/octet-stream');
+    else download(`brick-stash-strips-${format}.zip`, await makeZip(files), 'application/zip');
+    setBusy('');
+  };
+  const stripLength = ready.reduce((t, e) => t + labels[e.code].width, 0) / DOTS_PER_CM;
+
   const downloadOne = async (e: LabelEntry, format: 'lbx' | 'png') =>
     download(`${e.code}.${format}`, format === 'png' ? labels[e.code].png : await makeLbx(labels[e.code]), format === 'png' ? 'image/png' : 'application/octet-stream');
 
@@ -96,6 +116,30 @@ export default function TapeLabels({ entries, showSheet, options }: { entries: L
             Download PNGs
           </button>
           <span className="muted small">{busy || (ready.length < shown.length ? `Drawing ${ready.length} of ${shown.length}…` : `${ready.length} ready`)}</span>
+        </div>
+        <div className="tape-strip">
+          <b>One long strip</b>
+          <span className="muted small">
+            Every label above end to end, in order, each starting with its drawer code and with a dotted line to cut along between them. About {Math.round(stripLength / 10) / 10} m of tape.
+          </span>
+          <div className="row">
+            <label className="small">
+              Split into lengths of{' '}
+              <select value={stripCm} onChange={(e) => setStripCm(Number(e.target.value))}>
+                {STRIP_LENGTHS.map((cm) => (
+                  <option key={cm} value={cm}>
+                    up to {cm < 100 ? `${cm} cm` : `${cm / 100} m`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button disabled={!ready.length || ready.length < shown.length || !!busy} onClick={() => downloadStrip('lbx')}>
+              Download the strip (.lbx)
+            </button>
+            <button className="ghost" disabled={!ready.length || ready.length < shown.length || !!busy} onClick={() => downloadStrip('png')}>
+              PNG
+            </button>
+          </div>
         </div>
         <p className="muted small">
           Prefer Brick Architect's own labels for single parts? Their artwork is theirs to share, so it can't be built into these, but each label below links to their page for that part, where you
