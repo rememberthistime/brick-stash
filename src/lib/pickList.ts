@@ -2,10 +2,11 @@
 // take, in the order the drawers come, plus what there isn't enough of. Storage is by type, so a part is found by
 // its mould whatever its colour; the colours wanted are listed beside it for picking them out.
 import { baseMould } from './collection';
+import { colourName } from './colours';
 import { placeName } from './codes';
 import { leaves, sectionLabel, type PlannedCompartment } from './planner';
 import type { SetupComp } from './setup';
-import type { Catalog, InventoryRow, Part, Setup } from './types';
+import type { Catalog, ColourTable, InventoryRow, Part, Setup } from './types';
 
 export interface Place {
   /** "A3", or "A3.2" for one section or box of several */
@@ -60,10 +61,28 @@ export interface PickLine {
   want: number;
   /** pieces in the collection, of any colour, once built sets are taken off */
   have: number;
-  /** the colours the build needs them in, most first */
-  colours: { name: string; qty: number }[];
+  /** the colours the build needs them in, most first, with how many of each you have when that's known */
+  colours: PickColour[];
   /** everywhere it's kept; the first is the drawer it's listed under */
   places: Place[];
+}
+
+export interface PickColour {
+  name: string;
+  qty: number;
+  /** pieces of this part in this colour in the collection, when colours are known */
+  have?: number;
+}
+
+/** The tick for one colour of one part: "3001|Red" */
+export const pickKey = (partNum: string, colour: string) => `${partNum}|${colour}`;
+
+export interface ColourShort {
+  partNum: string;
+  name: string;
+  colour: string;
+  need: number;
+  have: number;
 }
 
 export interface PickList {
@@ -80,20 +99,29 @@ export interface PickList {
   types: number;
   /** pieces the collection can't supply */
   piecesShort: number;
+  /** colours you have too few of, though you may have the part in others: a shopping list */
+  colourShort: ColourShort[];
+}
+
+export interface ColourOptions {
+  /** pieces of each part in each colour: see colourStock() */
+  stock?: Map<string, Map<string, number>>;
+  table?: ColourTable | null;
 }
 
 /**
  * `owned` is everything in the collection, kept out of the plan or not. `keptOut` are the parts stored elsewhere.
  * Spares in a set's inventory aren't needed to build it, so they're left off.
  */
-export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned: Part[], places: Places, keptOut: ReadonlySet<string> = new Set()): PickList {
+export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned: Part[], places: Places, keptOut: ReadonlySet<string> = new Set(), colour: ColourOptions = {}): PickList {
   const byMould = new Map<string, { want: number; colours: Map<string, number>; name?: string }>();
   for (const r of wanted) {
     if (r.spare) continue;
     const key = baseMould(r.partNum, catalog);
     const e = byMould.get(key) ?? { want: 0, colours: new Map<string, number>(), name: r.name };
     e.want += r.qty;
-    if (r.colour) e.colours.set(r.colour, (e.colours.get(r.colour) ?? 0) + r.qty);
+    const c = colourName(r.colour, colour.table);
+    e.colours.set(c, (e.colours.get(c) ?? 0) + r.qty);
     byMould.set(key, e);
   }
   const have = new Map(owned.map((p) => [p.partNum, p]));
@@ -104,12 +132,17 @@ export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned:
       name: mine?.name ?? catalog?.parts[partNum]?.[0] ?? e.name ?? partNum,
       want: e.want,
       have: mine?.qty ?? 0,
-      colours: [...e.colours].map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty),
+      colours: [...e.colours]
+        .map(([name, qty]): PickColour => {
+          const known = name && colour.stock;
+          return { name, qty, ...(known ? { have: colour.stock!.get(partNum)?.get(name) ?? 0 } : {}) };
+        })
+        .sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name)),
       places: places.get(partNum) ?? [],
     };
   });
 
-  const list: PickList = { drawers: [], unplaced: [], elsewhere: [], missing: [], short: [], pieces: 0, types: lines.length, piecesShort: 0 };
+  const list: PickList = { drawers: [], unplaced: [], elsewhere: [], missing: [], short: [], pieces: 0, types: lines.length, piecesShort: 0, colourShort: [] };
   const drawers = new Map<string, { code: string; where: string; name?: string; order: number; lines: PickLine[] }>();
   for (const line of lines) {
     list.pieces += line.want;
@@ -117,6 +150,7 @@ export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned:
       list.piecesShort += line.want - line.have;
       if (line.have) list.short.push(line);
     }
+    for (const c of line.colours) if (c.have !== undefined && c.have < c.qty) list.colourShort.push({ partNum: line.partNum, name: line.name, colour: c.name, need: c.qty, have: c.have });
     if (!line.have) list.missing.push(line);
     else if (keptOut.has(line.partNum) && !line.places.length) list.elsewhere.push(line);
     else if (!line.places.length) list.unplaced.push(line);
@@ -131,5 +165,13 @@ export function pickList(wanted: InventoryRow[], catalog: Catalog | null, owned:
   const bySection = (a: PickLine, b: PickLine) => a.places[0].code.localeCompare(b.places[0].code, undefined, { numeric: true }) || byName(a, b);
   list.drawers = [...drawers.values()].sort((a, b) => a.order - b.order).map(({ code, where, name, lines }) => ({ code, where, ...(name ? { name } : {}), lines: lines.sort(bySection) }));
   for (const group of [list.unplaced, list.elsewhere, list.missing, list.short]) group.sort(byName);
+  list.colourShort.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }) || a.colour.localeCompare(b.colour));
   return list;
+}
+
+/** A shopping list for what's short, as Rebrickable's parts-list CSV (Part,Color,Quantity), with Rebrickable's colour numbers where known */
+export function shortCsv(short: ColourShort[], table?: ColourTable | null): string {
+  const ids = new Map(Object.entries(table?.byId ?? {}).map(([id, [name]]) => [name, id]));
+  const cell = (v: string) => (/[",]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return ['Part,Color,Quantity', ...short.map((s) => `${cell(s.partNum)},${cell(ids.get(s.colour) ?? s.colour)},${s.need - s.have}`)].join('\n') + '\n';
 }

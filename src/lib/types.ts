@@ -217,4 +217,28 @@ export interface Project {
   excluded: Exclusion[];
   keepOut: KeepOut;
   setup: Setup;
+  /** Colour names by Rebrickable and BrickLink number, fetched once from Rebrickable */
+  colours?: ColourTable;
+  /** Pick lists kept as checklists, newest first */
+  builds?: Build[];
+}
+
+export interface ColourTable {
+  fetched: string;
+  /** Rebrickable colour number → [name, rgb hex without #] */
+  byId: Record<string, [string, string]>;
+  /** BrickLink colour number → Rebrickable's name for it */
+  bl: Record<string, string>;
+}
+
+/** A build's pick list, kept so its ticks last and every device sees them */
+export interface Build {
+  id: string;
+  title: string;
+  /** the parts the build needs */
+  rows: InventoryRow[];
+  /** lines ticked off, as "part|colour" */
+  picked: string[];
+  /** when it was made, ISO */
+  made: string;
 }

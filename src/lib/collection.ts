@@ -70,7 +70,10 @@ function parseBrickLinkXml(text: string): ImportResult {
     }
     const partNum = get(item, 'ITEMID');
     const qty = Number(get(item, 'MINQTY') ?? get(item, 'QTY') ?? 1);
-    if (partNum && qty > 0) rows.push({ partNum, qty, colour: get(item, 'COLOR') });
+    if (partNum && qty > 0) {
+      const colour = get(item, 'COLOR');
+      rows.push({ partNum, qty, ...(colour ? { colour: `BL ${colour}` } : {}) });
+    }
   }
   return { rows, warnings: nonParts ? [`Ignored ${nonParts} non-part items (sets/minifigs) — break them down into parts first.`] : [] };
 }

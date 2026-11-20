@@ -232,6 +232,8 @@ export default function StorageView({ page, model, project, update, parts, keptO
         keptOut={new Set(keptOut.map((p) => p.partNum))}
         fromPlan={planPlaces(suggestedList)}
         fromSetup={analysis.drawersRecorded ? setupPlaces(setup, comps) : null}
+        project={project}
+        update={update}
       />
     );
   else if (page === 'export')

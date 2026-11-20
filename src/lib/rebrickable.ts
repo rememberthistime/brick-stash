@@ -65,6 +65,12 @@ export async function setParts(setNum: string, key: string, copies = 1): Promise
   return rows;
 }
 
+/** Rebrickable's colour list: names, swatches and BrickLink's numbers for each */
+export async function fetchColours(key: string) {
+  const page = await get<Page<{ id: number; name: string; rgb: string; external_ids?: { BrickLink?: { ext_ids: number[] } } }>>('/lego/colors/?page_size=1000', key);
+  return page.results;
+}
+
 /** Set name, for labelling */
 export async function setName(setNum: string, key: string): Promise<string> {
   const s = await get<{ name: string }>(`/lego/sets/${encodeURIComponent(normaliseSetNum(setNum))}/`, key);
