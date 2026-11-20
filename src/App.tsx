@@ -114,7 +114,7 @@ export default function App() {
             sub: [withRoom ? `${withRoom.toLocaleString()} have room beside their own sort in a recorded drawer.` : '', gaps.suggested.size ? `The rest are suggested for ${plural(gaps.suggested.size, 'empty drawer')}.` : '', overflow ? `${L(overflow)} has no room anywhere.` : ''].filter(Boolean).join(' '),
           }
         : { headline: 'Everything is in a drawer' }
-      : { headline: 'Put away' },
+      : { headline: 'Put away & move' },
     moves: storageReady
       ? { headline: moves ? `${moves}${analysis.moreSuggestions ? '+' : ''} ${moves === 1 && !analysis.moreSuggestions ? 'move' : 'moves'} worth making` : analysis.drawersRecorded ? 'No moves to suggest' : 'Record some drawers first', sub: 'Each is optional. Accepting one only changes what’s recorded here, and adds it to a list of moves to make.' }
       : { headline: 'Suggested moves' },

@@ -26,7 +26,7 @@ export const NAV: { group: string; pages: { id: Page; label: string }[] }[] = [
   {
     group: 'Sort',
     pages: [
-      { id: 'put-away', label: 'Put away' },
+      { id: 'put-away', label: 'Put away & move' },
       { id: 'moves', label: 'Suggested moves' },
       { id: 'tidy', label: 'Tidy the layout' },
       { id: 'review', label: 'Review' },

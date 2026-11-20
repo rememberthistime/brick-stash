@@ -783,7 +783,7 @@ function PocketRow({
                 </span>
                 <span className="part-actions">
                   <PlacePicker label="Move…" title={`Move ${x.part.name} to…`} options={() => places([x.part])} exclude={here} onPick={(o) => onMove(x.part.partNum, o)} />
-                  <button className="icon" title="Take it out: it goes back to Put away" aria-label={`Take out ${x.part.name}`} onClick={() => onRemove(x.part.partNum)}>
+                  <button className="icon" title="Take it out: it goes back to Put away & move" aria-label={`Take out ${x.part.name}`} onClick={() => onRemove(x.part.partNum)}>
                     ✕
                   </button>
                 </span>

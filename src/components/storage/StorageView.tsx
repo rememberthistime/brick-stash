@@ -23,7 +23,7 @@ import type { Page } from '../Shell';
 import DrawerEditor from './DrawerEditor';
 import { EstimateCheck, Findings, Suggestions } from './Improvements';
 import type { StorageModel } from './model';
-import NotSorted from './NotSorted';
+import SortPage from './SortPage';
 import Rearrange from './Rearrange';
 import { ColourKey } from './PlanSettings';
 import SuggestedDrawer from './Suggested';
@@ -77,7 +77,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   const describeMove = (items: MoveItem[], to: Spot) => {
     const verb = items.every((it) => !it.from) ? 'Put' : 'Moved';
     const what = items.length === 1 ? nameOf(items[0].part) : `${items.length} parts`;
-    return `${verb} ${what} in ${titleAt(to)}`;
+    return `${verb} ${what} ${verb === 'Put' ? 'in' : 'to'} ${titleAt(to)}`;
   };
   const move = (items: MoveItem[], to: Spot, text = describeMove(items, to)) => {
     const r = moveParts(setup, items, to, uid);
@@ -116,11 +116,13 @@ export default function StorageView({ page, model, project, update, parts, keptO
       spotsOf(num, setup).map((from) => ({ part: num, from })),
       to,
     );
-  const takeOutOf = (num: string, from: Spot) => {
-    const r = takeOut(setup, [{ part: num, from }]);
+  const takeOutMany = (items: Required<MoveItem>[]) => {
+    if (!items.length) return;
+    const r = takeOut(setup, items);
     update({ setup: r.setup });
-    history.push({ text: `Took ${nameOf(num)} out of ${titleAt(from)}`, drawers: r.before });
+    history.push({ text: items.length === 1 ? `Took ${nameOf(items[0].part)} out of ${titleAt(items[0].from)}` : `Took ${items.length} parts out`, drawers: r.before });
   };
+  const takeOutOf = (num: string, from: Spot) => takeOutMany([{ part: num, from }]);
   const undo = () => {
     const last = history.pop();
     if (last) update((p) => undoStep(p, last));
@@ -307,7 +309,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
   else if (page === 'put-away')
     body = (
       <>
-        {analysis.unplaced.length > 0 && search('Find a part: name or number')}
+        {search('Find a part not in a drawer: name or number')}
         {q && !analysis.unplaced.some(matchesPart) && (
           <p className="banner">
             Nothing that isn’t in a drawer matches “{filter}”.
@@ -318,22 +320,26 @@ export default function StorageView({ page, model, project, update, parts, keptO
             })()}
           </p>
         )}
-        <NotSorted
+        <SortPage
           unsorted={analysis.unplaced}
           comps={comps}
           setup={setup}
           setSetup={setSetup}
           pockets={analysis.pockets}
-          homeOf={gaps.homeOf}
+          placed={placed}
           recordedHomes={recordedHomes}
+          homeOf={gaps.homeOf}
           scale={scale}
           query={filter}
           resolve={resolvePart}
-          folds={folds}
-          onShowDrawer={setShowing}
           places={places}
           onMove={move}
           onMoveGroups={moveGroups}
+          onMovePocket={movePocketTo}
+          onTakeOut={takeOutMany}
+          onEdit={setEditing}
+          onShowSuggested={setShowing}
+          hasSuggestion={(key) => gaps.suggested.has(key)}
         />
       </>
     );
