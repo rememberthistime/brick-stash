@@ -5,7 +5,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 
 export type Page = 'import' | 'parts' | 'built' | 'kept' | 'units' | 'spaces' | 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'pick' | 'export' | 'settings' | 'project';
 
-export const NAV: { group: string; pages: { id: Page; label: string }[] }[] = [
+/** The pages, grouped. A page `under` another is reached from that page's tabs, not listed in the sidebar itself. */
+export const NAV: { group: string; pages: { id: Page; label: string; under?: Page }[] }[] = [
   {
     group: 'Collection',
     pages: [
@@ -26,10 +27,10 @@ export const NAV: { group: string; pages: { id: Page; label: string }[] }[] = [
   {
     group: 'Sort',
     pages: [
-      { id: 'put-away', label: 'Put away' },
-      { id: 'moves', label: 'Suggested moves' },
-      { id: 'tidy', label: 'Tidy the layout' },
-      { id: 'review', label: 'Review' },
+      { id: 'put-away', label: 'Put away & move' },
+      { id: 'moves', label: 'Suggestions' },
+      { id: 'tidy', label: 'Tidy the layout', under: 'moves' },
+      { id: 'review', label: 'Review', under: 'moves' },
     ],
   },
   {
@@ -77,11 +78,13 @@ export function Sidebar({ page, setPage, counts, open, setOpen }: { page: Page; 
       {NAV.map((g) => (
         <div key={g.group} className="nav-group">
           <div className="nav-label">{g.group}</div>
-          {g.pages.map((p) => (
+          {g.pages.filter((p) => !p.under).map((p) => {
+            const here = page === p.id || g.pages.some((x) => x.under === p.id && x.id === page);
+            return (
             <button
               key={p.id}
-              className={`nav-item ${page === p.id ? 'active' : ''}`}
-              aria-current={page === p.id ? 'page' : undefined}
+              className={`nav-item ${here ? 'active' : ''}`}
+              aria-current={here ? 'page' : undefined}
               onClick={() => {
                 setPage(p.id);
                 setOpen(false);
@@ -90,7 +93,8 @@ export function Sidebar({ page, setPage, counts, open, setOpen }: { page: Page; 
               <span>{p.label}</span>
               {counts[p.id] !== undefined && counts[p.id] !== '' && <span className="nav-count">{counts[p.id]}</span>}
             </button>
-          ))}
+            );
+          })}
         </div>
       ))}
     </nav>
@@ -101,11 +105,12 @@ export const pageLabel = (p: Page) => NAV.flatMap((g) => g.pages.map((x) => ({ .
 
 /** A page's name, then one sentence on where things stand, then a line on what the page is for */
 export function PageHead({ page, headline, children }: { page: Page; headline: ReactNode; children?: ReactNode }) {
-  const { group, label } = pageLabel(page);
+  const { group, label, under } = pageLabel(page);
+  const parent = under ? pageLabel(under).label : null;
   return (
     <header className="page-head no-print">
       <div className="page-kicker">
-        {group} · {label}
+        {parent ?? group} · {label}
       </div>
       <h2 className="page-headline">{headline}</h2>
       {children && <div className="page-sub">{children}</div>}

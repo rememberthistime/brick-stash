@@ -586,7 +586,7 @@ button.snap-code { position: relative; font-weight: 600; padding: 10px 4px; back
 .snap-box-field { display: grid; gap: 4px; margin-top: 8px; text-align: left; }
 .snap-box-field input { width: 100%; font-size: 16px; padding: 10px; }
 .snap-shot.marking img { outline: 3px solid var(--accent); }
-.setup-label-input { width: 160px; }
+.setup-label-input { flex: 1 1 220px; min-width: 160px; }
 
 /* Checking drafts (/review) */
 .review-drafts { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin: 12px 0; }
@@ -672,7 +672,7 @@ td.pic { width: 56px; padding: 3px 6px; }
 .unsorted-actions > button.small-btn:not(.ghost):hover { background: var(--accent); color: var(--accent-ink); }
 
 /* drawer editor: what's waiting for the drawer, and the search */
-.waiting { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 10px; padding: 4px 12px 10px; margin: 10px 0 12px; }
+.waiting { border: 1px dashed var(--line); background: var(--soft); border-radius: 10px; padding: 4px 12px 10px; margin: 10px 0 12px; }
 .waiting-head { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; color: var(--ink); padding: 8px 0 4px; text-align: left; flex-wrap: wrap; }
 .waiting-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 2px 0 4px; }
 .waiting-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
@@ -708,3 +708,95 @@ td.pic { width: 56px; padding: 3px 6px; }
 .part-link { color: inherit; text-decoration: none; }
 .part-link:hover { color: var(--accent); text-decoration: underline; }
 .waiting-move .part-strip { margin-top: 6px; }
+
+/* Move to… picker */
+.place-picker { position: relative; display: inline-block; }
+.picker-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: min(360px, 86vw); background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16); padding: 8px; text-align: left; color: var(--ink); font-weight: 400; }
+.picker-title { font-weight: 600; margin: 2px 4px 6px; }
+.picker-search { width: 100%; box-sizing: border-box; }
+.picker-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 320px; overflow: auto; }
+.picker-sub { padding: 6px 6px 2px; }
+.picker-option { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; background: none; border: none; color: var(--ink); text-align: left; padding: 6px 8px; border-radius: 6px; }
+.picker-option.on { background: var(--accent-soft); }
+.picker-option-title { font-size: 13px; }
+.picker-none { padding: 6px 8px; }
+
+/* Picking parts to move together */
+.pick-box { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.selection-bar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--card); border: 2px solid var(--accent); border-radius: 10px; padding: 8px 12px; margin: 10px 0; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.selection-bar .picker-pop { top: auto; bottom: calc(100% + 6px); right: auto; left: 0; }
+.selection-bar b { margin-right: auto; }
+
+/* Undo for steps taken by hand */
+.undo-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 25; display: flex; align-items: center; gap: 10px; max-width: min(640px, calc(100vw - 32px)); background: var(--ink); color: var(--bg); border-radius: 10px; padding: 8px 10px 8px 14px; font-size: 13px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2); }
+.undo-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-bar button { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
+.undo-bar button.icon { border: none; }
+.part-actions { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.drawer-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.picker-list li { display: block; padding: 0; border: none; }
+.selection-bar .picker-pop { left: auto; right: 0; }
+@media (max-width: 640px) {
+  .picker-pop, .selection-bar .picker-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; }
+  .picker-list { max-height: 50vh; }
+}
+
+/* Put away & move: the list beside your drawers */
+.sort-page { display: grid; grid-template-columns: minmax(320px, 2fr) 3fr; gap: 14px; align-items: start; }
+.sort-left { position: sticky; top: 64px; max-height: calc(100vh - 76px); overflow: auto; border-radius: 12px; }
+.sort-left .card, .sort-right .card { margin: 0 0 14px; }
+.sort-tray { min-height: 240px; }
+.sort-tray-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sort-tray-head .card-title { margin: 0; }
+.sort-order { margin-left: auto; }
+.sort-tray-note { margin: 6px 0; }
+.sort-family { border-top: 1px solid var(--line); }
+.sort-family-head { display: flex; align-items: baseline; gap: 6px; width: 100%; background: none; border: none; color: var(--ink); padding: 8px 0; text-align: left; }
+.sort-parts, .sort-pocket-parts { list-style: none; margin: 0; padding: 0; }
+.sort-parts li, .sort-pocket-parts li { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; cursor: grab; }
+.sort-parts li + li { border-top: 1px solid var(--line); }
+.sort-parts li.picked, .sort-pocket-parts li.picked { background: var(--accent-soft); }
+.sort-parts li:active, .sort-pocket-parts li:active { cursor: grabbing; }
+.sort-part-name { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.sort-part-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.sort-hint { display: flex; align-items: center; gap: 2px; }
+.sort-hint .link { padding-left: 0; text-align: left; }
+.muted-link { color: var(--muted) !important; }
+.sort-unit + .sort-unit { margin-top: 10px; }
+.sort-unit-name { margin-bottom: 4px; }
+.sort-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.sort-tile { display: flex; flex-direction: column; gap: 3px; align-items: stretch; text-align: left; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--fam, var(--line)); border-radius: 8px; padding: 6px; min-height: 76px; }
+.sort-tile.todo { border-style: dashed; background: var(--soft, var(--bg)); }
+.sort-tile.open { box-shadow: 0 0 0 2px var(--ink); }
+.sort-tile-head { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.sort-tile-pics { display: flex; gap: 2px; min-height: 26px; }
+.sort-tile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sort-tile.todo .sort-tile-name { color: var(--muted); }
+.drop-over { outline: 3px dashed var(--accent) !important; outline-offset: 2px; background: var(--accent-soft) !important; }
+.sort-open-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px; }
+.sort-open-head h3 { margin: 0; font-size: 16px; }
+.sort-pockets { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.sort-pocket { border: 1px solid var(--line); border-radius: 10px; padding: 8px; min-height: 90px; background: var(--card); }
+.sort-pocket.active { border-color: var(--accent); }
+.sort-pocket.empty-drawer { border-style: dashed; margin-bottom: 8px; }
+.sort-pocket-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.sort-pocket-head b { flex: 1; min-width: 0; }
+.sort-drop-hint { cursor: default !important; padding: 14px 4px !important; text-align: center; justify-content: center; }
+.sort-selection { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .sort-page { grid-template-columns: 1fr; }
+  .sort-left { position: static; max-height: none; overflow: visible; }
+}
+body:has(.selection-bar) .undo-bar { bottom: 80px; }
+
+/* The suggestions switch */
+.switch { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 6px; font-size: 13px; }
+.switch-track { width: 30px; height: 18px; border-radius: 9px; background: var(--line); position: relative; transition: background 0.15s; }
+.switch-knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: left 0.15s; }
+.switch.on .switch-track { background: var(--accent); }
+.switch.on .switch-knob { left: 14px; }
+.page-tools .switch { margin-left: auto; }
+.sub-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 0 14px; flex-wrap: wrap; }
+.sub-tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 8px 12px; }
+.sub-tabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.sub-tabs .nav-count { margin-left: 6px; }

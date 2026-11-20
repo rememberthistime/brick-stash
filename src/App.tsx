@@ -10,6 +10,7 @@ import CollectionTab, { type CollectionPage } from './components/CollectionTab';
 import StorageTab from './components/StorageTab';
 import StorageView, { STORAGE_PAGES, type StoragePage } from './components/storage/StorageView';
 import { useStorageModel } from './components/storage/model';
+import { useSuggestions } from './components/storage/suggestionsSwitch';
 import { PlanSettings } from './components/storage/PlanSettings';
 import { L, pct } from './components/storage/format';
 import { PageHead, Sidebar, usePage, type Page } from './components/Shell';
@@ -45,6 +46,7 @@ export default function App() {
   const totals = useMemo(() => ({ pieces: parts.reduce((t, p) => t + p.qty, 0), volume: parts.reduce((t, p) => t + partVolume(p, project.settings.volumeScale), 0) }), [parts, project.settings.volumeScale]);
   const model = useStorageModel(project, parts, catalog);
   const { analysis, gaps, recordedHomes, layoutMoves } = model;
+  const suggest = useSuggestions();
 
   const importProject = async (f: File) => {
     try {
@@ -75,9 +77,10 @@ export default function App() {
     spaces: n(project.spaces.length),
     drawers: storageReady ? `${analysis.drawersRecorded}/${analysis.drawersTotal}` : '',
     'put-away': storageReady ? n(unsorted) : '',
-    moves: storageReady ? `${n(moves)}${moves && analysis.moreSuggestions ? '+' : ''}` : '',
-    tidy: storageReady ? n(swaps) : '',
-    review: storageReady ? n(analysis.findings.length) : '',
+    // Suggestions are counted only with the switch on, so with it off nothing nags
+    moves: storageReady && suggest ? `${n(moves)}${moves && analysis.moreSuggestions ? '+' : ''}` : '',
+    tidy: storageReady && suggest ? n(swaps) : '',
+    review: storageReady && suggest ? n(analysis.findings.length) : '',
   };
 
   const heads: Record<Page, { headline: ReactNode; sub?: ReactNode }> = {
@@ -102,7 +105,7 @@ export default function App() {
           headline: `${analysis.drawersRecorded} of ${plural(analysis.drawersTotal, 'drawer')} recorded`,
           sub: (
             <>
-              {pct(analysis.volumePlaced)} of the collection, by volume, is in a recorded drawer{analysis.capacity ? `, and those drawers are ${pct(analysis.used / analysis.capacity)} full` : ''}. Click a drawer to record what’s in it. Dashed ones aren’t recorded: they show what the plan suggests, and nothing changes unless you take it.
+              {pct(analysis.volumePlaced)} of the collection, by volume, is in a recorded drawer{analysis.capacity ? `, and those drawers are ${pct(analysis.used / analysis.capacity)} full` : ''}. Click a drawer to record what’s in it, or to move parts out of it. {suggest ? 'Dashed ones aren’t recorded: they show what the plan suggests, and nothing changes unless you take it.' : 'Turn Suggestions on to see what the app would put in the drawers you haven’t recorded.'}
             </>
           ),
         }
@@ -111,10 +114,12 @@ export default function App() {
       ? unsorted
         ? {
             headline: `${plural(unsorted, 'part type')} ${unsorted === 1 ? 'isn’t' : 'aren’t'} in a drawer`,
-            sub: [withRoom ? `${withRoom.toLocaleString()} have room beside their own sort in a recorded drawer.` : '', gaps.suggested.size ? `The rest are suggested for ${plural(gaps.suggested.size, 'empty drawer')}.` : '', overflow ? `${L(overflow)} has no room anywhere.` : ''].filter(Boolean).join(' '),
+            sub: suggest
+              ? [withRoom ? `${withRoom.toLocaleString()} have room beside their own sort in a recorded drawer.` : '', gaps.suggested.size ? `The rest are suggested for ${plural(gaps.suggested.size, 'empty drawer')}.` : '', overflow ? `${L(overflow)} has no room anywhere.` : ''].filter(Boolean).join(' ')
+              : 'Drag them onto your drawers, or tick several and choose where they go. Turn Suggestions on for the app’s ideas.',
           }
         : { headline: 'Everything is in a drawer' }
-      : { headline: 'Put away' },
+      : { headline: 'Put away & move' },
     moves: storageReady
       ? { headline: moves ? `${moves}${analysis.moreSuggestions ? '+' : ''} ${moves === 1 && !analysis.moreSuggestions ? 'move' : 'moves'} worth making` : analysis.drawersRecorded ? 'No moves to suggest' : 'Record some drawers first', sub: 'Each is optional. Accepting one only changes what’s recorded here, and adds it to a list of moves to make.' }
       : { headline: 'Suggested moves' },
