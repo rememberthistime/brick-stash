@@ -28,7 +28,9 @@ export function PartZoom() {
     const hide = () => show(null);
     window.addEventListener('scroll', hide, true);
     window.addEventListener('keydown', hide);
+    window.addEventListener('dragstart', hide, true);
     return () => {
+      window.removeEventListener('dragstart', hide, true);
       listeners.delete(setZ);
       window.removeEventListener('scroll', hide, true);
       window.removeEventListener('keydown', hide);
@@ -64,6 +66,7 @@ export default function PartImage({ partNum, size = 32, title, zoomable = true }
       src={urls[idx]}
       alt={title ?? partNum}
       loading="lazy"
+      draggable={false}
       referrerPolicy="no-referrer"
       onMouseEnter={enter}
       onMouseLeave={() => zoomable && show(null)}
