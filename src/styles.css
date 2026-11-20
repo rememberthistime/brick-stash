@@ -985,6 +985,8 @@ main.wide .page-head { max-width: 1240px; }
 .unit-jobs-table th { text-align: left; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .unit-jobs-table td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .unit-jobs-table select, .unit-jobs-table input { max-width: 100%; }
+.unit-job-hint { max-width: 260px; }
+.unit-job-hint .block { display: block; font-size: 12px; line-height: 1.3; }
 @media (max-width: 700px) {
   .unit-jobs-table thead { display: none; }
   .unit-jobs-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 6px 0; border-bottom: 1px solid var(--line); }

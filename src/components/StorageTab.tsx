@@ -5,6 +5,7 @@ import { drawerKey, setPlaceName, setUnitCode, validUnitCode } from '../lib/code
 import { spaceUse } from '../lib/spaces';
 import NameInput from './NameInput';
 import UnitJobs from './UnitJobs';
+import type { JobHint } from '../lib/jobSuggest';
 import { compartmentVolume } from '../lib/volume';
 import { expandCompartments } from '../lib/planner';
 import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPreset, type UnitGroup } from '../lib/storageList';
@@ -17,11 +18,13 @@ interface Props {
   view: StoragePageView;
   project: Project;
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
+  /** suggested jobs for units, by unit id */
+  jobHints?: Map<string, JobHint>;
 }
 
 const unitVolume = (u: StorageUnit) => u.compartments.reduce((t, c) => t + compartmentVolume(c) * c.qty, 0);
 
-export default function StorageTab({ view, project, update }: Props) {
+export default function StorageTab({ view, project, update, jobHints }: Props) {
   const comps = expandCompartments(project.units, project.settings);
   const [preset, setPreset] = useState(PRESETS[0].id);
   const [count, setCount] = useState(1);
@@ -210,7 +213,7 @@ export default function StorageTab({ view, project, update }: Props) {
         )}
       </section>
 
-      <UnitJobs units={units} setUnits={setUnits} />
+      <UnitJobs units={units} setUnits={setUnits} hints={jobHints} />
     </>
   );
 }
