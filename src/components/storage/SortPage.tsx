@@ -65,10 +65,12 @@ interface Props {
   hasSuggestion: (key: string) => boolean;
   /** show the app's suggestions beside your own layout */
   suggest: boolean;
+  /** where a searched-for part is when it isn't in the list, and a way to add it */
+  notInList?: (ctx: { listHasMatches: boolean; onOpen: (key: string) => void }) => ReactNode;
 }
 
 export default function SortPage(props: Props) {
-  const { unsorted, comps, setup, setSetup, pockets, placed, recordedHomes, homeOf, scale, query, resolve, places, onMove, onMoveGroups, onMovePocket, onTakeOut, onEdit, onShowSuggested, hasSuggestion, suggest } = props;
+  const { unsorted, comps, setup, setSetup, pockets, placed, recordedHomes, homeOf, scale, query, resolve, places, onMove, onMoveGroups, onMovePocket, onTakeOut, onEdit, onShowSuggested, hasSuggestion, suggest, notInList } = props;
   const [order, setOrder] = useState<UnsortedOrder>(() => (recall(ORDER_STORE) === 'pieces' ? 'pieces' : 'volume'));
   const [openKey, setOpenKey] = useState<string | null>(() => recall(OPEN_STORE));
   const [activePocket, setActivePocket] = useState(0);
@@ -221,6 +223,7 @@ export default function SortPage(props: Props) {
           )}
         </p>
       )}
+      {q && notInList?.({ listHasMatches: unsorted.some(matches), onOpen: chooseDrawer })}
       {!unsorted.length && <p className="muted small">Every part is in a drawer. Drag a part here to take it out of its drawer.</p>}
       {unsorted.length > 0 && <p className="muted small sort-tray-note">Drag a part by its row onto a drawer or pocket, or tick several and use Move to…. Drag a pocket’s or drawer’s name to move everything in it. Drag a part here to take it out of its drawer.</p>}
       {families.map((f) => {

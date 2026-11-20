@@ -1,9 +1,12 @@
 // Parts added by hand: ones the imported list doesn't have, or that aren't in Rebrickable's catalogue at all.
 // They're kept apart from the imported rows, so replacing the collection with a fresh export leaves them alone.
 import { useMemo, useState } from 'react';
-import { findInCatalog } from '../lib/collection';
+import { baseMould, findInCatalog, mergeToParts } from '../lib/collection';
+import type { Spot } from '../lib/move';
 import { colourName } from '../lib/colours';
-import type { Catalog, ExtraPart, Project } from '../lib/types';
+import type { Catalog, ExtraPart, Part, Project } from '../lib/types';
+import PlacePicker from './storage/PlacePicker';
+import type { PlaceOption } from './storage/places';
 import { uid } from '../state';
 import PartImage from './PartImage';
 
@@ -11,9 +14,13 @@ interface Props {
   project: Project;
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
   catalog: Catalog | null;
+  /** drawers to offer for a part, beside similar parts first */
+  placesFor?: (p: Part) => PlaceOption[];
+  /** put a newly added part straight into a drawer */
+  putIn?: (partNum: string, to: Spot, name: string) => void;
 }
 
-export default function ExtraParts({ project, update, catalog }: Props) {
+export default function ExtraParts({ project, update, catalog, placesFor, putIn }: Props) {
   const extras = project.extraParts ?? [];
   const [mode, setMode] = useState<'catalog' | 'own'>('catalog');
   const [query, setQuery] = useState('');
@@ -36,15 +43,44 @@ export default function ExtraParts({ project, update, catalog }: Props) {
   const categories = useMemo(() => Object.entries(catalog?.categories ?? {}).sort((a, b) => a[1].localeCompare(b[1])), [catalog]);
 
   const n = Math.max(0, Math.round(Number(qty) || 0));
-  const add = (part: Omit<ExtraPart, 'id' | 'qty'>, size?: number) => {
+  const add = (part: Omit<ExtraPart, 'id' | 'qty'>, size?: number, to?: PlaceOption) => {
     const row: ExtraPart = { id: uid(), qty: n, ...part, ...(colour.trim() ? { colour: colour.trim() } : {}) };
     update((p) => ({ extraParts: [...(p.extraParts ?? []), row], ...(size ? { volumeOverrides: { ...p.volumeOverrides, [row.partNum]: size } } : {}) }));
-    setNote(`Added ${n} × ${part.name ?? part.partNum}${colour.trim() ? ` in ${colour.trim()}` : ''}. It's on Put away & move, ready for a drawer.`);
+    const what = `${n} × ${part.name ?? part.partNum}${colour.trim() ? ` in ${colour.trim()}` : ''}`;
+    if (to && putIn) {
+      putIn(baseMould(row.partNum, catalog), { key: to.key, pocket: to.pocket }, part.name ?? part.partNum);
+      setNote(`Added ${what} and put it in ${to.code}.`);
+    } else setNote(`Added ${what}. It's on Put away & move, ready for a drawer.`);
     setChosen(null);
     setQuery('');
     setQty('1');
     setOwn({ partNum: '', name: '', catId: '', size: '' });
   };
+  const ownNum = () => {
+    const taken = new Set([...Object.keys(catalog?.parts ?? {}), ...extras.map((e) => e.partNum)]);
+    let partNum = own.partNum.trim();
+    if (!partNum) {
+      let i = 1;
+      while (taken.has(`own-${i}`)) i++;
+      partNum = `own-${i}`;
+    }
+    return partNum;
+  };
+  const ownPart = () => ({ partNum: ownNum(), name: own.name.trim(), ...(own.catId ? { catId: Number(own.catId) } : {}) });
+  /** "Add and put in…", beside Add, when drawers can be offered */
+  const putPicker = (part: () => Omit<ExtraPart, 'id' | 'qty'>, size?: number) =>
+    placesFor &&
+    putIn && (
+      <PlacePicker
+        label="Add and put in…"
+        title="Add it and put it in…"
+        options={() => {
+          const p = part();
+          return placesFor(mergeToParts([{ ...p, qty: n }], catalog)[0]);
+        }}
+        onPick={(o) => add(part(), size, o)}
+      />
+    );
   const addOwn = () => {
     const taken = new Set([...Object.keys(catalog?.parts ?? {}), ...extras.map((e) => e.partNum)]);
     let partNum = own.partNum.trim();
@@ -133,6 +169,7 @@ export default function ExtraParts({ project, update, catalog }: Props) {
             <button disabled={!chosen || !n} onClick={() => chosen && add({ partNum: chosen.partNum, name: chosen.name })}>
               Add
             </button>
+            {chosen && n > 0 && putPicker(() => ({ partNum: chosen.partNum, name: chosen.name }))}
           </div>
         </div>
       ) : (
@@ -168,6 +205,7 @@ export default function ExtraParts({ project, update, catalog }: Props) {
             <button disabled={!own.name.trim() || !n} onClick={addOwn}>
               Add
             </button>
+            {own.name.trim() && n > 0 && putPicker(ownPart, Number(own.size) > 0 ? Number(own.size) : undefined)}
           </div>
         </div>
       )}

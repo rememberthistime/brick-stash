@@ -1,5 +1,8 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { download, useCatalog, useProject, withDefaults } from './state';
+import { download, uid, useCatalog, useProject, withDefaults } from './state';
+import { moveParts } from './lib/move';
+import { placeOptions } from './components/storage/places';
+import { history } from './components/storage/history';
 import { collectionRows, mergeToParts, partVolume, subtractParts } from './lib/collection';
 import { splitKeptOut, summariseKept } from './lib/keepOut';
 import { calibrationFrom, withCalibration } from './lib/measure';
@@ -138,9 +141,28 @@ export default function App() {
 
   let body: ReactNode;
   if (page === 'parts' || page === 'import' || page === 'built' || page === 'kept')
-    body = <CollectionTab view={page as CollectionPage} goTo={setPage} project={project} update={update} catalog={catalog} parts={parts} everything={everything} subtraction={subtraction} kept={kept} keptSummary={keptSummary} />;
+    body = (
+      <CollectionTab
+        view={page as CollectionPage}
+        goTo={setPage}
+        project={project}
+        update={update}
+        catalog={catalog}
+        parts={parts}
+        everything={everything}
+        subtraction={subtraction}
+        kept={kept}
+        keptSummary={keptSummary}
+        placesFor={(p) => placeOptions(model.comps, project.setup, model.analysis.pockets, [p])}
+        putIn={(num, to, name) => {
+          const r = moveParts(project.setup, [{ part: num }], to, uid);
+          update({ setup: r.setup });
+          history.push({ text: `Added ${name} and put it in a drawer`, drawers: r.before });
+        }}
+      />
+    );
   else if (page === 'units' || page === 'spaces') body = <StorageTab view={page} project={project} update={update} />;
-  else if (STORAGE_PAGES.has(page)) body = <StorageView page={page as StoragePage} model={model} project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} catalog={catalog} goTo={setPage} />;
+  else if (STORAGE_PAGES.has(page)) body = <StorageView page={page as StoragePage} model={model} project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} kept={kept} owned={owned} catalog={catalog} goTo={setPage} />;
   else if (page === 'settings')
     body = (
       <section className="card page-narrow">

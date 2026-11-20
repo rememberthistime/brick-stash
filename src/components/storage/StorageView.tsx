@@ -2,7 +2,12 @@
 // drawer yet, moves worth making, tidying the layout, the review, labels, the pick list and the export. The plan only
 // ever fills the gaps: parts already in a recorded drawer stay there, and the rest are laid out in the drawers with
 // nothing recorded. The drawer editor and the suggested drawer open over whichever page asked for them.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { baseMould, collectionRows, mergeToParts } from '../../lib/collection';
+import { colourName } from '../../lib/colours';
+import { pickPart, type KeptPart } from '../../lib/keepOut';
+import { findElsewhere } from './find';
+import NotInList, { type NewPart } from './NotInList';
 import { moveParts, movePocket, swapDrawers, takeOut, undoStep, type MoveItem, type Spot } from '../../lib/move';
 import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../../lib/codes';
 import { pocketsFromSuggestion } from '../../lib/gaps';
@@ -13,7 +18,7 @@ import { leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner
 import { acceptSuggestion, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { stem } from '../../lib/storageList';
 import { shortName } from '../../lib/tapeLabel';
-import type { Catalog, OpenedUnit, Part, Project, Setup, SetupPocket } from '../../lib/types';
+import type { Catalog, ExtraPart, OpenedUnit, Part, Project, Setup, SetupPocket } from '../../lib/types';
 import { download, uid } from '../../state';
 import Fold, { useFolds } from '../Fold';
 import Labels from '../Labels';
@@ -45,13 +50,17 @@ interface Props {
   parts: Part[];
   /** parts kept out of storage, for the pick list */
   keptOut: Part[];
+  /** the same, with why each is kept out */
+  kept: KeptPart[];
+  /** the whole collection, before sets kept built come off */
+  owned: Part[];
   catalog: Catalog | null;
   goTo: (p: Page) => void;
 }
 
 type Suggestion = PlannedCompartment & { code: string };
 
-export default function StorageView({ page, model, project, update, parts, keptOut, catalog, goTo }: Props) {
+export default function StorageView({ page, model, project, update, parts, keptOut, kept, owned, catalog, goTo }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [showing, setShowing] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -126,6 +135,34 @@ export default function StorageView({ page, model, project, update, parts, keptO
     history.push({ text: items.length === 1 ? `Took ${nameOf(items[0].part)} out of ${titleAt(items[0].from)}` : `Took ${items.length} parts out`, drawers: r.before });
   };
   const takeOutOf = (num: string, from: Spot) => takeOutMany([{ part: num, from }]);
+  /** A part added from the Put away & move search, to the list or straight into a drawer */
+  const addPart = (np: NewPart, to?: Spot) => {
+    const taken = new Set([...Object.keys(catalog?.parts ?? {}), ...(project.extraParts ?? []).map((e) => e.partNum)]);
+    let partNum = np.partNum.trim();
+    if (!partNum) {
+      let i = 1;
+      while (taken.has(`own-${i}`)) i++;
+      partNum = `own-${i}`;
+    }
+    const row: ExtraPart = { ...np, partNum, id: uid() };
+    update((p) => ({ extraParts: [...(p.extraParts ?? []), row] }));
+    if (to) move([{ part: baseMould(partNum, catalog) }], to, `Added ${np.name ?? partNum} and put it in ${titleAt(to)}`);
+  };
+  /** A part kept out of storage, brought back to be stored, and put in a drawer if one is given */
+  const keepIn = (part: Part, to?: Spot) => {
+    update((p) => ({ keepOut: pickPart(p.keepOut, part, false, p.units) }));
+    if (to) move([{ part: part.partNum }], to);
+  };
+  const partFor = (np: NewPart): Part => mergeToParts([{ ...np, partNum: np.partNum || 'own' }], catalog)[0];
+  const colourChoices = useMemo(() => {
+    const names = new Set<string>();
+    for (const r of collectionRows(project)) {
+      const c = colourName(r.colour, project.colours);
+      if (c && !/^(BrickLink colour|Colour) /.test(c)) names.add(c);
+    }
+    return [...names].sort();
+  }, [project]);
+  const categoryChoices = useMemo(() => Object.entries(catalog?.categories ?? {}).sort((a, b) => a[1].localeCompare(b[1])), [catalog]);
   const undo = () => {
     const last = history.pop();
     if (last) update((p) => undoStep(p, last));
@@ -349,6 +386,24 @@ export default function StorageView({ page, model, project, update, parts, keptO
           onShowSuggested={setShowing}
           hasSuggestion={(key) => gaps.suggested.has(key)}
           suggest={suggest}
+          notInList={({ listHasMatches, onOpen }) => (
+            <NotInList
+              query={filter}
+              found={findElsewhere(filter, { owned, toStore: parts, kept, setup, catalog, resolve: resolvePart })}
+              listHasMatches={listHasMatches}
+              codeOf={(spot) => {
+                const c = comps.find((x) => x.key === spot.key);
+                return c ? ((setup.drawers[spot.key]?.length ?? 0) > 1 ? `${c.code}.${spot.pocket + 1}` : c.code) : spot.key;
+              }}
+              onOpen={onOpen}
+              places={places}
+              partFor={partFor}
+              onKeepIn={keepIn}
+              onAdd={addPart}
+              categories={categoryChoices}
+              colours={colourChoices}
+            />
+          )}
         />
       </>
     );
