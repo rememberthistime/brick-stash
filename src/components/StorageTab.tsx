@@ -20,11 +20,13 @@ interface Props {
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
   /** suggested jobs for units, by unit id */
   jobHints?: Map<string, JobHint>;
+  /** moves that would put parts in a unit whose job they fit */
+  jobMoves?: number;
 }
 
 const unitVolume = (u: StorageUnit) => u.compartments.reduce((t, c) => t + compartmentVolume(c) * c.qty, 0);
 
-export default function StorageTab({ view, project, update, jobHints }: Props) {
+export default function StorageTab({ view, project, update, jobHints, jobMoves = 0 }: Props) {
   const comps = expandCompartments(project.units, project.settings);
   const [preset, setPreset] = useState(PRESETS[0].id);
   const [count, setCount] = useState(1);
@@ -213,7 +215,7 @@ export default function StorageTab({ view, project, update, jobHints }: Props) {
         )}
       </section>
 
-      <UnitJobs units={units} setUnits={setUnits} hints={jobHints} />
+      <UnitJobs units={units} setUnits={setUnits} hints={jobHints} moves={jobMoves} />
     </>
   );
 }

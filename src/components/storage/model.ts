@@ -64,7 +64,7 @@ export function useStorageModel(project: Project, parts: Part[], catalog: Catalo
   }, [analysis]);
   /** a part number as typed or pasted, as the collection files it */
   const resolvePart = useMemo(() => (n: string) => baseMould(n, catalog), [catalog]);
-  return { tree, base, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart, jobHints };
+  return { tree, base, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart, jobHints, jobMoves: analysis.allSuggestions.filter((s) => s.kind === 'job').length };
 }
 
 export type StorageModel = ReturnType<typeof useStorageModel>;

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { recordedJobs, suggestJobs } from './jobSuggest';
 import { layoutCheck } from './layoutCheck';
 import { buildTree, expandCompartments, plan } from './planner';
-import { contentsName, placePockets, setupComps } from './setup';
+import { acceptSuggestion, analyseSetup, contentsName, placePockets, setupComps, undoLastAccepted } from './setup';
 import { sizeClass } from './taxonomy';
 import { DEFAULT_SETTINGS, EMPTY_SETUP, type Part, type Setup, type SetupPocket, type StorageUnit } from './types';
 import { fitsJob, jobLabel, nameFromJobs, setJob, shapeOf, unitShape } from './unitJobs';
@@ -202,5 +202,30 @@ describe('suggested jobs', () => {
     const jobs = recordedJobs(units, pockets);
     expect(jobs.has('a')).toBe(false);
     expect(jobLabel(jobs.get('b'))).toBe('Windows, Doors & Panels');
+  });
+});
+
+describe('moves towards the jobs', () => {
+  const drawers = (id: string, code: string, job?: StorageUnit['job']): StorageUnit => ({ id, code, name: `Drawers ${code}`, accessibility: 2, ...(job ? { job } : {}), compartments: [{ id: 'c', label: 'Drawer', w: 220, d: 290, h: 70, qty: 2 }] });
+  const parts = [part('3001', 'Brick 2 x 4', 100, BRICKS, 4), part('3003', 'Brick 2 x 2', 100, BRICKS, 2), part('3020', 'Plate 2 x 4', 100, PLATES, 10)];
+  const units = [drawers('a', 'A', { what: 'group:bricks' }), drawers('b', 'B', { what: 'group:plates' })];
+  const comps = setupComps(expandCompartments(units, DEFAULT_SETTINGS));
+  const key = (code: string) => comps.find((c) => c.code === code)!.key;
+
+  it('moves a stray part to a pocket of its sort in the unit for it', () => {
+    const setup: Setup = { ...EMPTY_SETUP, drawers: { [key('A1')]: [{ id: 'a1', share: 1, parts: ['3001', '3020'] }], [key('B1')]: [{ id: 'b1', share: 1, parts: ['3020'] }] } };
+    const jobs = analyseSetup(setup, comps, parts, DEFAULT_SETTINGS, null).allSuggestions.filter((s) => s.kind === 'job');
+    expect(jobs.map((s) => s.title)).toContain('Move Plate 2×4 from A1 to B1');
+  });
+
+  it('moves a whole pocket, with its name, to an empty drawer in the unit for it', () => {
+    const setup: Setup = { ...EMPTY_SETUP, drawers: { [key('A1')]: [{ id: 'a1', share: 1, parts: ['3003'] }, { id: 'a2', share: 1, parts: ['3020'], label: 'Plates' }] } };
+    const an = analyseSetup(setup, comps, parts, DEFAULT_SETTINGS, null);
+    const s = an.allSuggestions.find((x) => x.kind === 'job')!;
+    expect(s.title).toBe('Move A1.2 (Plates) to B1');
+    const after = acceptSuggestion(setup, s, an.pockets, () => 'new');
+    expect(after.drawers[key('B1')]).toEqual([{ id: 'new', share: 1, parts: ['3020'], label: 'Plates' }]);
+    expect(after.drawers[key('A1')][1]).toEqual({ id: 'a2', share: 1, parts: [] });
+    expect(undoLastAccepted(after).drawers[key('B1')]).toBeUndefined();
   });
 });

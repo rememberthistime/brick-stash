@@ -998,3 +998,4 @@ main.wide .page-head { max-width: 1240px; }
 .group-key { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin: 6px 0; }
 .group-key-item { display: inline-flex; align-items: center; gap: 4px; }
 .map-unit-job { display: block; font-size: 11px; color: var(--muted); }
+.unit-jobs-moves { margin-top: 8px; font-size: 13px; }

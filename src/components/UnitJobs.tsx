@@ -9,7 +9,7 @@ import type { JobHint } from '../lib/jobSuggest';
 
 const byCode = (a: StorageUnit, b: StorageUnit) => (a.code ?? '').length - (b.code ?? '').length || (a.code ?? '').localeCompare(b.code ?? '');
 
-export default function UnitJobs({ units, setUnits, hints = new Map() }: { units: StorageUnit[]; setUnits: (fn: (u: StorageUnit[]) => StorageUnit[]) => void; hints?: Map<string, JobHint> }) {
+export default function UnitJobs({ units, setUnits, hints = new Map(), moves = 0 }: { units: StorageUnit[]; setUnits: (fn: (u: StorageUnit[]) => StorageUnit[]) => void; hints?: Map<string, JobHint>; moves?: number }) {
   if (!units.length) return null;
   const choices = whatChoices();
   const sorted = [...units].sort(byCode);
@@ -23,7 +23,7 @@ export default function UnitJobs({ units, setUnits, hints = new Map() }: { units
     <section className="card unit-jobs">
       <h3>What each unit is for</h3>
       <p className="muted small">
-        Give each unit one job, such as Bricks, Technic, or Plates &amp; Tiles in its flat parts, so anyone can tell where a part belongs. Each unit has a suggested job, from what’s already in it (or, for an empty unit, what the suggestions would put there) and what its drawers’ shape suits. Moving a part offers the units whose job it fits first, the suggestions for drawers not yet recorded follow the jobs, and the layout check on Review points out parts in another unit’s job.
+        Give each unit one job, such as Bricks, Technic, or Plates &amp; Tiles in its flat parts, so anyone can tell where a part belongs. Each unit has a suggested job, from what’s already in it (or, for an empty unit, what the suggestions would put there) and what its drawers’ shape suits. Moving a part offers the units whose job it fits first, the suggestions for drawers not yet recorded follow the jobs, Suggestions offers moves for parts in another unit’s job, and the layout check on Review points them out.
       </p>
       <table className="unit-jobs-table">
         <thead>
@@ -102,6 +102,11 @@ export default function UnitJobs({ units, setUnits, hints = new Map() }: { units
           </button>
         )}
       </p>
+      {moves > 0 && (
+        <p className="unit-jobs-moves">
+          {moves} {moves === 1 ? 'part or pocket is' : 'parts and pockets are'} in a unit whose job {moves === 1 ? 'it doesn’t' : 'they don’t'} fit, with room in one whose job {moves === 1 ? 'it does' : 'they do'}. <a href="#/moves">See the moves on Suggestions</a>, to accept or skip.
+        </p>
+      )}
     </section>
   );
 }
