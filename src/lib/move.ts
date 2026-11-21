@@ -1,7 +1,7 @@
 // Moving parts by hand: from wherever they are (a pocket, or not in a drawer yet) to any pocket of any drawer, a
 // pocket's whole contents to another, or two drawers swapped. Each change says which drawers it touched and how they
 // were before, so it can be undone, a step at a time.
-import { newPocket } from './setup';
+import { newPocket, withParts } from './setup';
 import { nameAt, withNameAt } from './rearrange';
 import type { Project, Setup, SetupPocket, StorageUnit } from './types';
 
@@ -42,7 +42,7 @@ export function moveParts(setup: Setup, items: MoveItem[], to: Spot, newId: () =
     drawers[it.from.key] = drawers[it.from.key].map((p, i) => {
       if (i !== it.from!.pocket || !p.parts.includes(it.part)) return p;
       const parts = p.parts.filter((x) => x !== it.part);
-      return { ...p, parts, fill: parts.length ? p.fill : undefined };
+      return { ...withParts(p, parts), fill: parts.length ? p.fill : undefined };
     });
   }
   const list = drawers[to.key]?.length ? drawers[to.key] : [newPocket(newId())];
@@ -101,7 +101,7 @@ export function takeOut(setup: Setup, items: Required<MoveItem>[]): { setup: Set
     drawers[from.key] = drawers[from.key].map((p, i) => {
       if (i !== from.pocket) return p;
       const parts = p.parts.filter((x) => x !== part);
-      return { ...p, parts, fill: parts.length ? p.fill : undefined };
+      return { ...withParts(p, parts), fill: parts.length ? p.fill : undefined };
     });
   }
   return { setup: { ...setup, drawers }, before };

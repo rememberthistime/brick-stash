@@ -16,7 +16,7 @@ import { applyCycle, undoLast } from '../../lib/rearrange';
 import { setupLabels } from '../../lib/labels';
 import { planPlaces, setupPlaces } from '../../lib/pickList';
 import { leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner';
-import { acceptSuggestion, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
+import { acceptSuggestion, checkEverything, setChecked, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
 import { stem } from '../../lib/storageList';
 import { shortName } from '../../lib/tapeLabel';
 import type { Catalog, ExtraPart, OpenedUnit, Part, Project, Setup, SetupPocket } from '../../lib/types';
@@ -299,6 +299,30 @@ export default function StorageView({ page, model, project, update, parts, keptO
           </button>
           <SuggestionsSwitch />
         </div>
+        {(() => {
+          const all = analysis.pockets.flatMap((p) => p.parts.map((x) => p.checked.has(x.part.partNum)));
+          const ticked = all.filter(Boolean).length;
+          if (!all.length) return null;
+          return (
+            <p className="muted small setup-checked no-print">
+              {ticked === all.length ? (
+                <>
+                  <span className="good-text">✓ Every recorded part is ticked as there.</span>{' '}
+                  <button className="link small" onClick={() => setSetup((s) => ({ ...s, drawers: Object.fromEntries(Object.entries(s.drawers).map(([k, ps]) => [k, ps.map((x) => setChecked(x, x.parts, false))])) }))}>
+                    Untick everything
+                  </button>
+                </>
+              ) : (
+                <>
+                  {ticked.toLocaleString()} of {all.length.toLocaleString()} recorded parts ticked as there. Open a drawer and tick each part once you’ve seen it; a part moved or put away comes unticked until you do.{' '}
+                  <button className="link small" onClick={() => setSetup((s) => checkEverything(s))}>
+                    Tick everything recorded so far
+                  </button>
+                </>
+              )}
+            </p>
+          );
+        })()}
         {lifted.length > 0 && (
           <p className="muted small setup-lifted">
             <b>Loose containers in use:</b> {lifted.map((c) => `${c.used} ${c.container.name}${c.used > (c.total ?? 0) ? `, more than the ${c.total} lifted out` : ''}`).join(' · ')}
@@ -555,6 +579,9 @@ function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, suggest, onCli
   const names = [...new Set(inUse.map((p) => p.label?.trim() || contentsName(p)))];
   // The parts with the most pieces, so the pictures show what you'd see opening it
   const pics = inUse.flatMap((p) => p.parts.map((x) => x.part)).sort((a, b) => b.qty - a.qty);
+  // Ticked as really there: all of it, or how many are left to check once checking has started here
+  const all = inUse.flatMap((p) => p.parts.map((x) => x.part.partNum).filter(Boolean).map((n) => p.checked.has(n)));
+  const ticked = all.filter(Boolean).length;
   return (
     <button className={`setup-tile ${recorded ? '' : 'todo'} ${dim ? 'dim' : ''} ${family ? `fam-border-${family}` : ''}`} onClick={onClick} title={comp.sections ? `${comp.unitName}, whole box` : `${comp.unitName} › ${comp.label} — ${comp.w}×${comp.d}×${comp.h} mm`}>
       <span className="setup-tile-head">
@@ -570,6 +597,8 @@ function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, suggest, onCli
       </span>
       {pics.length > 0 && <TilePics parts={pics} />}
       <span className="small setup-tile-names">{recorded ? (names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` + ${names.length - 2}` : '') : 'Empty') : suggest ? 'Not recorded, nothing suggested' : 'Not recorded'}</span>
+      {all.length > 0 && ticked === all.length && <span className="tile-checked small">✓ checked</span>}
+      {ticked > 0 && ticked < all.length && <span className="tile-check small">{all.length - ticked} to check</span>}
       {(toAdd > 0 || moves > 0) && (
         <span className="tile-todo small">
           {toAdd > 0 && <span>+{toAdd} to put in</span>}

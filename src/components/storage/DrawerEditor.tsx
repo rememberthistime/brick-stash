@@ -13,11 +13,13 @@ import {
   groupsOf,
   floorLeft,
   howManyFit,
+  isChecked,
   newPocket,
   removeFromPocket,
   removePocket,
   resizePockets,
   searchParts,
+  setChecked,
   setPocket,
   unplacedNeighbours,
   type ContainerChoice,
@@ -261,6 +263,28 @@ export default function DrawerEditor({
             {left < 0 ? `These containers need ${pct(1 - left)} of the floor, so they won’t all stand in here.` : plain.length ? `Containers take ${pct(1 - left)} of the floor, and the pockets share the rest.` : `Containers take ${pct(1 - left)} of the floor. Add a pocket if you use the rest.`}
           </p>
         )}
+
+        {(() => {
+          const all = current.flatMap((p) => p.parts.map((x) => [p, x] as const));
+          const ticked = all.filter(([p, x]) => isChecked(p, x)).length;
+          if (!all.length) return null;
+          return (
+            <p className="setup-checked small">
+              <span className={ticked === all.length ? 'good-text' : 'muted'}>
+                {ticked === all.length ? `✓ All ${all.length} parts ticked as there` : `${ticked} of ${all.length} parts ticked as there. Tick each part once you’ve seen it in the drawer.`}
+              </span>{' '}
+              {ticked < all.length ? (
+                <button className="link small" onClick={() => onChange(current.map((p) => setChecked(p, p.parts, true)))}>
+                  Tick all as there
+                </button>
+              ) : (
+                <button className="link small" onClick={() => onChange(current.map((p) => setChecked(p, p.parts, false)))}>
+                  Untick all
+                </button>
+              )}
+            </p>
+          );
+        })()}
 
         {current.map((pocket, i) => (
           <PocketRow
@@ -683,6 +707,7 @@ function PocketRow({
           {pocket.parts.length ? `${pocket.parts.length} ${pocket.parts.length === 1 ? 'part' : 'parts'}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? '…' : ''}` : 'nothing yet'}
         </span>
         <span className="muted small nowrap">{pocket.fill === undefined ? '' : `${fillPercent}% full`}</span>
+        {pocket.parts.length > 0 && (pocket.parts.every((x) => isChecked(pocket, x)) ? <span className="good-text small nowrap">✓ there</span> : <span className="muted small nowrap">{pocket.parts.filter((x) => !isChecked(pocket, x)).length} not checked</span>)}
       </button>
     );
   }
@@ -781,10 +806,14 @@ function PocketRow({
                 <PartImage partNum={x.part.partNum} size={40} title={nameTitle(x.part)} />
                 <span>
                   <PartLink part={x.part} />
+                  {!isChecked(pocket, x.part.partNum) && <span className="muted small"> · not checked</span>}
                   {elsewhere.length > 0 && <span className="muted small"> · also {elsewhere.slice(0, 2).join(', ')}</span>}
                   {x.tooBig && <span className="warn-text small"> · looks too big for this</span>}
                 </span>
                 <span className="part-actions">
+                  <label className={`there-box small ${isChecked(pocket, x.part.partNum) ? 'on' : ''}`} title="Tick once you’ve seen it in the drawer" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={isChecked(pocket, x.part.partNum)} onChange={(e) => onChange({ checked: setChecked(pocket, [x.part.partNum], e.target.checked).checked })} /> There
+                  </label>
                   <PlacePicker label="Move…" title={`Move ${partPlainName(x.part)} to…`} options={() => places([x.part])} exclude={here} onPick={(o) => onMove(x.part.partNum, o)} />
                   <button className="icon" title="Take it out: it goes back to Put away & move" aria-label={`Take out ${partPlainName(x.part)}`} onClick={() => onRemove(x.part.partNum)}>
                     ✕

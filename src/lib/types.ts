@@ -181,6 +181,8 @@ export interface SetupPocket {
   mixed?: boolean;
   /** what its label should say, such as "Fences", instead of listing every part */
   label?: string;
+  /** parts ticked as really in it, not just recorded or planned there. A part moved in comes unticked. */
+  checked?: string[];
 }
 
 /** A small tub or insert that can go in any drawer it fits. Internal mm. */
