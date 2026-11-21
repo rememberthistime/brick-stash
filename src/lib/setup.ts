@@ -167,7 +167,31 @@ export function removePocket(pockets: SetupPocket[], index: number, newId: () =>
 
 export const addToPocket = (pockets: SetupPocket[], index: number, parts: string[]) => pockets.map((p, i) => (i === index ? { ...p, parts: [...new Set([...p.parts, ...parts])] } : p));
 
-export const removeFromPocket = (pockets: SetupPocket[], index: number, part: string) => pockets.map((p, i) => (i === index ? { ...p, parts: p.parts.filter((x) => x !== part) } : p));
+export const removeFromPocket = (pockets: SetupPocket[], index: number, part: string) => pockets.map((p, i) => (i === index ? withParts(p, p.parts.filter((x) => x !== part)) : p));
+
+/** A pocket with these parts in it now: ticks for parts no longer in it go */
+export function withParts(p: SetupPocket, parts: string[]): SetupPocket {
+  const { checked, ...rest } = p;
+  const still = checked?.filter((x) => parts.includes(x));
+  return { ...rest, parts, ...(still?.length ? { checked: still } : {}) };
+}
+
+/** Whether a part is ticked as really in this pocket */
+export const isChecked = (p: SetupPocket, part: string) => !!p.checked?.includes(part) && p.parts.includes(part);
+
+/** Tick or untick parts as really in a pocket */
+export function setChecked(p: SetupPocket, parts: string[], on: boolean): SetupPocket {
+  const now = new Set((p.checked ?? []).filter((x) => p.parts.includes(x)));
+  for (const x of parts) if (p.parts.includes(x)) on ? now.add(x) : now.delete(x);
+  const { checked: _old, ...rest } = p;
+  return now.size ? { ...rest, checked: [...now] } : rest;
+}
+
+/** Every recorded part ticked as really there */
+export function checkEverything(setup: Setup): Setup {
+  const drawers = Object.fromEntries(Object.entries(setup.drawers).map(([k, ps]) => [k, ps.map((p) => (p.parts.length ? setChecked(p, p.parts, true) : p))]));
+  return { ...setup, drawers };
+}
 
 export const setPocket = (pockets: SetupPocket[], index: number, change: Partial<SetupPocket>) => pockets.map((p, i) => (i === index ? { ...p, ...change } : p));
 
@@ -210,6 +234,8 @@ export interface PlacedPocket {
   container?: LooseContainer;
   mixed: boolean;
   label?: string;
+  /** parts ticked as really in it */
+  checked: Set<string>;
   /** whichever family and group take up the most room here */
   family: string;
   group: string;
@@ -321,6 +347,7 @@ export function placePockets(setup: Setup, comps: SetupComp[], parts: Part[], vo
       container: pocket.container,
       mixed: !!pocket.mixed,
       label: pocket.label,
+      checked: new Set((pocket.checked ?? []).filter((x) => pocket.parts.includes(x))),
       estimate,
       used: real ?? estimate,
       parts: placed,
@@ -722,7 +749,7 @@ export function acceptSuggestion(setup: Setup, s: Suggestion, pockets: PlacedPoc
     if (m.toDrawer) {
       changed(m.from, (p, capacity) => {
         const left = p.parts.filter((x) => x !== m.part);
-        return { ...p, parts: left, fill: !left.length || p.fill === undefined ? undefined : roundFill(p.fill - m.volume / capacity) };
+        return { ...withParts(p, left), fill: !left.length || p.fill === undefined ? undefined : roundFill(p.fill - m.volume / capacity) };
       });
       const id = into.get(m.toDrawer)!;
       drawers[m.toDrawer] = drawers[m.toDrawer].map((p) => (p.id === id ? { ...p, parts: [...new Set([...p.parts, m.part])] } : p));
@@ -730,7 +757,7 @@ export function acceptSuggestion(setup: Setup, s: Suggestion, pockets: PlacedPoc
     }
     changed(m.from, (p, capacity) => {
       const left = p.parts.filter((x) => x !== m.part);
-      return { ...p, parts: left, fill: !left.length || p.fill === undefined ? undefined : roundFill(p.fill - m.volume / capacity) };
+      return { ...withParts(p, left), fill: !left.length || p.fill === undefined ? undefined : roundFill(p.fill - m.volume / capacity) };
     });
     changed(m.to, (p, capacity) => ({ ...p, parts: [...new Set([...p.parts, m.part])], fill: p.fill === undefined ? undefined : roundFill(p.fill + m.volume / capacity) }));
   }
