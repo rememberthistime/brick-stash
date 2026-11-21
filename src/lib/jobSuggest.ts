@@ -58,6 +58,9 @@ function whatOf(items: Item[]): { what: string; label: string; share: number } |
   return null;
 }
 
+/** Cups and big drawers are only kept to their size when this share of what's in them suits it */
+const LOOSE_SHAPE_SHARE = 0.8;
+
 /** Shapes that decide a unit's job even when what's in it doesn't suit them */
 const STRONG = new Set<SizeClass>(['flat', 'long']);
 
@@ -80,7 +83,8 @@ function jobFrom(items: Item[], shape: SizeClass | null, source: 'recorded' | 'p
     const natural = NATURAL[shape];
     if (!vol(sized)) return { job: { ...(natural ? { what: natural } : {}), size: shape }, ...sentence(`its drawers suit ${sizeName}`) };
     const share = vol(suiting) / vol(sized);
-    if (share >= SHAPE_SHARE) {
+    // Cups and big drawers hold most things well enough, so they're only kept to their size when nearly all of it is
+    if (share >= (STRONG.has(shape) ? SHAPE_SHARE : LOOSE_SHAPE_SHARE)) {
       const w = whatOf(suiting);
       return { job: { ...(w ? { what: w.what } : {}), size: shape }, ...sentence(`its drawers suit ${sizeName}, and ${pct(share)} of ${said} is ${sizeName}${w ? `, mostly ${w.label}` : ''}`) };
     }

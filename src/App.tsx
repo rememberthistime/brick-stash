@@ -161,7 +161,7 @@ export default function App() {
         }}
       />
     );
-  else if (page === 'units' || page === 'spaces') body = <StorageTab view={page} project={project} update={update} jobHints={model.jobHints} />;
+  else if (page === 'units' || page === 'spaces') body = <StorageTab view={page} project={project} update={update} jobHints={model.jobHints} jobMoves={model.jobMoves} />;
   else if (STORAGE_PAGES.has(page)) body = <StorageView page={page as StoragePage} model={model} project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} kept={kept} owned={owned} catalog={catalog} goTo={setPage} />;
   else if (page === 'settings')
     body = (

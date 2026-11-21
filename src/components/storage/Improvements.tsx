@@ -99,6 +99,13 @@ export function Suggestions({ setup, setSetup, analysis, onUndo }: { setup: Setu
         ))}
       </ul>
       <p className="muted small">
+        {analysis.suggestions.length > 1 && (
+          <>
+            <button className="link small" onClick={() => setSetup((x) => analysis.suggestions.reduce((acc, s) => acceptSuggestion(acc, s, analysis.pockets), x))}>
+              Accept all {analysis.suggestions.length}
+            </button>{' '}
+          </>
+        )}
         {analysis.suggestions.length > 0 && 'Accepting updates your record here and adds it to Moves to make. '}
         {analysis.moreSuggestions > 0 && `${analysis.moreSuggestions} more possible, shown as you work through these. `}
         {setup.skipped.some((id) => !id.startsWith('home:')) && (

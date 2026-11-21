@@ -8,6 +8,7 @@ import { stem } from './storageList';
 import { shortName } from './tapeLabel';
 import { partPlainName, searchName } from './builderNames';
 import { layoutCheck, type LayoutFinding } from './layoutCheck';
+import { fitsJob, jobLabel } from './unitJobs';
 import { familyFor } from './taxonomy';
 import type { LooseContainer, Measurement, OpenedUnit, Part, Settings, Setup, SetupPocket } from './types';
 import { compartmentVolume, partSizeMm } from './volume';
@@ -367,11 +368,14 @@ export interface SetupMove {
   to: string;
   /** cm³ */
   volume: number;
+  /** moving into an empty drawer: its key (`to` is then "drawer:" and the key), and the name the pocket takes with it */
+  toDrawer?: string;
+  label?: string;
 }
 
 export interface Suggestion {
   id: string;
-  kind: 'ease' | 'join' | 'stray' | 'combine';
+  kind: 'ease' | 'job' | 'join' | 'stray' | 'combine';
   title: string;
   why: string;
   /** relies on the estimates rather than a fill you've entered, so check it fits */
@@ -403,6 +407,8 @@ export interface SetupAnalysis {
 }
 
 const MAX_SHOWN_SUGGESTIONS = 15;
+/** A pocket moved to an empty drawer should fill at least this share of it, or the drawer is wasted on it */
+const EMPTY_DRAWER_MIN = 0.15;
 /** A pocket may hold bits of other families without being called mixed */
 const MIXED_MINORITY = 0.05;
 const ROOMY_FREE = 0.5;
@@ -479,7 +485,7 @@ function findingsFor(pockets: PlacedPocket[], settings: Settings): Finding[] {
   return out;
 }
 
-function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: string[]) {
+function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: string[], comps: SetupComp[] = []) {
   const limit = targetFill(settings);
   const room = (p: PlacedPocket) => (p.mixed ? 0 : p.capacity * limit - p.used);
   const inUse = pockets.filter((p) => p.parts.length);
@@ -504,6 +510,78 @@ function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: st
         size: x.used,
         s: { id: `ease:${x.part.partNum}:${p.id}:${host.id}`, kind: 'ease', title: `Move ${partPlainName(x.part)} from ${p.name} to ${host.name}`, why: `${p.name} is ${pct(p.fill)} full. ${host.name} holds similar parts and would be ${after(host, x.used)} full.`, estimated: unmeasured(host), moves: [move(x, p, host)] },
       });
+  }
+
+  // Parts in a unit whose job they don't fit, to a unit whose job they do: a whole pocket into a pocket of the same
+  // sort or an empty drawer, or a stray part into a pocket beside its own sort
+  const unitOf = (c: SetupComp) => c.unitTitle ?? c.unitCode ?? c.unitName;
+  const fitsAll = (c: SetupComp, xs: Placed[]) => xs.every((x) => fitsJob(c.unitJob, x.part) === true);
+  const emptyDrawers = comps.filter((c) => !inUse.some((p) => p.comp.key === c.key));
+  const byDistance = (from: PlacedPocket) => (a: { comp: SetupComp }, b: { comp: SetupComp }) => Math.abs(a.comp.physOrder - from.comp.physOrder) - Math.abs(b.comp.physOrder - from.comp.physOrder);
+  for (const p of inUse) {
+    const job = p.comp.unitJob;
+    if (!job || p.mixed) continue;
+    const against = p.parts.filter((x) => fitsJob(job, x.part) === false);
+    if (!against.length) continue;
+    const isFor = `${unitOf(p.comp)} is for ${jobLabel(job)}`;
+    if (against.length === p.parts.length) {
+      const host = inUse
+        .filter((h) => h !== p && !h.mixed && fitsAll(h.comp, p.parts) && h.group === p.group && room(h) >= p.used)
+        .sort((a, b) => Number(b.family === p.family) - Number(a.family === p.family) || byDistance(p)(a, b))[0];
+      if (host) {
+        found.push({
+          rank: 0.5,
+          size: p.used,
+          s: {
+            id: `job:${p.id}:${host.id}`,
+            kind: 'job',
+            title: `Move ${p.name} into ${host.name}`,
+            why: `${isFor}. ${unitOf(host.comp)} is for ${jobLabel(host.comp.unitJob)}, and ${host.name} holds ${host.groupLabel} with room: it would be ${after(host, p.used)} full.`,
+            estimated: unmeasured(p, host),
+            moves: p.parts.map((x) => move(x, p, host)),
+          },
+        });
+        continue;
+      }
+      // The smallest empty drawer that holds it, nearest first among those the same size
+      const drawer = emptyDrawers
+        .filter((c) => fitsAll(c, p.parts) && c.volume * limit >= p.used && p.used >= c.volume * EMPTY_DRAWER_MIN)
+        .sort((a, b) => a.volume - b.volume || Math.abs(a.physOrder - p.comp.physOrder) - Math.abs(b.physOrder - p.comp.physOrder))[0];
+      if (drawer) {
+        const label = p.label?.trim();
+        found.push({
+          rank: 0.5,
+          size: p.used,
+          s: {
+            id: `job:${p.id}:${drawer.key}`,
+            kind: 'job',
+            title: `Move ${p.name} to ${drawer.code}`,
+            why: `${isFor}. ${drawer.code} is empty and ${unitOf(drawer)} is for ${jobLabel(drawer.unitJob)}; it would be about ${pct(p.used / drawer.volume)} full.`,
+            estimated: unmeasured(p),
+            moves: p.parts.map((x) => ({ ...move(x, p, p), to: `drawer:${drawer.key}`, toDrawer: drawer.key, ...(label ? { label } : {}) })),
+          },
+        });
+      }
+      continue;
+    }
+    for (const x of against) {
+      const host = inUse
+        .filter((h) => h !== p && !h.mixed && fitsJob(h.comp.unitJob, x.part) === true && (h.family === x.family || h.group === x.group) && room(h) >= x.used)
+        .sort(nearest(p, x))[0];
+      if (!host) continue;
+      found.push({
+        rank: 0.5,
+        size: x.used,
+        s: {
+          id: `job:${x.part.partNum}:${p.id}:${host.id}`,
+          kind: 'job',
+          title: `Move ${partPlainName(x.part)} from ${p.name} to ${host.name}`,
+          why: `${isFor}, which this isn’t. ${unitOf(host.comp)} is for ${jobLabel(host.comp.unitJob)}, and ${host.name} holds ${host.groupLabel}, with room.`,
+          estimated: unmeasured(p, host),
+          moves: [move(x, p, host)],
+        },
+      });
+    }
   }
 
   // The same part in two places, where one could take it all
@@ -598,7 +676,7 @@ export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], se
   const placed = new Set(pockets.flatMap((p) => p.parts.map((x) => x.part.partNum)));
   const volumeOf = (p: Part) => partVolume(p, settings.volumeScale);
   const allVolume = parts.reduce((t, p) => t + volumeOf(p), 0);
-  const { suggestions, more, all } = suggestionsFor(pockets, settings, setup.skipped);
+  const { suggestions, more, all } = suggestionsFor(pockets, settings, setup.skipped, comps);
   return {
     pockets,
     drawersRecorded: comps.filter((c) => setup.drawers[c.key]?.length).length,
@@ -622,16 +700,34 @@ export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], se
 
 const roundFill = (f: number) => Math.round(Math.min(1, Math.max(0, f)) * 100) / 100;
 
-export function acceptSuggestion(setup: Setup, s: Suggestion, pockets: PlacedPocket[]): Setup {
+export function acceptSuggestion(setup: Setup, s: Suggestion, pockets: PlacedPocket[], newId: () => string = () => Math.random().toString(36).slice(2, 9)): Setup {
   const placed = new Map(pockets.map((p) => [p.id, p]));
-  const keys = new Set(s.moves.flatMap((m) => [placed.get(m.from)?.comp.key, placed.get(m.to)?.comp.key]).filter((k): k is string => !!k));
+  const keys = new Set(s.moves.flatMap((m) => [placed.get(m.from)?.comp.key, m.toDrawer ?? placed.get(m.to)?.comp.key]).filter((k): k is string => !!k));
   const before = Object.fromEntries([...keys].map((k) => [k, setup.drawers[k]]));
   const drawers = { ...setup.drawers };
   const changed = (id: string, f: (p: SetupPocket, capacity: number) => SetupPocket) => {
     const at = placed.get(id);
     if (at) drawers[at.comp.key] = drawers[at.comp.key].map((p) => (p.id === id ? f(p, at.capacity) : p));
   };
+  // Into an empty drawer: its first pocket (or a new one) takes the parts, and the name goes with them
+  const into = new Map<string, string>();
   for (const m of s.moves) {
+    if (!m.toDrawer || into.has(m.toDrawer)) continue;
+    const list = drawers[m.toDrawer]?.length ? drawers[m.toDrawer] : [newPocket(newId())];
+    drawers[m.toDrawer] = list.map((p, i) => (i === 0 ? { ...p, ...(m.label ? { label: m.label } : {}) } : p));
+    into.set(m.toDrawer, list[0].id);
+    if (m.label) changed(m.from, (p) => { const { label: _gone, ...rest } = p; return rest; });
+  }
+  for (const m of s.moves) {
+    if (m.toDrawer) {
+      changed(m.from, (p, capacity) => {
+        const left = p.parts.filter((x) => x !== m.part);
+        return { ...p, parts: left, fill: !left.length || p.fill === undefined ? undefined : roundFill(p.fill - m.volume / capacity) };
+      });
+      const id = into.get(m.toDrawer)!;
+      drawers[m.toDrawer] = drawers[m.toDrawer].map((p) => (p.id === id ? { ...p, parts: [...new Set([...p.parts, m.part])] } : p));
+      continue;
+    }
     changed(m.from, (p, capacity) => {
       const left = p.parts.filter((x) => x !== m.part);
       return { ...p, parts: left, fill: !left.length || p.fill === undefined ? undefined : roundFill(p.fill - m.volume / capacity) };
