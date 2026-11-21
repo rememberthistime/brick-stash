@@ -2,8 +2,8 @@
 // pocket's whole contents to another, or two drawers swapped. Each change says which drawers it touched and how they
 // were before, so it can be undone, a step at a time.
 import { newPocket, withParts } from './setup';
-import { nameAt, withNameAt } from './rearrange';
-import type { Project, Setup, SetupPocket, StorageUnit } from './types';
+import { jobAt, nameAt, withJobAt, withNameAt } from './rearrange';
+import type { Project, Setup, SetupPocket, StorageUnit, UnitJob } from './types';
 
 /** A pocket: the drawer's compartment key and the pocket's place in it */
 export interface Spot {
@@ -22,6 +22,7 @@ export interface Step {
   text: string;
   drawers: Record<string, SetupPocket[] | undefined>;
   names?: Record<string, string>;
+  jobs?: Record<string, UnitJob | null>;
 }
 
 const same = (a: Spot | undefined, b: Spot) => !!a && a.key === b.key && a.pocket === b.pocket;
@@ -63,10 +64,11 @@ export function movePocket(setup: Setup, from: Spot, to: Spot, newId: () => stri
 }
 
 /** Two drawers swapped: each one's pockets and its own name go to the other's slot */
-export function swapDrawers(p: Pick<Project, 'setup' | 'units'>, a: string, b: string): { setup: Setup; units: StorageUnit[]; before: Step['drawers']; names: Record<string, string> } {
+export function swapDrawers(p: Pick<Project, 'setup' | 'units'>, a: string, b: string): { setup: Setup; units: StorageUnit[]; before: Step['drawers']; names: Record<string, string>; jobs: Record<string, UnitJob | null> } {
   const before = { [a]: p.setup.drawers[a], [b]: p.setup.drawers[b] };
   const names = { [a]: nameAt(p.units, a), [b]: nameAt(p.units, b) };
-  if (a === b) return { setup: p.setup, units: p.units, before: {}, names: {} };
+  const jobs = { [a]: jobAt(p.units, a), [b]: jobAt(p.units, b) };
+  if (a === b) return { setup: p.setup, units: p.units, before: {}, names: {}, jobs: {} };
   const drawers = { ...p.setup.drawers };
   for (const [to, from] of [
     [a, b],
@@ -75,8 +77,8 @@ export function swapDrawers(p: Pick<Project, 'setup' | 'units'>, a: string, b: s
     if (before[from]) drawers[to] = before[from]!;
     else delete drawers[to];
   }
-  const units = withNameAt(withNameAt(p.units, a, names[b]), b, names[a]);
-  return { setup: { ...p.setup, drawers }, units, before, names };
+  const units = withJobAt(withJobAt(withNameAt(withNameAt(p.units, a, names[b]), b, names[a]), a, jobs[b]), b, jobs[a]);
+  return { setup: { ...p.setup, drawers }, units, before, names, jobs };
 }
 
 /** Put the drawers a step touched back as they were, and their names */
@@ -88,6 +90,7 @@ export function undoStep(p: Pick<Project, 'setup' | 'units'>, step: Step): { set
   }
   let units = p.units;
   for (const [key, name] of Object.entries(step.names ?? {})) units = withNameAt(units, key, name);
+  for (const [key, job] of Object.entries(step.jobs ?? {})) units = withJobAt(units, key, job);
   return { setup: { ...p.setup, drawers }, units };
 }
 

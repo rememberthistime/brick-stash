@@ -1005,3 +1005,8 @@ main.wide .page-head { max-width: 1240px; }
 .tile-checked { color: var(--good, #2f9e44); font-weight: 600; }
 .tile-check { color: var(--warn, #b26a00); }
 .setup-parts .part-meta { display: block; }
+.setup-editor-use { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
+.setup-editor-use select { max-width: 220px; }
+.setup-use-hint { flex-basis: 100%; padding: 6px 8px; border-radius: 8px; background: var(--soft); }
+.drawer-uses { margin-bottom: 16px; }
+.drawer-uses li { margin: 4px 0; }

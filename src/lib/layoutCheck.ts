@@ -1,5 +1,5 @@
-// Could someone else find things? The layout check reads the drawers as recorded the way a stranger would: a unit
-// should do one job, a family should live in few units, a drawer shouldn't be a catch-all, every drawer should say
+// Could someone else find things? The layout check reads the drawers as recorded the way a stranger would: a family
+// should live in few units, a drawer shouldn't be a catch-all, every drawer should say
 // what it's for, and parts should be in a unit whose job they fit. It only points things out; nothing moves.
 import { partPlainName } from './builderNames';
 import { placeName } from './codes';
@@ -8,7 +8,7 @@ import type { PlacedPocket } from './setup';
 import { familyGroup, groupLabel } from './taxonomy';
 import { fitsJob, jobLabel } from './unitJobs';
 
-export type LayoutKind = 'twoJobs' | 'spread' | 'catchAll' | 'againstJob' | 'unnamed';
+export type LayoutKind = 'spread' | 'catchAll' | 'againstJob' | 'unnamed';
 
 export interface LayoutFinding {
   kind: LayoutKind;
@@ -17,8 +17,6 @@ export interface LayoutFinding {
   parts?: string[];
 }
 
-/** A group needs this share of a unit's parts to count as one of its jobs */
-const JOB_SHARE = 0.25;
 /** A family in this many units or more is spread out */
 const SPREAD_UNITS = 3;
 /** A drawer holding this many groups, or this many pockets, is a catch-all */
@@ -37,23 +35,6 @@ const unitCode = (p: PlacedPocket) => p.comp.unitCode ?? p.comp.code.replace(/\d
 export function layoutCheck(pockets: PlacedPocket[]): LayoutFinding[] {
   const out: LayoutFinding[] = [];
   const inUse = pockets.filter((p) => p.parts.length);
-
-  // A unit doing two unrelated jobs: two groups each with a good share of what's in it
-  const units = new Map<string, { code: string; job: string; groups: Map<string, number>; total: number }>();
-  for (const p of inUse) {
-    if (p.mixed) continue;
-    const u = units.get(p.comp.unitId) ?? { code: unitCode(p), job: jobLabel(p.comp.unitJob), groups: new Map(), total: 0 };
-    for (const x of p.parts) {
-      const g = familyGroup(x.family);
-      u.groups.set(g, (u.groups.get(g) ?? 0) + x.used);
-      u.total += x.used;
-    }
-    units.set(p.comp.unitId, u);
-  }
-  for (const u of [...units.values()].sort((a, b) => byCode(a.code, b.code))) {
-    const jobs = [...u.groups].filter(([, v]) => u.total > 0 && v / u.total >= JOB_SHARE).sort((a, b) => b[1] - a[1]);
-    if (jobs.length > 1) out.push({ kind: 'twoJobs', text: `${u.code} holds ${and(jobs.map(([g, v]) => `${groupLabel(g)} (${Math.round((v / u.total) * 100)}%)`))}` });
-  }
 
   // A family whose drawers are in many units
   const families = new Map<string, Set<string>>();
@@ -81,16 +62,17 @@ export function layoutCheck(pockets: PlacedPocket[]): LayoutFinding[] {
       out.push({ kind: 'catchAll', text: `${list[0].comp.code} holds ${types} part types in ${list.length} ${list.length === 1 ? 'pocket' : 'pockets'}, from ${and(big.map(([g]) => groupLabel(g)))}` });
   }
 
-  // Parts in a unit whose job they don't fit
+  // Parts in a drawer whose use (its own, or its unit's job) they don't fit
   const against = new Map<string, { code: string; job: string; parts: string[] }>();
   for (const p of inUse) {
     if (p.mixed) continue;
     const job = p.comp.unitJob;
+    const holder = p.comp.drawerJob ? p.comp.key : p.comp.unitId;
     for (const x of p.parts) {
       if (fitsJob(job, x.part) !== false) continue;
-      const e = against.get(p.comp.unitId) ?? { code: unitCode(p), job: jobLabel(job), parts: [] };
+      const e = against.get(holder) ?? { code: p.comp.drawerJob ? p.comp.code : unitCode(p), job: jobLabel(job), parts: [] };
       if (!e.parts.includes(x.part.partNum)) e.parts.push(x.part.partNum);
-      against.set(p.comp.unitId, e);
+      against.set(holder, e);
     }
   }
   const nameOf = new Map(inUse.flatMap((p) => p.parts.map((x) => [x.part.partNum, partPlainName(x.part)] as const)));

@@ -6,7 +6,7 @@ import { leaves } from './planner';
 import type { PlacedPocket } from './setup';
 import { FAMILIES, GROUPS, familyGroup, sizeClass } from './taxonomy';
 import type { Part, SizeClass, StorageUnit, UnitJob } from './types';
-import { jobLabel, sizeClassLabel, unitShape } from './unitJobs';
+import { fitsJob, jobLabel, shapeOf, sizeClassLabel, unitShape } from './unitJobs';
 
 export interface JobHint {
   job: UnitJob;
@@ -145,4 +145,60 @@ export function suggestJobs(units: StorageUnit[], pockets: PlacedPocket[], sugge
     out.set(u.id, hint);
   }
   return out;
+}
+
+/** A drawer whose contents are mostly one sort of part that isn't what it's for: its use could change to suit them */
+export interface DrawerUse {
+  /** the drawer's compartment key and code */
+  key: string;
+  code: string;
+  unitId: string;
+  /** the use that suits what's in it, and what it's for now */
+  job: UnitJob;
+  now: UnitJob;
+  why: string;
+}
+
+/** A drawer this share mostly one sort of part is themed on it, and can be given that use */
+const THEMED_SHARE = 0.6;
+/** A drawer with this share fitting its use is doing its job */
+const DOING_ITS_JOB = 0.5;
+
+/**
+ * Drawers recorded with mostly one sort of part that their use (their own, or their unit's job) doesn't fit. Rather
+ * than moving everything out, the drawer can be given the use its contents suit. Drawers keep their themes this way
+ * and similar drawers can then be brought side by side on Tidy the layout.
+ */
+export function suggestDrawerUses(pockets: PlacedPocket[], drawersIn: (unitId: string) => number = () => 2): DrawerUse[] {
+  const byDrawer = new Map<string, PlacedPocket[]>();
+  for (const p of pockets) if (p.parts.length && !p.mixed) byDrawer.set(p.comp.key, [...(byDrawer.get(p.comp.key) ?? []), p]);
+  const out: DrawerUse[] = [];
+  for (const list of byDrawer.values()) {
+    const comp = list[0].comp;
+    const now = comp.unitJob;
+    if (!now || !jobLabel(now)) continue;
+    const items = recordedItems(list);
+    const total = items.reduce((t, x) => t + x.volume, 0);
+    if (!total) continue;
+    const fitting = items.reduce((t, x) => t + (x.part && fitsJob(now, x.part) === true ? x.volume : 0), 0);
+    if (fitting / total >= DOING_ITS_JOB) continue;
+    const theme = whatOf(items);
+    if (!theme || theme.share < THEMED_SHARE) continue;
+    const shape = shapeOf(comp);
+    const sized = items.filter((x) => x.part);
+    const suits = sized.reduce((t, x) => t + (sizeClass(x.part!.name, x.part!.catId) === shape ? x.volume : 0), 0) / (sized.reduce((t, x) => t + x.volume, 0) || 1);
+    // Keep its size where its contents suit the drawer's shape, as with a unit's job
+    const keepSize = shape !== 'ordinary' && suits >= (STRONG.has(shape) ? SHAPE_SHARE : LOOSE_SHAPE_SHARE);
+    const job: UnitJob = { what: theme.what, ...(keepSize ? { size: shape } : {}) };
+    if (jobLabel(job) === jobLabel(now)) continue;
+    out.push({
+      key: comp.key,
+      code: comp.code,
+      unitId: comp.unitId,
+      job,
+      now,
+      why: `${pct(theme.share)} of what's in it is ${theme.label}, but it's for ${jobLabel(now)}${comp.drawerJob || drawersIn(comp.unitId) < 2 ? '' : ` along with the rest of ${comp.unitTitle ?? comp.unitCode ?? comp.unitName}`}`,
+    });
+  }
+  return out.sort((a, b) => a.code.length - b.code.length || a.code.localeCompare(b.code));
 }

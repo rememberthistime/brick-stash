@@ -9,6 +9,7 @@ import { shortName } from './tapeLabel';
 import { partPlainName, searchName } from './builderNames';
 import { layoutCheck, type LayoutFinding } from './layoutCheck';
 import { fitsJob, jobLabel } from './unitJobs';
+import { suggestDrawerUses, type DrawerUse } from './jobSuggest';
 import { familyFor } from './taxonomy';
 import type { LooseContainer, Measurement, OpenedUnit, Part, Settings, Setup, SetupPocket } from './types';
 import { compartmentVolume, partSizeMm } from './volume';
@@ -426,6 +427,8 @@ export interface SetupAnalysis {
   findings: Finding[];
   /** could someone else find things: units with two jobs, families spread out, catch-alls, drawers with no name */
   layout: LayoutFinding[];
+  /** drawers mostly of a sort their use doesn't fit, that could be given that use instead */
+  drawerUses: DrawerUse[];
   suggestions: Suggestion[];
   /** suggestions beyond those shown */
   moreSuggestions: number;
@@ -512,7 +515,7 @@ function findingsFor(pockets: PlacedPocket[], settings: Settings): Finding[] {
   return out;
 }
 
-function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: string[], comps: SetupComp[] = []) {
+function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: string[], comps: SetupComp[] = [], rethemed: Set<string> = new Set()) {
   const limit = targetFill(settings);
   const room = (p: PlacedPocket) => (p.mixed ? 0 : p.capacity * limit - p.used);
   const inUse = pockets.filter((p) => p.parts.length);
@@ -541,19 +544,21 @@ function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: st
 
   // Parts in a unit whose job they don't fit, to a unit whose job they do: a whole pocket into a pocket of the same
   // sort or an empty drawer, or a stray part into a pocket beside its own sort
-  const unitOf = (c: SetupComp) => c.unitTitle ?? c.unitCode ?? c.unitName;
+  // Whose job it is: a drawer with its own use, or its unit
+  const unitOf = (c: SetupComp) => (c.drawerJob ? c.code : c.unitTitle ?? c.unitCode ?? c.unitName);
   const fitsAll = (c: SetupComp, xs: Placed[]) => xs.every((x) => fitsJob(c.unitJob, x.part) === true);
   const emptyDrawers = comps.filter((c) => !inUse.some((p) => p.comp.key === c.key));
   const byDistance = (from: PlacedPocket) => (a: { comp: SetupComp }, b: { comp: SetupComp }) => Math.abs(a.comp.physOrder - from.comp.physOrder) - Math.abs(b.comp.physOrder - from.comp.physOrder);
   for (const p of inUse) {
     const job = p.comp.unitJob;
-    if (!job || p.mixed) continue;
+    // A drawer mostly of another sort is better given that use than emptied: see drawerUses
+    if (!job || p.mixed || rethemed.has(p.comp.key)) continue;
     const against = p.parts.filter((x) => fitsJob(job, x.part) === false);
     if (!against.length) continue;
     const isFor = `${unitOf(p.comp)} is for ${jobLabel(job)}`;
     if (against.length === p.parts.length) {
       const host = inUse
-        .filter((h) => h !== p && !h.mixed && fitsAll(h.comp, p.parts) && h.group === p.group && room(h) >= p.used)
+        .filter((h) => h !== p && !h.mixed && !rethemed.has(h.comp.key) && fitsAll(h.comp, p.parts) && h.group === p.group && room(h) >= p.used)
         .sort((a, b) => Number(b.family === p.family) - Number(a.family === p.family) || byDistance(p)(a, b))[0];
       if (host) {
         found.push({
@@ -593,7 +598,7 @@ function suggestionsFor(pockets: PlacedPocket[], settings: Settings, skipped: st
     }
     for (const x of against) {
       const host = inUse
-        .filter((h) => h !== p && !h.mixed && fitsJob(h.comp.unitJob, x.part) === true && (h.family === x.family || h.group === x.group) && room(h) >= x.used)
+        .filter((h) => h !== p && !h.mixed && !rethemed.has(h.comp.key) && fitsJob(h.comp.unitJob, x.part) === true && (h.family === x.family || h.group === x.group) && room(h) >= x.used)
         .sort(nearest(p, x))[0];
       if (!host) continue;
       found.push({
@@ -703,7 +708,8 @@ export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], se
   const placed = new Set(pockets.flatMap((p) => p.parts.map((x) => x.part.partNum)));
   const volumeOf = (p: Part) => partVolume(p, settings.volumeScale);
   const allVolume = parts.reduce((t, p) => t + volumeOf(p), 0);
-  const { suggestions, more, all } = suggestionsFor(pockets, settings, setup.skipped, comps);
+  const drawerUses = suggestDrawerUses(pockets, (unitId) => comps.filter((c) => c.unitId === unitId).length);
+  const { suggestions, more, all } = suggestionsFor(pockets, settings, setup.skipped, comps, new Set(drawerUses.map((d) => d.key)));
   return {
     pockets,
     drawersRecorded: comps.filter((c) => setup.drawers[c.key]?.length).length,
@@ -717,6 +723,7 @@ export function analyseSetup(setup: Setup, comps: SetupComp[], parts: Part[], se
     check: checkEstimates(pockets),
     findings: findingsFor(pockets, settings),
     layout: layoutCheck(pockets),
+    drawerUses,
     suggestions,
     moreSuggestions: more,
     allSuggestions: all,

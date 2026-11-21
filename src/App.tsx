@@ -71,7 +71,7 @@ export default function App() {
   const unsorted = analysis.unplaced.length;
   const withRoom = analysis.unplaced.filter((p) => recordedHomes.has(p.partNum)).length;
   const swaps = layoutMoves.reduce((t, r) => t + r.cycles.length, 0);
-  const moves = analysis.suggestions.length;
+  const moves = analysis.suggestions.length + analysis.drawerUses.length;
   const overflow = gaps.plan.stats.overflowVolume;
   const n = (x: number) => (x ? x.toLocaleString() : '');
   const counts: Partial<Record<Page, ReactNode>> = {

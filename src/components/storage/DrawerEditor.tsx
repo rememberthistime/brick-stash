@@ -27,7 +27,9 @@ import {
   type SetupComp,
   type Suggestion,
 } from '../../lib/setup';
-import type { LooseContainer, OpenedUnit, Part, SetupPocket } from '../../lib/types';
+import type { LooseContainer, OpenedUnit, Part, SetupPocket, SizeClass, UnitJob } from '../../lib/types';
+import { SIZE_CLASSES, jobLabel, whatChoices } from '../../lib/unitJobs';
+import type { DrawerUse } from '../../lib/jobSuggest';
 import { uid } from '../../state';
 import NameInput from '../NameInput';
 import PartImage from '../PartImage';
@@ -70,6 +72,8 @@ export default function DrawerEditor({
   onMoveHere,
   onTakeOut,
   notInList,
+  onJob,
+  useHint,
 }: {
   comp: SetupComp;
   pockets: SetupPocket[] | null;
@@ -110,6 +114,10 @@ export default function DrawerEditor({
   onMoveHere: (part: string, to: Spot) => void;
   onTakeOut: (part: string, from: Spot) => void;
   /** parts the search finds that aren't in the collection to store, with a way to add them here */
+  /** set or clear what this drawer is for (null: whatever its unit is for) */
+  onJob?: (job: UnitJob | null) => void;
+  /** a use its contents suit better than the one it has */
+  useHint?: DrawerUse;
   notInList?: (o: { query: string; listHasMatches: boolean; addNew: boolean; here: Spot; hereLabel: string }) => ReactNode;
 }) {
   const [first] = useState(uid);
@@ -201,6 +209,40 @@ export default function DrawerEditor({
             onChange={onName}
           />
         </label>
+        {onJob && !comp.sections && (
+          <div className="setup-editor-use small">
+            <span>Used for</span>
+            <select aria-label={`What ${comp.code} holds`} value={comp.drawerJob ? comp.unitJob?.what ?? '' : ''} onChange={(e) => onJob(e.target.value ? { ...(comp.drawerJob ? comp.unitJob : {}), what: e.target.value } : comp.drawerJob && comp.unitJob?.size ? { size: comp.unitJob.size } : null)}>
+              <option value="">{comp.drawerJob ? 'Anything' : `As the unit: ${jobLabel(comp.baseJob) || 'anything'}`}</option>
+              {whatChoices().map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.indent ? `   ${c.label}` : c.label}
+                </option>
+              ))}
+            </select>
+            <select aria-label={`Size of part for ${comp.code}`} value={comp.drawerJob ? comp.unitJob?.size ?? '' : ''} onChange={(e) => onJob(comp.drawerJob && comp.unitJob?.what ? { what: comp.unitJob.what, ...(e.target.value ? { size: e.target.value as SizeClass } : {}) } : e.target.value ? { ...(comp.baseJob?.what ? { what: comp.baseJob.what } : {}), size: e.target.value as SizeClass } : null)}>
+              <option value="">Any size</option>
+              {SIZE_CLASSES.map((c) => (
+                <option key={c.key} value={c.key} title={c.hint}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            {comp.drawerJob && (
+              <button className="link small" onClick={() => onJob(null)}>
+                Same as the unit{comp.baseJob ? ` (${jobLabel(comp.baseJob)})` : ''}
+              </button>
+            )}
+            {useHint && (
+              <span className="setup-use-hint">
+                {useHint.why}.{' '}
+                <button className="small-btn" onClick={() => onJob(useHint.job)}>
+                  Use it for {jobLabel(useHint.job)}
+                </button>
+              </span>
+            )}
+          </div>
+        )}
         {pockets && (
           <div className="drawer-tools small">
             <PlacePicker label="Swap with another drawer…" title={`Swap ${comp.code} with…`} options={drawers} exclude={{ key: comp.key }} onPick={(o) => onSwap(o.key)} />

@@ -3,10 +3,11 @@
 // pulls out of one unit and slides into another, so moving its contents is moving the drawer. Nothing moves until the
 // user accepts a move, and each is a swap of two drawers, so they can be done one at a time.
 import { drawerKeyOf, setPlaceName } from './codes';
+import { setDrawerJob } from './unitJobs';
 import type { PlacedPocket, SetupComp } from './setup';
 import { stem } from './storageList';
 import { FAMILIES, familyGroup } from './taxonomy';
-import type { Project, StorageUnit } from './types';
+import type { Project, StorageUnit, UnitJob } from './types';
 
 /** A drawer's contents moved from one slot to another */
 export interface DrawerStep {
@@ -124,6 +125,19 @@ export function withNameAt(units: StorageUnit[], key: string, name: string): Sto
   return setPlaceName(units, whole ? key.slice('whole:'.length) : key.split(':')[0], whole ? null : drawerKeyOf(key), name);
 }
 
+/** A drawer's own use, by compartment key (null for none, or an opened-up box) */
+export function jobAt(units: StorageUnit[], key: string): UnitJob | null {
+  if (key.startsWith('whole:')) return null;
+  const drawer = drawerKeyOf(key);
+  return (drawer && units.find((u) => u.id === key.split(':')[0])?.drawerJobs?.[drawer]) || null;
+}
+
+export function withJobAt(units: StorageUnit[], key: string, job: UnitJob | null): StorageUnit[] {
+  const drawer = drawerKeyOf(key);
+  if (key.startsWith('whole:') || !drawer) return units;
+  return setDrawerJob(units, key.split(':')[0], drawer, job);
+}
+
 /**
  * Move the drawers in one ring: each drawer's pockets, and its name, go to the slot it moves to. The move is added to
  * Moves to make, with what's needed to undo it.
@@ -132,13 +146,15 @@ export function applyCycle(p: Project, cycle: DrawerCycle, text: string): Pick<P
   const keys = cycle.steps.map((s) => s.from);
   const before = Object.fromEntries(keys.map((k) => [k, p.setup.drawers[k]]));
   const namesBefore = Object.fromEntries(keys.map((k) => [k, nameAt(p.units, k)]));
+  const jobsBefore = Object.fromEntries(keys.map((k) => [k, jobAt(p.units, k)]));
   const drawers = { ...p.setup.drawers };
   let units = p.units;
+  // A drawer's name and use go with it
   for (const { from, to } of cycle.steps) {
     drawers[to] = before[from];
-    units = withNameAt(units, to, namesBefore[from]);
+    units = withJobAt(withNameAt(units, to, namesBefore[from]), to, jobsBefore[from]);
   }
-  return { units, setup: { ...p.setup, drawers, accepted: [...p.setup.accepted, { id: cycle.id, text, before, namesBefore }] } };
+  return { units, setup: { ...p.setup, drawers, accepted: [...p.setup.accepted, { id: cycle.id, text, before, namesBefore, jobsBefore }] } };
 }
 
 /** Undo the most recent accepted move, drawer names included */
@@ -147,5 +163,6 @@ export function undoLast(p: Project): Pick<Project, 'setup' | 'units'> {
   if (!last) return { setup: p.setup, units: p.units };
   let units = p.units;
   for (const [key, name] of Object.entries(last.namesBefore ?? {})) units = withNameAt(units, key, name);
+  for (const [key, job] of Object.entries(last.jobsBefore ?? {})) units = withJobAt(units, key, job);
   return { units, setup: { ...p.setup, drawers: { ...p.setup.drawers, ...last.before }, accepted: p.setup.accepted.slice(0, -1) } };
 }
