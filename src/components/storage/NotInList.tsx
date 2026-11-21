@@ -33,18 +33,22 @@ interface Props {
   onAdd: (p: NewPart, to?: Spot) => void;
   categories: [string, string][];
   colours: string[];
+  /** searching from inside a drawer: add straight to it */
+  here?: { spot: Spot; label: string };
+  /** asked to add a part that isn't in the collection, whatever else the search finds */
+  addNew?: boolean;
 }
 
 const WHY: Record<KeptReason, string> = { family: 'its family is kept out of storage', bulky: 'kept out as a bulky part', picked: 'kept out by hand' };
 
-export default function NotInList({ query, found, listHasMatches, codeOf, onOpen, places, partFor, onKeepIn, onAdd, categories, colours }: Props) {
+export default function NotInList({ query, found, listHasMatches, codeOf, onOpen, places, partFor, onKeepIn, onAdd, categories, colours, here, addNew }: Props) {
   const [qty, setQty] = useState('1');
   const [colour, setColour] = useState('');
   const [own, setOwn] = useState<{ name: string; catId: string } | null>(null);
   const n = Math.max(1, Math.round(Number(qty) || 1));
-  const anything = found.inDrawers.length + found.kept.length + found.built.length > 0;
-  const nothingOwned = !anything && !listHasMatches;
-  if (query.trim().length < 2 || (!anything && listHasMatches)) return null;
+  const anything = (here ? 0 : found.inDrawers.length) + found.kept.length + found.built.length > 0;
+  const nothingOwned = addNew || (!anything && !listHasMatches);
+  if (query.trim().length < 2 || (!anything && listHasMatches && !addNew)) return null;
 
   const extra = (p: { partNum: string; name?: string; catId?: number }): NewPart => ({ ...p, qty: n, ...(colour.trim() ? { colour: colour.trim() } : {}) });
   const amount = (
@@ -64,16 +68,23 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
   );
   const addButtons = (p: NewPart, label: string) => (
     <span className="not-in-actions">
-      <button className="ghost small-btn" onClick={() => onAdd(p)}>
-        Add to the list
-      </button>
+      {here ? (
+        <button className="small-btn" onClick={() => onAdd(p, here.spot)}>
+          + Add to {here.label}
+        </button>
+      ) : (
+        <button className="ghost small-btn" onClick={() => onAdd(p)}>
+          Add to the list
+        </button>
+      )}
       <PlacePicker label="Add and put in…" title={`Add ${label} and put it in…`} options={() => places([partFor(p)])} onPick={(o) => onAdd(p, { key: o.key, pocket: o.pocket })} />
     </span>
   );
 
   return (
     <div className="not-in card-inset">
-      {found.inDrawers.map(({ part, spots }) => (
+      {/* Searching from a drawer, its own results already show parts in drawers, with Move here */}
+      {!here && found.inDrawers.map(({ part, spots }) => (
         <div key={part.partNum} className="not-in-row">
           <PartImage partNum={part.partNum} size={40} title={nameTitle(part)} />
           <span className="not-in-what">
@@ -95,8 +106,8 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
             </small>
           </span>
           <span className="not-in-actions">
-            <button className="ghost small-btn" onClick={() => onKeepIn(part)}>
-              Store it in a drawer
+            <button className={here ? 'small-btn' : 'ghost small-btn'} onClick={() => onKeepIn(part, here?.spot)}>
+              {here ? `Store it in ${here.label}` : 'Store it in a drawer'}
             </button>
             <PlacePicker label="Put in…" title={`Store ${partPlainName(part)} in…`} options={() => places([part])} onPick={(o) => onKeepIn(part, { key: o.key, pocket: o.pocket })} />
           </span>
@@ -114,7 +125,7 @@ export default function NotInList({ query, found, listHasMatches, codeOf, onOpen
       {nothingOwned && (
         <>
           <p className="small not-in-head">
-            <b>Not in your collection.</b> Add it here, and put it straight in a drawer if you like.
+            <b>{addNew ? 'Adding a part that isn’t in your collection.' : 'Not in your collection.'}</b> {here ? `Add it, straight into ${here.label}.` : 'Add it here, and put it straight in a drawer if you like.'}
           </p>
           {amount}
           {found.catalog.map((c) => (

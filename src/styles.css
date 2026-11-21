@@ -1004,3 +1004,4 @@ main.wide .page-head { max-width: 1240px; }
 .setup-checked { margin: 6px 0; }
 .tile-checked { color: var(--good, #2f9e44); font-weight: 600; }
 .tile-check { color: var(--warn, #b26a00); }
+.setup-parts .part-meta { display: block; }

@@ -146,7 +146,9 @@ export default function StorageView({ page, model, project, update, parts, keptO
       partNum = `own-${i}`;
     }
     const row: ExtraPart = { ...np, partNum, id: uid() };
-    update((p) => ({ extraParts: [...(p.extraParts ?? []), row] }));
+    // Put straight in a drawer, it's stored, even if its kind or size would otherwise keep it out
+    const stored = to ? partFor({ ...np, partNum }) : null;
+    update((p) => ({ extraParts: [...(p.extraParts ?? []), row], ...(stored ? { keepOut: pickPart(p.keepOut, { ...stored, partNum: baseMould(partNum, catalog) }, false, p.units) } : {}) }));
     if (to) move([{ part: baseMould(partNum, catalog) }], to, `Added ${np.name ?? partNum} and put it in ${titleAt(to)}`);
   };
   /** A part kept out of storage, brought back to be stored, and put in a drawer if one is given */
@@ -164,6 +166,27 @@ export default function StorageView({ page, model, project, update, parts, keptO
     return [...names].sort();
   }, [project]);
   const categoryChoices = useMemo(() => Object.entries(catalog?.categories ?? {}).sort((a, b) => a[1].localeCompare(b[1])), [catalog]);
+  /** Parts a search finds that aren't in the list to put away: where they are, and a way to add them */
+  const notInList = ({ listHasMatches, onOpen, query = filter, here, addNew }: { listHasMatches: boolean; onOpen: (key: string) => void; query?: string; here?: { spot: Spot; label: string }; addNew?: boolean }) => (
+    <NotInList
+      query={query}
+      found={findElsewhere(query, { owned, toStore: parts, kept, setup, catalog, resolve: resolvePart })}
+      listHasMatches={listHasMatches}
+      codeOf={(spot) => {
+        const c = comps.find((x) => x.key === spot.key);
+        return c ? ((setup.drawers[spot.key]?.length ?? 0) > 1 ? `${c.code}.${spot.pocket + 1}` : c.code) : spot.key;
+      }}
+      onOpen={onOpen}
+      places={places}
+      partFor={partFor}
+      onKeepIn={keepIn}
+      onAdd={addPart}
+      categories={categoryChoices}
+      colours={colourChoices}
+      here={here}
+      addNew={addNew}
+    />
+  );
   const undo = () => {
     const last = history.pop();
     if (last) update((p) => undoStep(p, last));
@@ -411,24 +434,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
           onShowSuggested={setShowing}
           hasSuggestion={(key) => gaps.suggested.has(key)}
           suggest={suggest}
-          notInList={({ listHasMatches, onOpen }) => (
-            <NotInList
-              query={filter}
-              found={findElsewhere(filter, { owned, toStore: parts, kept, setup, catalog, resolve: resolvePart })}
-              listHasMatches={listHasMatches}
-              codeOf={(spot) => {
-                const c = comps.find((x) => x.key === spot.key);
-                return c ? ((setup.drawers[spot.key]?.length ?? 0) > 1 ? `${c.code}.${spot.pocket + 1}` : c.code) : spot.key;
-              }}
-              onOpen={onOpen}
-              places={places}
-              partFor={partFor}
-              onKeepIn={keepIn}
-              onAdd={addPart}
-              categories={categoryChoices}
-              colours={colourChoices}
-            />
-          )}
+          notInList={({ listHasMatches, onOpen }) => notInList({ listHasMatches, onOpen })}
         />
       </>
     );
@@ -561,6 +567,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
           }}
           onMoveHere={moveHere}
           onTakeOut={takeOutOf}
+          notInList={({ query, listHasMatches, addNew, here, hereLabel }) => notInList({ query, listHasMatches, addNew, onOpen: setEditing, here: { spot: here, label: hereLabel } })}
           onAccept={(s) => setSetup((x) => acceptSuggestion(x, s, analysis.pockets))}
           onSkip={(id) => setSetup((x) => ({ ...x, skipped: [...x.skipped, id] }))}
         />

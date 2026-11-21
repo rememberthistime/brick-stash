@@ -1,7 +1,7 @@
 // Recording one drawer as it really is: its pockets, how full each is, and what's in them.
 import { nameTitle, partPlainName } from '../../lib/builderNames';
 import PartName from '../PartName';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { homeSkipId, type RecordedHome } from '../../lib/gaps';
 import { familyFor } from '../../lib/taxonomy';
 import { familyLabel, leaves, type TreeNode } from '../../lib/planner';
@@ -69,6 +69,7 @@ export default function DrawerEditor({
   onSwap,
   onMoveHere,
   onTakeOut,
+  notInList,
 }: {
   comp: SetupComp;
   pockets: SetupPocket[] | null;
@@ -108,10 +109,14 @@ export default function DrawerEditor({
   /** move a part here from wherever else it is */
   onMoveHere: (part: string, to: Spot) => void;
   onTakeOut: (part: string, from: Spot) => void;
+  /** parts the search finds that aren't in the collection to store, with a way to add them here */
+  notInList?: (o: { query: string; listHasMatches: boolean; addNew: boolean; here: Spot; hereLabel: string }) => ReactNode;
 }) {
   const [first] = useState(uid);
   const [active, setActive] = useState(0);
   const [query, setQuery] = useState('');
+  /** the search's own results aren't it: show the parts not in the collection too */
+  const [notThese, setNotThese] = useState('');
   const [lastAdded, setLastAdded] = useState<string | null>(null);
   /** parts ticked here, as "pocket|part", to move together */
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -372,8 +377,27 @@ export default function DrawerEditor({
           {nextUp.map((p) => (
             <PartChoice key={p.partNum} part={p} whereIs={whereIs} here={inPocket(p.partNum)} pockets={current.length} active={activeIndex} best={bestPocket(p)} titleOf={titleOf} code={comp.code} onAdd={(i) => add([p.partNum], i)} />
           ))}
-          {query && !results.groups.length && !results.parts.length && <p className="muted small">Nothing in your collection matches. It may be kept out of storage, in a set you keep built, or not in your parts list.</p>}
+          {query && !results.groups.length && !results.parts.length && !notInList && <p className="muted small">Nothing in your collection matches. It may be kept out of storage, in a set you keep built, or not in your parts list.</p>}
         </div>
+        {notInList && query.trim().length >= 2 && (
+          <>
+            {(results.groups.length > 0 || results.parts.length > 0) && notThese !== query && (
+              <p className="small">
+                Not one of these?{' '}
+                <button className="link small" onClick={() => setNotThese(query)}>
+                  Add a part that isn’t in your collection
+                </button>
+              </p>
+            )}
+            {notInList({
+              query,
+              listHasMatches: (results.groups.length > 0 || results.parts.length > 0) && notThese !== query,
+              addNew: notThese === query,
+              here: { key: comp.key, pocket: activeIndex },
+              hereLabel: current.length > 1 ? `pocket ${activeIndex + 1}` : 'this drawer',
+            })}
+          </>
+        )}
 
         <div className="setup-editor-foot">
           <button className="ghost small-btn" onClick={onPrev}>
@@ -806,9 +830,12 @@ function PocketRow({
                 <PartImage partNum={x.part.partNum} size={40} title={nameTitle(x.part)} />
                 <span>
                   <PartLink part={x.part} />
-                  {!isChecked(pocket, x.part.partNum) && <span className="muted small"> · not checked</span>}
-                  {elsewhere.length > 0 && <span className="muted small"> · also {elsewhere.slice(0, 2).join(', ')}</span>}
-                  {x.tooBig && <span className="warn-text small"> · looks too big for this</span>}
+                  <span className="part-meta small">
+                    <span className="mono">{x.part.partNum}</span>
+                    {!isChecked(pocket, x.part.partNum) && <span className="muted"> · not checked</span>}
+                    {elsewhere.length > 0 && <span className="muted"> · also {elsewhere.slice(0, 2).join(', ')}</span>}
+                    {x.tooBig && <span className="warn-text"> · looks too big for this</span>}
+                  </span>
                 </span>
                 <span className="part-actions">
                   <label className={`there-box small ${isChecked(pocket, x.part.partNum) ? 'on' : ''}`} title="Tick once you’ve seen it in the drawer" onClick={(e) => e.stopPropagation()}>
