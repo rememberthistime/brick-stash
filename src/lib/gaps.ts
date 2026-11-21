@@ -6,7 +6,8 @@ import { partVolume } from './collection';
 import { buildTree, expandCompartments, leaves, plan, SHARE_OVERHEAD, targetFill, type Plan, type PlannedCompartment } from './planner';
 import { newPocket, setupComps, type PlacedPocket, type SetupComp } from './setup';
 import { familyFor, familyGroup } from './taxonomy';
-import type { Part, Settings, Setup, SetupPocket, StorageUnit } from './types';
+import { withRecordedJobs } from './jobSuggest';
+import type { Part, Settings, Setup, SetupPocket, StorageUnit, UnitJob } from './types';
 
 export interface GapPlan {
   /** every space, as the Drawers page shows them: opened-up units are one space */
@@ -23,8 +24,9 @@ export interface GapPlan {
  * `unsorted` are the parts in no recorded drawer. A unit that's been opened up into one space is planned as that one
  * space, with as many sections as its floor and the settings allow.
  */
-export function planGaps(units: StorageUnit[], setup: Setup, unsorted: Part[], categories: Record<string, string>, s: Settings): GapPlan {
-  const comps = setupComps(expandCompartments(units, s), setup.open);
+export function planGaps(units: StorageUnit[], setup: Setup, unsorted: Part[], categories: Record<string, string>, s: Settings, jobs?: Map<string, UnitJob>): GapPlan {
+  // Units without a job of their own are planned for the job their recorded drawers point to
+  const comps = setupComps(expandCompartments(jobs ? withRecordedJobs(units, jobs) : units, s), setup.open);
   const forPlanning = comps.map((c) =>
     c.sections ? { ...c, cap: c.volume * targetFill(s), maxSections: Math.max(1, Math.min(s.maxSections, Math.floor(c.w / 45) * Math.floor(c.d / 45))), classKey: `whole:${c.unitId}` } : c,
   );

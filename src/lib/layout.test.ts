@@ -1,5 +1,6 @@
 // Unit jobs, part sizes and shapes, the layout check, and the planner's builder sorts and shape preference
 import { describe, expect, it } from 'vitest';
+import { recordedJobs, suggestJobs } from './jobSuggest';
 import { layoutCheck } from './layoutCheck';
 import { buildTree, expandCompartments, plan } from './planner';
 import { contentsName, placePockets, setupComps } from './setup';
@@ -168,5 +169,38 @@ describe('jobs split a kind of unit', () => {
     const where = (family: string) => p.zones.find((z) => z.families.includes(family))?.unitIds;
     expect(where('building')).toEqual(['x']);
     expect(where('bricks')).toEqual(['y']);
+  });
+});
+
+describe('suggested jobs', () => {
+  const ordinary = (id: string, code: string): StorageUnit => ({ id, code, name: `Drawers ${code}`, accessibility: 2, compartments: [{ id: 'c', label: 'Drawer', w: 220, d: 290, h: 70, qty: 2 }] });
+  const shallow = (id: string, code: string): StorageUnit => ({ id, code, name: `Shallow ${code}`, accessibility: 2, compartments: [{ id: 'c', label: 'Drawer', w: 220, d: 300, h: 30, qty: 2 }] });
+  const cups = (id: string, code: string): StorageUnit => ({ id, code, name: `Cups ${code}`, accessibility: 2, compartments: [{ id: 's', label: 'Cup', w: 60, d: 60, h: 50, qty: 4 }] });
+  const parts = [part('3001', 'Brick 2 x 4', 100, BRICKS, 4), part('3003', 'Brick 2 x 2', 100, BRICKS, 2), part('3020', 'Plate 2 x 4', 100, PLATES), part('60592', 'Window 1 x 2 x 2', 20, WINDOWS)];
+  const setupWith = (units: StorageUnit[], byCode: Record<string, string[]>) => {
+    const comps = setupComps(expandCompartments(units, DEFAULT_SETTINGS));
+    const setup: Setup = { ...EMPTY_SETUP, drawers: Object.fromEntries(Object.entries(byCode).map(([code, ps]) => [comps.find((c) => c.code === code)!.key, [{ id: code, share: 1, parts: ps }]])) };
+    return placePockets(setup, comps, parts, 1);
+  };
+
+  it('suggests a job from what a unit holds and what its drawers suit', () => {
+    const units = [ordinary('a', 'A'), shallow('b', 'B'), shallow('c', 'C'), cups('d', 'D')];
+    const hints = suggestJobs(units, setupWith(units, { A1: ['3001', '60592'], B1: ['3020'], C1: ['3003'] }));
+    expect(jobLabel(hints.get('a')!.job)).toBe('Bricks');
+    expect(hints.get('a')!.why).toMatch(/of what's in it is Bricks$/);
+    expect(jobLabel(hints.get('b')!.job)).toBe('Plates: flat parts');
+    // Bricks in shallow drawers: the drawers are for plates and tiles, and the bricks would be better elsewhere
+    expect(jobLabel(hints.get('c')!.job)).toBe('Plates & Tiles: flat parts');
+    expect(hints.get('c')!.why).toMatch(/none of what's in it is: the Bricks would be easier to find/);
+    expect(jobLabel(hints.get('d')!.job)).toBe('Tiny parts');
+  });
+
+  it('leaves out units whose job already matches, and steers the suggestions by recorded contents', () => {
+    const units = [{ ...ordinary('a', 'A'), job: { what: 'bricks' } }, ordinary('b', 'B')];
+    const pockets = setupWith(units, { A1: ['3001'], B1: ['60592'] });
+    expect(suggestJobs(units, pockets).has('a')).toBe(false);
+    const jobs = recordedJobs(units, pockets);
+    expect(jobs.has('a')).toBe(false);
+    expect(jobLabel(jobs.get('b'))).toBe('Windows, Doors & Panels');
   });
 });

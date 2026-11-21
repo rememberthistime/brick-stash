@@ -2,6 +2,7 @@
 // recorded, the review of them, room for unsorted parts beside their own sort, the plan for the rest, and the layout swaps.
 import { useMemo } from 'react';
 import { baseMould } from '../../lib/collection';
+import { recordedJobs, suggestJobs } from '../../lib/jobSuggest';
 import { homesInRecorded, planGaps, type RecordedHome } from '../../lib/gaps';
 import { buildTree, expandCompartments } from '../../lib/planner';
 import { rearrangements } from '../../lib/rearrange';
@@ -24,7 +25,10 @@ export function useStorageModel(project: Project, parts: Part[], catalog: Catalo
     return homesInRecorded(analysis.unplaced, analysis.pockets, setup, (n) => groups.get(n)?.key, project.settings);
   }, [analysis, setup, tree, project.settings]);
   const forGaps = useMemo(() => analysis.unplaced.filter((p) => !recordedHomes.has(p.partNum)), [analysis.unplaced, recordedHomes]);
-  const gaps = useMemo(() => planGaps(project.units, setup, forGaps, categories, project.settings), [project.units, setup, forGaps, categories, project.settings]);
+  // A unit with no job of its own is planned for the job its recorded drawers point to
+  const recorded = useMemo(() => recordedJobs(project.units, analysis.pockets), [project.units, analysis.pockets]);
+  const gaps = useMemo(() => planGaps(project.units, setup, forGaps, categories, project.settings, recorded), [project.units, setup, forGaps, categories, project.settings, recorded]);
+  const jobHints = useMemo(() => suggestJobs(project.units, analysis.pockets, gaps.suggested), [project.units, analysis.pockets, gaps.suggested]);
   const comps = gaps.comps;
   const openable = useMemo(() => openableUnits(base), [base]);
   const choices = useMemo(() => containerChoices(setup, base), [setup, base]);
@@ -60,7 +64,7 @@ export function useStorageModel(project: Project, parts: Part[], catalog: Catalo
   }, [analysis]);
   /** a part number as typed or pasted, as the collection files it */
   const resolvePart = useMemo(() => (n: string) => baseMould(n, catalog), [catalog]);
-  return { tree, base, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart };
+  return { tree, base, analysis, recordedHomes, gaps, comps, openable, choices, placed, layoutMoves, whereIs, homesIn, movesIn, topMovesIn, resolvePart, jobHints };
 }
 
 export type StorageModel = ReturnType<typeof useStorageModel>;
