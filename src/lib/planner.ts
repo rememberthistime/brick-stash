@@ -188,7 +188,12 @@ export interface Compartment {
   /** the user's own names for the unit and for this drawer */
   unitTitle?: string;
   /** what the unit is for */
+  /** what this drawer is for: its own use if it has one, otherwise its unit's job */
   unitJob?: UnitJob;
+  /** the unit's own job, whatever single drawers are for */
+  baseJob?: UnitJob;
+  /** the drawer has a use of its own */
+  drawerJob?: boolean;
   name?: string;
   label: string;
   w: number;
@@ -220,7 +225,11 @@ export function expandCompartments(units: StorageUnit[], s: Settings): Compartme
           unitName: u.name,
           unitCode: u.code,
           ...(u.title?.trim() ? { unitTitle: u.title.trim() } : {}),
-          ...(u.job ? { unitJob: u.job } : {}),
+          ...(() => {
+            const own = u.drawerJobs?.[drawerKey(spec.id, i)];
+            const job = own ?? u.job;
+            return { ...(job ? { unitJob: job } : {}), ...(u.job ? { baseJob: u.job } : {}), ...(own ? { drawerJob: true } : {}) };
+          })(),
           ...(u.drawerNames?.[drawerKey(spec.id, i)]?.trim() ? { name: u.drawerNames[drawerKey(spec.id, i)].trim() } : {}),
           label: spec.qty > 1 ? `${spec.label} ${i + 1}` : spec.label,
           w: spec.w,
@@ -323,7 +332,7 @@ export function buildZones(comps: Compartment[]): Zone[] {
   for (const [unitId, cs] of byUnit) {
     const shape = cs.map((c) => c.classKey).join(',');
     // Units given different jobs are different places to plan for, even when they're the same product
-    const job = jobLabel(cs[0].unitJob);
+    const job = jobLabel(cs[0].baseJob);
     const key = `${stem(cs[0].unitName)}|${shape}|${job}`;
     const z = zones.get(key) ?? { label: job ? `${stem(cs[0].unitName)} (${job})` : stem(cs[0].unitName), unitIds: [], boxes: [], cellVolume: 0 };
     z.unitIds.push(unitId);
@@ -571,7 +580,8 @@ function zoneCost(groups: TreeNode[], z: Zone, capOf: (c: Compartment) => number
 const JOB_WEIGHT = 2;
 
 function jobCost(groups: TreeNode[], z: Zone): number {
-  const jobs = [...new Map(zoneCells(z).map((c) => [c.unitId, c.unitJob?.what])).values()];
+  // Each drawer by its own use, or its unit's job
+  const jobs = zoneCells(z).map((c) => c.unitJob?.what);
   if (!groups.length || !jobs.some(Boolean)) return 0;
   const fam = groups[0].familyKey;
   const mine = (what: string | undefined) => !!what && (what.startsWith('group:') ? familyGroup(fam) === what.slice(6) : what === fam);

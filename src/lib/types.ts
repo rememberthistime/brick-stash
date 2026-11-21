@@ -82,6 +82,8 @@ export interface StorageUnit {
   title?: string;
   /** The user's own names for its drawers, by drawerKey (compartment spec id and number, from 0) */
   drawerNames?: Record<string, string>;
+  /** What single drawers are for, where it differs from the unit's job, by drawerKey */
+  drawerJobs?: Record<string, UnitJob>;
   /** 3 = eye/hand level, 1 = awkward (floor, top shelf, back of cupboard) */
   accessibility: 1 | 2 | 3;
   compartments: CompartmentSpec[];
@@ -210,6 +212,8 @@ export interface AcceptedMove {
   parts?: string[];
   /** for drawers moved to other slots: each drawer's own name before, by compartment key ('' for none) */
   namesBefore?: Record<string, string>;
+  /** and each drawer's own use before (null for none) */
+  jobsBefore?: Record<string, UnitJob | null>;
 }
 
 /** The user's storage as it stands today, separate from anything the planner suggests */

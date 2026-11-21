@@ -54,6 +54,18 @@ export function setJob(units: StorageUnit[], unitId: string, job: UnitJob): Stor
   });
 }
 
+/** Set or clear what one drawer is for; cleared, it's for whatever its unit is for */
+export function setDrawerJob(units: StorageUnit[], unitId: string, drawer: string, job: UnitJob | undefined | null): StorageUnit[] {
+  return units.map((u) => {
+    if (u.id !== unitId) return u;
+    const { [drawer]: _old, ...others } = u.drawerJobs ?? {};
+    const clean: UnitJob = { ...(job?.what ? { what: job.what } : {}), ...(job?.size ? { size: job.size } : {}) };
+    const drawerJobs = clean.what || clean.size ? { ...others, [drawer]: clean } : others;
+    const { drawerJobs: _was, ...rest } = u;
+    return Object.keys(drawerJobs).length ? { ...rest, drawerJobs } : rest;
+  });
+}
+
 /** Units with a job and no name of their own are named for their job. Returns the same list if none needed it. */
 export function nameFromJobs(units: StorageUnit[]): StorageUnit[] {
   if (!units.some((u) => !u.title?.trim() && jobLabel(u.job))) return units;

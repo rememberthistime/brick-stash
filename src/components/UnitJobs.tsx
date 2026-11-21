@@ -23,7 +23,7 @@ export default function UnitJobs({ units, setUnits, hints = new Map(), moves = 0
     <section className="card unit-jobs">
       <h3>What each unit is for</h3>
       <p className="muted small">
-        Give each unit one job, such as Bricks, Technic, or Plates &amp; Tiles in its flat parts, so anyone can tell where a part belongs. Each unit has a suggested job, from what’s already in it (or, for an empty unit, what the suggestions would put there) and what its drawers’ shape suits. Moving a part offers the units whose job it fits first, the suggestions for drawers not yet recorded follow the jobs, Suggestions offers moves for parts in another unit’s job, and the layout check on Review points them out.
+        Give each unit a job, such as Bricks, Technic, or Plates &amp; Tiles in its flat parts, so anyone can tell where a part belongs. A single drawer can have a use of its own, set in the drawer (Used for), and Suggestions offers one for a drawer that’s mostly another sort of part. Each unit has a suggested job, from what’s already in it (or, for an empty unit, what the suggestions would put there) and what its drawers’ shape suits. Moving a part offers the units whose job it fits first, the suggestions for drawers not yet recorded follow the jobs, Suggestions offers moves for parts in another unit’s job, and the layout check on Review points them out.
       </p>
       <table className="unit-jobs-table">
         <thead>

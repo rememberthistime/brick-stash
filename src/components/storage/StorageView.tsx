@@ -11,6 +11,7 @@ import { findElsewhere } from './find';
 import NotInList, { type NewPart } from './NotInList';
 import { moveParts, movePocket, swapDrawers, takeOut, undoStep, type MoveItem, type Spot } from '../../lib/move';
 import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../../lib/codes';
+import { setDrawerJob } from '../../lib/unitJobs';
 import { pocketsFromSuggestion } from '../../lib/gaps';
 import { applyCycle, undoLast } from '../../lib/rearrange';
 import { setupLabels } from '../../lib/labels';
@@ -121,7 +122,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
     const r = swapDrawers(project, a, b);
     update({ setup: r.setup, units: r.units });
     const code = (k: string) => comps.find((c) => c.key === k)?.code ?? k;
-    history.push({ text: `Swapped ${code(a)} and ${code(b)}`, drawers: r.before, names: r.names });
+    history.push({ text: `Swapped ${code(a)} and ${code(b)}`, drawers: r.before, names: r.names, jobs: r.jobs });
   };
   /** Move a part here from every other pocket it's in */
   const moveHere = (num: string, to: Spot) =>
@@ -441,7 +442,20 @@ export default function StorageView({ page, model, project, update, parts, keptO
   else if (page === 'moves')
     body = (
       <section className="card">
-        <Suggestions setup={setup} setSetup={setSetup} analysis={analysis} onUndo={() => update(undoLast)} />
+        <Suggestions
+          setup={setup}
+          setSetup={setSetup}
+          analysis={analysis}
+          onUndo={() => update(undoLast)}
+          onUse={(uses) =>
+            update((p) => ({
+              units: uses.reduce((us, d) => {
+                const drawer = drawerKeyOf(d.key);
+                return drawer ? setDrawerJob(us, d.unitId, drawer, d.job) : us;
+              }, p.units),
+            }))
+          }
+        />
       </section>
     );
   else if (page === 'tidy')
@@ -472,7 +486,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
     <div className="sub-tabs no-print" role="tablist">
       {(
         [
-          ['moves', 'Moves worth making', analysis.suggestions.length],
+          ['moves', 'Moves worth making', analysis.suggestions.length + analysis.drawerUses.length],
           ['tidy', 'Tidy the layout', layoutMoves.reduce((t, r) => t + r.cycles.length, 0)],
           ['review', 'Review', analysis.findings.length + analysis.layout.length],
         ] as const
@@ -567,6 +581,11 @@ export default function StorageView({ page, model, project, update, parts, keptO
           }}
           onMoveHere={moveHere}
           onTakeOut={takeOutOf}
+          onJob={(job) => {
+            const drawer = drawerKeyOf(current.key);
+            if (drawer) update((p) => ({ units: setDrawerJob(p.units, current.unitId, drawer, job) }));
+          }}
+          useHint={analysis.drawerUses.find((d) => d.key === current.key)}
           notInList={({ query, listHasMatches, addNew, here, hereLabel }) => notInList({ query, listHasMatches, addNew, onOpen: setEditing, here: { spot: here, label: hereLabel } })}
           onAccept={(s) => setSetup((x) => acceptSuggestion(x, s, analysis.pockets))}
           onSkip={(id) => setSetup((x) => ({ ...x, skipped: [...x.skipped, id] }))}

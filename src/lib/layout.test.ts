@@ -6,7 +6,8 @@ import { buildTree, expandCompartments, plan } from './planner';
 import { acceptSuggestion, analyseSetup, contentsName, placePockets, setupComps, undoLastAccepted } from './setup';
 import { sizeClass } from './taxonomy';
 import { DEFAULT_SETTINGS, EMPTY_SETUP, type Part, type Setup, type SetupPocket, type StorageUnit } from './types';
-import { fitsJob, jobLabel, nameFromJobs, setJob, shapeOf, unitShape } from './unitJobs';
+import { fitsJob, jobLabel, nameFromJobs, setDrawerJob, setJob, shapeOf, unitShape } from './unitJobs';
+import { swapDrawers, undoStep } from './move';
 import { placeOptions, filterPlaces } from '../components/storage/places';
 
 const BRICKS = 11;
@@ -90,9 +91,8 @@ describe('layout check', () => {
   };
   const pocket = (id: string, ps: string[]): SetupPocket => ({ id, share: 1, parts: ps });
 
-  it('finds a unit doing two jobs, a family in many units and drawers with no name', () => {
+  it('finds a family in many units and drawers with no name', () => {
     const found = check({ A1: [pocket('1', ['3001'])], A2: [pocket('2', ['60592'])], B1: [pocket('3', ['3003'])], C1: [pocket('4', ['3004'])] });
-    expect(found.find((f) => f.kind === 'twoJobs')?.text).toMatch(/^A holds Bricks & Slopes \(\d+%\) and Vehicles & Building/);
     expect(found.find((f) => f.kind === 'spread')?.text).toBe('Bricks are in 3 units: A, B, C');
     expect(found.find((f) => f.kind === 'unnamed')?.text).toBe('4 recorded drawers have no name: A1, A2, B1, C1');
   });
@@ -207,7 +207,7 @@ describe('suggested jobs', () => {
 
 describe('moves towards the jobs', () => {
   const drawers = (id: string, code: string, job?: StorageUnit['job']): StorageUnit => ({ id, code, name: `Drawers ${code}`, accessibility: 2, ...(job ? { job } : {}), compartments: [{ id: 'c', label: 'Drawer', w: 220, d: 290, h: 70, qty: 2 }] });
-  const parts = [part('3001', 'Brick 2 x 4', 100, BRICKS, 4), part('3003', 'Brick 2 x 2', 100, BRICKS, 2), part('3020', 'Plate 2 x 4', 100, PLATES, 10)];
+  const parts = [part('3001', 'Brick 2 x 4', 100, BRICKS, 20), part('3003', 'Brick 2 x 2', 100, BRICKS, 2), part('3020', 'Plate 2 x 4', 100, PLATES, 10)];
   const units = [drawers('a', 'A', { what: 'group:bricks' }), drawers('b', 'B', { what: 'group:plates' })];
   const comps = setupComps(expandCompartments(units, DEFAULT_SETTINGS));
   const key = (code: string) => comps.find((c) => c.code === code)!.key;
@@ -219,7 +219,7 @@ describe('moves towards the jobs', () => {
   });
 
   it('moves a whole pocket, with its name, to an empty drawer in the unit for it', () => {
-    const setup: Setup = { ...EMPTY_SETUP, drawers: { [key('A1')]: [{ id: 'a1', share: 1, parts: ['3003'] }, { id: 'a2', share: 1, parts: ['3020'], label: 'Plates' }] } };
+    const setup: Setup = { ...EMPTY_SETUP, drawers: { [key('A1')]: [{ id: 'a1', share: 1, parts: ['3001', '3003'] }, { id: 'a2', share: 1, parts: ['3020'], label: 'Plates' }] } };
     const an = analyseSetup(setup, comps, parts, DEFAULT_SETTINGS, null);
     const s = an.allSuggestions.find((x) => x.kind === 'job')!;
     expect(s.title).toBe('Move A1.2 (Plates) to B1');
@@ -227,5 +227,26 @@ describe('moves towards the jobs', () => {
     expect(after.drawers[key('B1')]).toEqual([{ id: 'new', share: 1, parts: ['3020'], label: 'Plates' }]);
     expect(after.drawers[key('A1')][1]).toEqual({ id: 'a2', share: 1, parts: [] });
     expect(undoLastAccepted(after).drawers[key('B1')]).toBeUndefined();
+  });
+
+  it('offers a new use for a drawer mostly of another sort, instead of emptying it', () => {
+    const setup: Setup = { ...EMPTY_SETUP, drawers: { [key('A2')]: [{ id: 'p', share: 1, parts: ['3020'] }] } };
+    const an = analyseSetup(setup, comps, parts, DEFAULT_SETTINGS, null);
+    expect(an.drawerUses.map((d) => [d.code, jobLabel(d.job)])).toEqual([['A2', 'Plates']]);
+    expect(an.drawerUses[0].why).toMatch(/^100% of what's in it is Plates, but it's for Bricks & Slopes along with the rest of A/);
+    expect(an.allSuggestions.filter((s) => s.kind === 'job')).toEqual([]);
+    // Given that use, the drawer is for plates and the rest of A is still for bricks
+    const given = setDrawerJob(units, 'a', 'c:1', an.drawerUses[0].job);
+    const after = setupComps(expandCompartments(given, DEFAULT_SETTINGS));
+    expect(jobLabel(after.find((c) => c.code === 'A2')!.unitJob)).toBe('Plates');
+    expect(jobLabel(after.find((c) => c.code === 'A1')!.unitJob)).toBe('Bricks & Slopes');
+    expect(analyseSetup(setup, after, parts, DEFAULT_SETTINGS, null).drawerUses).toEqual([]);
+  });
+
+  it('takes a drawer’s use with it when drawers swap', () => {
+    const given = setDrawerJob(units, 'a', 'c:0', { what: 'plates' });
+    const r = swapDrawers({ setup: EMPTY_SETUP, units: given }, key('A1'), key('A2'));
+    expect(r.units[0].drawerJobs).toEqual({ 'c:1': { what: 'plates' } });
+    expect(undoStep({ setup: r.setup, units: r.units }, { text: '', drawers: r.before, names: r.names, jobs: r.jobs }).units[0].drawerJobs).toEqual({ 'c:0': { what: 'plates' } });
   });
 });

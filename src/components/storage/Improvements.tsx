@@ -1,6 +1,8 @@
 // What the app makes of the drawers as recorded: moves worth making, how the estimates compare, and what to look at.
 import { nameTitle } from '../../lib/builderNames';
 import PartName from '../PartName';
+import type { DrawerUse } from '../../lib/jobSuggest';
+import { jobLabel } from '../../lib/unitJobs';
 import { acceptSuggestion, type EstimateRow, type Finding, type FindingKind, type SetupAnalysis } from '../../lib/setup';
 import type { Part, Setup } from '../../lib/types';
 import type { LayoutFinding, LayoutKind } from '../../lib/layoutCheck';
@@ -50,7 +52,7 @@ export function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map
   );
 }
 
-export function Suggestions({ setup, setSetup, analysis, onUndo }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis; onUndo: () => void }) {
+export function Suggestions({ setup, setSetup, analysis, onUndo, onUse }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis; onUndo: () => void; onUse?: (uses: DrawerUse[]) => void }) {
   const byNum = partsOf(analysis);
   return (
     <>
@@ -73,6 +75,30 @@ export function Suggestions({ setup, setSetup, analysis, onUndo }: { setup: Setu
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {onUse && analysis.drawerUses.length > 0 && (
+        <div className="drawer-uses">
+          <h4>Drawers to give a new use</h4>
+          <p className="muted small">These are mostly one sort of part that isn’t what they’re for. Rather than moving it all out, the drawer can be for what’s in it. Similar drawers can then be brought together on Tidy the layout.</p>
+          <ul className="change-list">
+            {analysis.drawerUses.map((d) => (
+              <li key={d.key}>
+                <b>
+                  <span className="code">{d.code}</span> for {jobLabel(d.job)}
+                </b>{' '}
+                <span className="muted small">{d.why}.</span>{' '}
+                <button className="small-btn" onClick={() => onUse([d])}>
+                  Use
+                </button>
+              </li>
+            ))}
+          </ul>
+          {analysis.drawerUses.length > 1 && (
+            <button className="link small" onClick={() => onUse(analysis.drawerUses)}>
+              Use all {analysis.drawerUses.length}
+            </button>
+          )}
         </div>
       )}
       {analysis.suggestions.length === 0 && <p className="muted small">{analysis.drawersRecorded ? 'Nothing to suggest from what’s recorded so far. More drawers, with fills entered, give it more to work with.' : 'Record a few drawers above and suggestions will appear here.'}</p>}
@@ -201,7 +227,6 @@ export function Findings({ findings, analysis }: { findings: Finding[]; analysis
 }
 
 const LAYOUT: { kind: LayoutKind; title: string; hint: string }[] = [
-  { kind: 'twoJobs', title: 'Units doing two jobs', hint: 'Someone who finds one sort of part in a unit won’t think to look there for another. Give each unit one job on Units.' },
   { kind: 'againstJob', title: 'Parts in another unit’s job', hint: 'Parts that don’t fit the job you gave their unit on Units.' },
   { kind: 'spread', title: 'Families in many units', hint: 'The more units a family is in, the more places there are to look.' },
   { kind: 'catchAll', title: 'Catch-all drawers', hint: 'Drawers holding parts from three or more groups, or a dozen pockets or more. Tick “Mixed on purpose” on a pocket to leave it out.' },
