@@ -224,6 +224,125 @@ export default function DrawerEditor({
             ✕
           </button>
         </div>
+        <details className="drawer-settings" open={!pockets}>
+          <summary>
+            <b>Drawer settings</b>{' '}
+            <span className="muted small">
+              {[current.length > 1 ? `${current.length} pockets` : '1 pocket', !comp.sections && comp.unitJob ? `for ${jobLabel(comp.unitJob)}` : '', comp.sections ? `whole box, ${L(comp.volume)}` : `${comp.w}×${comp.d}×${comp.h} mm`].filter(Boolean).join(' · ')}
+            </span>
+          </summary>
+        {onJob && !comp.sections && (
+          <div className="setup-editor-use small">
+            <span>Used for</span>
+            <select aria-label={`What ${comp.code} holds`} value={setUse ? comp.unitJob?.what ?? '' : ''} onChange={(e) => onJob(e.target.value ? { ...(setUse ? comp.unitJob : {}), what: e.target.value } : setUse && comp.unitJob?.size ? { size: comp.unitJob.size } : null)}>
+              <option value="">{setUse ? 'Anything' : comp.nameJob ? `From its name: ${jobLabel(comp.unitJob)}` : `As the unit: ${jobLabel(comp.baseJob) || 'anything'}`}</option>
+              {whatChoices().map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.indent ? `   ${c.label}` : c.label}
+                </option>
+              ))}
+            </select>
+            <select aria-label={`Size of part for ${comp.code}`} value={setUse ? comp.unitJob?.size ?? '' : ''} onChange={(e) => onJob(setUse && comp.unitJob?.what ? { what: comp.unitJob.what, ...(e.target.value ? { size: e.target.value as SizeClass } : {}) } : e.target.value ? { ...(comp.baseJob?.what ? { what: comp.baseJob.what } : {}), size: e.target.value as SizeClass } : null)}>
+              <option value="">Any size</option>
+              {SIZE_CLASSES.map((c) => (
+                <option key={c.key} value={c.key} title={c.hint}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            {setUse && (
+              <button className="link small" onClick={() => onJob(null)}>
+                {useFromName(comp.name) ? `As its name says (${jobLabel(useFromName(comp.name)!)})` : `Same as the unit${comp.baseJob ? ` (${jobLabel(comp.baseJob)})` : ''}`}
+              </button>
+            )}
+            {useHint && (
+              <span className="setup-use-hint">
+                {useHint.why}.{' '}
+                <button className="small-btn" onClick={() => onJob(useHint.job)}>
+                  Use it for {jobLabel(useHint.job)}
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+        {pockets && (
+          <div className="drawer-tools small">
+            <PlacePicker label="Swap with another drawer…" title={`Swap ${comp.code} with…`} options={drawers} exclude={{ key: comp.key }} onPick={(o) => onSwap(o.key)} />
+            <span className="muted">Its pockets and name change places with the other drawer’s.</span>
+          </div>
+        )}
+        {comp.sections ? (
+          <div className="setup-layout small">
+            <label>
+              Holds{' '}
+              <input
+                type="number"
+                min={0.1}
+                step={0.1}
+                defaultValue={Number((comp.volume / 1000).toFixed(2))}
+                aria-label="What the whole box holds, litres"
+                onBlur={(e) => {
+                  const v = Number(e.target.value);
+                  if (v > 0) onLitres(v);
+                }}
+              />{' '}
+              L
+            </label>
+            <span className="muted">Whole box, without its {comp.sections} sections</span>
+            <button className="link small" onClick={onPutBack}>
+              Put the sections back
+            </button>
+          </div>
+        ) : (
+          <>
+            {canOpen && (
+              <div className="setup-layout small">
+                <span className="muted">Not using this box’s sections?</span>
+                <button className="ghost small-btn" onClick={() => onOpen('dividers')}>
+                  Take the dividers out
+                </button>
+                <button className="ghost small-btn" onClick={() => onOpen('containers')}>
+                  Lift the containers out
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+
+
+        <div className="setup-count">
+          <span>Pockets</span>
+          <button className="ghost small-btn" aria-label="Fewer pockets" disabled={plain.length <= minPockets} onClick={() => onChange(resizePockets(current, plain.length - 1, uid))}>
+            −
+          </button>
+          <b>{plain.length}</b>
+          <button className="ghost small-btn" aria-label="More pockets" onClick={() => onChange(resizePockets(current, plain.length + 1, uid))}>
+            +
+          </button>
+          {plain.length > 0 && Math.abs(totalShare - 1) > 0.02 && <span className="muted small">Sizes add up to {pct(totalShare)}, and will be scaled to fit.</span>}
+        </div>
+
+        <ContainerAdder comp={comp} current={current} choices={choices} onAdd={(c, n) => onChange(addContainers(current, c, n, uid))} onNew={onNewContainer} />
+        {hasContainers && (
+          <p className={`muted small ${left < 0 ? 'warn-text' : ''}`}>
+            {left < 0 ? `These containers need ${pct(1 - left)} of the floor, so they won’t all stand in here.` : plain.length ? `Containers take ${pct(1 - left)} of the floor, and the pockets share the rest.` : `Containers take ${pct(1 - left)} of the floor. Add a pocket if you use the rest.`}
+          </p>
+        )}
+
+          {pockets && (
+            <p className="drawer-forget">
+              <button
+                className="link small danger"
+                onClick={() => {
+                  if (confirm(`Forget what you’ve recorded for ${comp.code}? Your other drawers aren’t affected.`)) onForget();
+                }}
+              >
+                Forget this drawer
+              </button>
+            </p>
+          )}
+        </details>
         <label className="setup-editor-name small">
           Name
           <NameInput
@@ -354,6 +473,7 @@ export default function DrawerEditor({
           <Waiting
             homes={homes}
             moves={moves}
+            into={(m) => m.moves.some((x) => x.toDrawer === comp.key || current.some((p) => p.id === x.to))}
             divided={current.length > 1}
             titleOf={titleOf}
             byNum={byNum}
@@ -364,125 +484,6 @@ export default function DrawerEditor({
           />
         )}
 
-        <details className="drawer-settings" open={!pockets}>
-          <summary>
-            <b>Drawer settings</b>{' '}
-            <span className="muted small">
-              {[current.length > 1 ? `${current.length} pockets` : '1 pocket', !comp.sections && comp.unitJob ? `for ${jobLabel(comp.unitJob)}` : '', comp.sections ? `whole box, ${L(comp.volume)}` : `${comp.w}×${comp.d}×${comp.h} mm`].filter(Boolean).join(' · ')}
-            </span>
-          </summary>
-        {onJob && !comp.sections && (
-          <div className="setup-editor-use small">
-            <span>Used for</span>
-            <select aria-label={`What ${comp.code} holds`} value={setUse ? comp.unitJob?.what ?? '' : ''} onChange={(e) => onJob(e.target.value ? { ...(setUse ? comp.unitJob : {}), what: e.target.value } : setUse && comp.unitJob?.size ? { size: comp.unitJob.size } : null)}>
-              <option value="">{setUse ? 'Anything' : comp.nameJob ? `From its name: ${jobLabel(comp.unitJob)}` : `As the unit: ${jobLabel(comp.baseJob) || 'anything'}`}</option>
-              {whatChoices().map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.indent ? `   ${c.label}` : c.label}
-                </option>
-              ))}
-            </select>
-            <select aria-label={`Size of part for ${comp.code}`} value={setUse ? comp.unitJob?.size ?? '' : ''} onChange={(e) => onJob(setUse && comp.unitJob?.what ? { what: comp.unitJob.what, ...(e.target.value ? { size: e.target.value as SizeClass } : {}) } : e.target.value ? { ...(comp.baseJob?.what ? { what: comp.baseJob.what } : {}), size: e.target.value as SizeClass } : null)}>
-              <option value="">Any size</option>
-              {SIZE_CLASSES.map((c) => (
-                <option key={c.key} value={c.key} title={c.hint}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            {setUse && (
-              <button className="link small" onClick={() => onJob(null)}>
-                {useFromName(comp.name) ? `As its name says (${jobLabel(useFromName(comp.name)!)})` : `Same as the unit${comp.baseJob ? ` (${jobLabel(comp.baseJob)})` : ''}`}
-              </button>
-            )}
-            {useHint && (
-              <span className="setup-use-hint">
-                {useHint.why}.{' '}
-                <button className="small-btn" onClick={() => onJob(useHint.job)}>
-                  Use it for {jobLabel(useHint.job)}
-                </button>
-              </span>
-            )}
-          </div>
-        )}
-        {pockets && (
-          <div className="drawer-tools small">
-            <PlacePicker label="Swap with another drawer…" title={`Swap ${comp.code} with…`} options={drawers} exclude={{ key: comp.key }} onPick={(o) => onSwap(o.key)} />
-            <span className="muted">Its pockets and name change places with the other drawer’s.</span>
-          </div>
-        )}
-        {comp.sections ? (
-          <div className="setup-layout small">
-            <label>
-              Holds{' '}
-              <input
-                type="number"
-                min={0.1}
-                step={0.1}
-                defaultValue={Number((comp.volume / 1000).toFixed(2))}
-                aria-label="What the whole box holds, litres"
-                onBlur={(e) => {
-                  const v = Number(e.target.value);
-                  if (v > 0) onLitres(v);
-                }}
-              />{' '}
-              L
-            </label>
-            <span className="muted">Whole box, without its {comp.sections} sections</span>
-            <button className="link small" onClick={onPutBack}>
-              Put the sections back
-            </button>
-          </div>
-        ) : (
-          <>
-            {canOpen && (
-              <div className="setup-layout small">
-                <span className="muted">Not using this box’s sections?</span>
-                <button className="ghost small-btn" onClick={() => onOpen('dividers')}>
-                  Take the dividers out
-                </button>
-                <button className="ghost small-btn" onClick={() => onOpen('containers')}>
-                  Lift the containers out
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-
-
-        <div className="setup-count">
-          <span>Pockets</span>
-          <button className="ghost small-btn" aria-label="Fewer pockets" disabled={plain.length <= minPockets} onClick={() => onChange(resizePockets(current, plain.length - 1, uid))}>
-            −
-          </button>
-          <b>{plain.length}</b>
-          <button className="ghost small-btn" aria-label="More pockets" onClick={() => onChange(resizePockets(current, plain.length + 1, uid))}>
-            +
-          </button>
-          {plain.length > 0 && Math.abs(totalShare - 1) > 0.02 && <span className="muted small">Sizes add up to {pct(totalShare)}, and will be scaled to fit.</span>}
-        </div>
-
-        <ContainerAdder comp={comp} current={current} choices={choices} onAdd={(c, n) => onChange(addContainers(current, c, n, uid))} onNew={onNewContainer} />
-        {hasContainers && (
-          <p className={`muted small ${left < 0 ? 'warn-text' : ''}`}>
-            {left < 0 ? `These containers need ${pct(1 - left)} of the floor, so they won’t all stand in here.` : plain.length ? `Containers take ${pct(1 - left)} of the floor, and the pockets share the rest.` : `Containers take ${pct(1 - left)} of the floor. Add a pocket if you use the rest.`}
-          </p>
-        )}
-
-          {pockets && (
-            <p className="drawer-forget">
-              <button
-                className="link small danger"
-                onClick={() => {
-                  if (confirm(`Forget what you’ve recorded for ${comp.code}? Your other drawers aren’t affected.`)) onForget();
-                }}
-              >
-                Forget this drawer
-              </button>
-            </p>
-          )}
-        </details>
         <div className="setup-editor-foot">
           <button className="ghost small-btn" onClick={onPrev}>
             ‹ Previous
@@ -666,9 +667,12 @@ function Waiting({
   onNotHere,
   onAccept,
   onSkip,
+  into,
 }: {
   homes: (RecordedHome & { part: Part })[];
   moves: Suggestion[];
+  /** whether a move brings parts into this drawer, rather than taking them out */
+  into: (s: Suggestion) => boolean;
   divided: boolean;
   titleOf: (i: number) => string;
   byNum: Map<string, Part>;
@@ -679,19 +683,41 @@ function Waiting({
 }) {
   const [open, setOpen] = useState(true);
   const SHOWN = 12;
+  const movesIn = moves.filter(into).slice(0, MOVES_SHOWN);
+  const movesOut = moves.filter((m) => !into(m)).slice(0, MOVES_SHOWN);
+  const moveRow = (m: Suggestion) => (
+    <div key={m.id} className="waiting-move">
+      <span className="move-name">
+        <b className="small">{m.title}</b>
+        <span className="muted small">
+          {' '}
+          {m.why}
+          {m.estimated && <span className="warn-text"> Based on an estimated fill.</span>}
+        </span>
+        <PartStrip nums={m.moves.map((x) => x.part)} byNum={byNum} max={4} />
+      </span>
+      <button className="small-btn accept-btn" onClick={() => onAccept(m)}>
+        Accept
+      </button>
+      <button className="ghost small-btn" onClick={() => onSkip(m.id)}>
+        Skip
+      </button>
+    </div>
+  );
   return (
     <section className="waiting">
       <button className="waiting-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="fold-caret">{open ? '▾' : '▸'}</span>
         <b>Suggested for this drawer</b>
         <span className="muted small">
-          {[homes.length ? `${homes.length} ${homes.length === 1 ? 'part' : 'parts'} to put in` : '', moves.length ? (moves.length === 1 ? '1 move' : `${Math.min(moves.length, MOVES_SHOWN)} best moves`) : ''].filter(Boolean).join(' · ')}
+          {[homes.length ? `${homes.length} ${homes.length === 1 ? 'part' : 'parts'} to put in` : '', movesIn.length ? `${movesIn.length} ${movesIn.length === 1 ? 'move' : 'moves'} in` : '', movesOut.length ? `${movesOut.length} ${movesOut.length === 1 ? 'move' : 'moves'} out` : ''].filter(Boolean).join(' · ')}
         </span>
       </button>
       {open && (
         <>
           {homes.length > 0 && (
             <>
+              <h5 className="waiting-title">Parts to put in</h5>
               <div className="waiting-sub">
                 <span className="muted small">Not in a drawer yet, with room here beside the same sort of parts.</span>
                 {homes.length > 1 && (
@@ -722,25 +748,18 @@ function Waiting({
               {homes.length > SHOWN && <p className="muted small">and {homes.length - SHOWN} more, added with Add all.</p>}
             </>
           )}
-          {moves.slice(0, MOVES_SHOWN).map((m) => (
-            <div key={m.id} className="waiting-move">
-              <span className="move-name">
-                <b className="small">{m.title}</b>
-                <span className="muted small">
-                  {' '}
-                  {m.why}
-                  {m.estimated && <span className="warn-text"> Based on an estimated fill.</span>}
-                </span>
-                <PartStrip nums={m.moves.map((x) => x.part)} byNum={byNum} max={4} />
-              </span>
-              <button className="small-btn accept-btn" onClick={() => onAccept(m)}>
-                Accept
-              </button>
-              <button className="ghost small-btn" onClick={() => onSkip(m.id)}>
-                Skip
-              </button>
-            </div>
-          ))}
+          {movesIn.length > 0 && (
+            <>
+              <h5 className="waiting-title">Moves into this drawer</h5>
+              {movesIn.map(moveRow)}
+            </>
+          )}
+          {movesOut.length > 0 && (
+            <>
+              <h5 className="waiting-title">Suggested moves out of this drawer</h5>
+              {movesOut.map(moveRow)}
+            </>
+          )}
         </>
       )}
     </section>
