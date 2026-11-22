@@ -234,10 +234,11 @@ export interface Setup {
 export const EMPTY_SETUP: Setup = { drawers: {}, skipped: [], accepted: [], useFills: false, open: {}, containers: [] };
 
 /**
- * A way of grouping parts. Looks like: by appearance (flat, round, curved, clips…) then outline. Catalogue: by
+ * A way of grouping parts. Kind: what it is (windscreens, bricks, clips), then small, long or large (or what it's on),
+ * then exact size. Looks like: by appearance (flat, round, curved, clips…) then outline. Catalogue: by
  * Rebrickable's families and categories, as the app always has. Used for: vehicles, scenery, Technic and so on.
  */
-export type Lens = 'looks' | 'catalogue' | 'usedFor';
+export type Lens = 'kind' | 'looks' | 'catalogue' | 'usedFor';
 
 /** How parts are grouped for planning: a lens for each level, top first, and parts put in a group by hand */
 export interface Sorting {

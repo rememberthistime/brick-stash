@@ -3,7 +3,7 @@
 // browser's back button and bookmarks work.
 import { useEffect, useState, type ReactNode } from 'react';
 
-export type Page = 'import' | 'parts' | 'built' | 'kept' | 'units' | 'spaces' | 'drawers' | 'put-away' | 'todo' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export' | 'settings' | 'project';
+export type Page = 'import' | 'parts' | 'groups' | 'built' | 'kept' | 'units' | 'spaces' | 'drawers' | 'put-away' | 'todo' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export' | 'settings' | 'project';
 
 /** The pages, grouped. A page `under` another is reached from that page's tabs, not listed in the sidebar itself. */
 export const NAV: { group: string; pages: { id: Page; label: string; under?: Page }[] }[] = [
@@ -39,6 +39,7 @@ export const NAV: { group: string; pages: { id: Page; label: string; under?: Pag
     group: 'Collection',
     pages: [
       { id: 'parts', label: 'Parts' },
+      { id: 'groups', label: 'Groups' },
       { id: 'import', label: 'Import' },
       { id: 'built', label: 'Sets kept built' },
       { id: 'kept', label: 'Kept out' },

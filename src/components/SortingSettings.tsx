@@ -9,16 +9,22 @@ import { DEFAULT_SORTING, type Catalog, type Lens, type Part, type Project, type
 import WhatIf from './WhatIf';
 
 const LENSES: { k: Lens; label: string; hint: string }[] = [
+  { k: 'kind', label: 'Kind, then size', hint: 'Windscreens, bricks, clips… then small, long or large (or what it’s on), then exact size' },
   { k: 'looks', label: 'Looks like', hint: 'Flat pieces, rounds, curves, clips and bars… then by outline (1×2, 2×4…)' },
   { k: 'catalogue', label: 'Catalogue', hint: 'Rebrickable’s families and categories: plates, modified plates, tiles…' },
   { k: 'usedFor', label: 'Used for', hint: 'General building, vehicles, scenery, Technic, figures (a rough guess)' },
 ];
 
-const PRESETS: { label: string; levels: Lens[] }[] = [
+export const SORTING_PRESETS: { label: string; levels: Lens[] }[] = [
+  { label: 'Kind, then size (the builder’s way)', levels: ['kind'] },
   { label: 'Looks like, then catalogue', levels: ['looks', 'catalogue'] },
   { label: 'Catalogue only (as before)', levels: ['catalogue'] },
   { label: 'Used for, then looks like', levels: ['usedFor', 'looks'] },
 ];
+
+/** A preset's name, or the lenses in order */
+export const presetLabel = (levels: Lens[]) =>
+  SORTING_PRESETS.find((p) => p.levels.join() === levels.join())?.label ?? levels.map((l) => LENSES.find((x) => x.k === l)?.label ?? l).join(', then ');
 
 const same = (a: Sorting, b: Sorting) => JSON.stringify({ l: a.levels, p: a.parts ?? {} }) === JSON.stringify({ l: b.levels, p: b.parts ?? {} });
 
@@ -78,7 +84,7 @@ export default function SortingSettings({ project, catalog, parts, onApply }: { 
         How parts are grouped when the app suggests where they go. Pick a way of grouping for each level: with Looks like then Catalogue, a 1×1 round plate and a 1×1 round tile both go in “Round 1×1”, each in its own part of it. Nothing changes until you press Use this sorting, and you can see what would happen first.
       </p>
       <div className="row">
-        {PRESETS.map((p) => (
+        {SORTING_PRESETS.map((p) => (
           <button key={p.label} className={`ghost ${draft.levels.join() === p.levels.join() ? 'on' : ''}`} onClick={() => setDraft({ ...draft, levels: p.levels })}>
             {p.label}
           </button>

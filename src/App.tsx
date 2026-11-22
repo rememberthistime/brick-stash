@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { download, uid, useCatalog, useProject, useTrial, withDefaults } from './state';
-import SortingSettings from './components/SortingSettings';
+import SortingSettings, { presetLabel } from './components/SortingSettings';
+import GroupsPage from './components/GroupsPage';
 import TryChange from './components/TryChange';
 import ResortAll from './components/ResortAll';
 import { moveParts } from './lib/move';
@@ -150,6 +151,7 @@ export default function App() {
     parts: parts.length
       ? { headline: `${plural(parts.length, 'part type')}, ${totals.pieces.toLocaleString()} pieces`, sub: `About ${(totals.volume / 1000).toFixed(1)} L loose, colours merged. Click a family for its parts; untick one to keep it out of storage.` }
       : { headline: 'No parts yet' },
+    groups: { headline: 'Every group, as a list', sub: `Grouped by ${presetLabel((project.sorting ?? DEFAULT_SORTING).levels).toLowerCase()}. Open a group for the groups inside it, down to each part with its colours and drawers.` },
     import: project.rows.length
       ? { headline: `${plural(project.rows.length, 'row')} loaded`, sub: 'A parts list from Rebrickable, BrickLink, Brickset or any spreadsheet, or whole sets.' }
       : { headline: 'Start with your parts list', sub: 'Any spreadsheet saved as CSV works, as do Rebrickable, BrickLink and Brickset exports.' },
@@ -227,6 +229,7 @@ export default function App() {
         }}
       />
     );
+  else if (page === 'groups') body = <GroupsPage project={project} catalog={catalog} parts={parts} whereIs={model.whereIs} apply={(sorting) => update({ sorting })} />;
   else if (page === 'units' || page === 'spaces') body = <StorageTab view={page} project={project} update={update} jobHints={model.jobHints} jobMoves={model.jobMoves} />;
   else if (STORAGE_PAGES.has(page)) body = <StorageView page={page as StoragePage} model={model} project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} kept={kept} owned={owned} catalog={catalog} goTo={setPage} />;
   else if (page === 'settings')

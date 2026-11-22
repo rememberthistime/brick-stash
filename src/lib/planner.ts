@@ -1,5 +1,5 @@
 import type { Granularity, Lens, Part, Settings, Sorting, StorageUnit, UnitJob } from './types';
-import { LOOK_GROUPS, OUTLINE_ORDER, USE_GROUPS, lookGroup, outlineLabel, traitsOf, useGroup, usedFor } from './traits';
+import { KINDS, LOOK_GROUPS, kindByHeading, OUTLINE_ORDER, USE_GROUPS, kindPlace, lookGroup, outlineLabel, traitsOf, useGroup, usedFor } from './traits';
 import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeClass, sizeGroupName, sortKeyInfo, registerSortKey } from './taxonomy';
 import { jobLabel, shapeOf, useFromName } from './unitJobs';
 
@@ -156,8 +156,17 @@ function finishTree(root: TreeNode): TreeNode {
     n.seq = seq++;
     n.children.sort(compareNodes);
     for (const c of n.children) finish(c);
-    // A group with a single sub-group adds a level without adding a choice — skip it
-    n.children = n.children.map((c) => (!c.part && c.children.length === 1 ? c.children[0] : c));
+    // A group with a single sub-group adds a level without adding a choice — skip it. At the top the group keeps its
+    // own name (Turntables, not the one catalogue heading under it) and takes on what's inside.
+    n.children = n.children.map((c) => {
+      if (c.part || c.children.length !== 1) return c;
+      if (n === root && !c.children[0].part) {
+        c.children = c.children[0].children;
+        for (const g of c.children) g.parent = c;
+        return c;
+      }
+      return c.children[0];
+    });
     for (const c of n.children) c.parent = n;
     if (n.children.length) {
       n.pieces = n.children.reduce((t, c) => t + c.pieces, 0);
@@ -185,6 +194,16 @@ function segmentsFor(lens: Lens, part: Part, top: boolean, categories: Record<st
     const look = lookGroup(t.look)!;
     const out: Seg[] = [{ id: look.key, label: within(look.label), order: LOOK_GROUPS.indexOf(look) }];
     if (t.outline) out.push({ id: `o${t.outline}`, label: outlineLabel(look, t.outline), order: OUTLINE_ORDER.indexOf(t.outline) });
+    return out;
+  }
+  if (lens === 'kind') {
+    const k = kindPlace(part);
+    const out: Seg[] = [{ id: k.kind.key, label: within(k.kind.label), order: KINDS.indexOf(k.kind) }];
+    const lower = k.kind.label.replace(/^(?!Technic)\w/, (c) => c.toLowerCase());
+    if (k.band) out.push({ id: `b${k.band.id}`, label: k.band.label.startsWith('On ') || k.band.id === 'other' ? `${k.kind.label}, ${k.band.label.toLowerCase()}` : `${k.band.label} ${lower}`, order: k.band.order });
+    if (k.size) out.push({ id: `s${k.size}`, label: `${k.kind.label} ${k.size}`, order: k.size.split('×').reduce((t, x) => t * (parseFloat(x) || 1), 1) });
+    // Kinds with nothing to measure (minifig parts, plants, Technic bits) go by catalogue heading instead
+    else if (!k.band && kindByHeading(k.kind.key) && part.catId != null) out.push({ id: `c${part.catId}`, label: categoryName(categories[part.catId] ?? `Category ${part.catId}`), order: catOrder(part.catId) });
     return out;
   }
   if (lens === 'usedFor') {
