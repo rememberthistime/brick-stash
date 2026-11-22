@@ -23,7 +23,7 @@ export default function TryChange({ real, trial, catalog, keep, discard }: { rea
           Throw them away
         </button>
       </div>
-      {open && changed && <WhatIf now={real} after={trial} catalog={catalog} title="Your project now, and with these changes" />}
+      {open && changed && <WhatIf now={real} after={trial} catalog={catalog} title="Your project now, and with these changes" note="" />}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { Catalog, Part } from './types';
 import { leadOf, traitsOf, usedFor } from './traits';
 import { buildTree, leaves, plan } from './planner';
-import { summarise, compare } from './whatIf';
+import { summarise, compare, resortedSetup } from './whatIf';
 import { DEFAULT_SETTINGS, DEFAULT_KEEP_OUT, EMPTY_SETUP, type Project } from './types';
 
 const catalog: Catalog = JSON.parse(readFileSync(join(__dirname, '..', '..', 'public/data/parts.json'), 'utf8'));
@@ -101,5 +101,19 @@ describe('what if', () => {
     const c = compare(summarise(tight, catalog), summarise(project, catalog));
     expect(c.after.noRoom).toBeLessThanOrEqual(c.now.noRoom);
     expect(c.after.drawersFree).toBeGreaterThan(c.now.drawersFree);
+  });
+  it('re-sorts every drawer, recorded ones included, without changing the project', () => {
+    // Everything tipped into the first drawer by hand
+    const recorded = { ...project, setup: { ...EMPTY_SETUP, drawers: { 'u:c:0': [{ id: 'p', share: 1, parts: parts.map((p) => p.partNum) }] } } };
+    let n = 0;
+    const setup = resortedSetup(recorded, catalog, () => `n${n++}`);
+    expect(Object.keys(setup.drawers).length).toBeGreaterThan(1);
+    const stored = Object.values(setup.drawers).flatMap((d) => d.flatMap((p) => p.parts));
+    // A part with too many pieces for one drawer runs on into the next
+    expect(new Set(stored).size).toBe(parts.length);
+    expect(recorded.setup.drawers['u:c:0'][0].parts.length).toBe(parts.length);
+    const c = compare(summarise(recorded, catalog), summarise({ ...recorded, setup }, catalog));
+    expect(c.moved.length).toBeGreaterThan(0);
+    expect(c.drawers.length).toBeGreaterThan(0);
   });
 });

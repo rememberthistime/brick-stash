@@ -11,7 +11,19 @@ const SHOWN = 12;
 
 const where = (x: string | null) => (x === null ? 'not in the collection' : x === '' ? 'no room' : x);
 
-export default function WhatIf({ now, after, catalog, title = 'What would change' }: { now: Project; after: Project; catalog: Catalog | null; title?: string }) {
+export default function WhatIf({
+  now,
+  after,
+  catalog,
+  title = 'What would change',
+  note = 'Drawers you’ve recorded stay as they are either way: this only changes what’s suggested for the rest.',
+}: {
+  now: Project;
+  after: Project;
+  catalog: Catalog | null;
+  title?: string;
+  note?: string;
+}) {
   const before = useMemo(() => summarise(now, catalog), [now, catalog]);
   const then = useMemo(() => summarise(after, catalog), [after, catalog]);
   const c = useMemo(() => compare(before, then), [before, then]);
@@ -65,7 +77,7 @@ export default function WhatIf({ now, after, catalog, title = 'What would change
           </table>
           {c.drawers.length > 0 && (
             <>
-              <h5>Empty drawers whose suggestion would change ({c.drawers.length})</h5>
+              <h5>Drawers whose contents would change ({c.drawers.length})</h5>
               <ul className="what-if-list">
                 {drawers.map((d) => (
                   <li key={d.code}>
@@ -82,7 +94,7 @@ export default function WhatIf({ now, after, catalog, title = 'What would change
           )}
           {c.moved.length > 0 && (
             <>
-              <h5>Parts that would be suggested somewhere else ({c.moved.length})</h5>
+              <h5>Parts that would be somewhere else ({c.moved.length})</h5>
               <ul className="what-if-list">
                 {moves.map((m) => (
                   <li key={m.partNum}>
@@ -99,7 +111,7 @@ export default function WhatIf({ now, after, catalog, title = 'What would change
           )}
         </>
       )}
-      <p className="muted small">Drawers you’ve recorded stay as they are either way: this only changes what’s suggested for the rest.</p>
+      {note && <p className="muted small">{note}</p>}
     </div>
   );
 }

@@ -2,13 +2,13 @@
 // change made (a different sorting, a part put in a group by hand, new storage, a set added or kept built, anything),
 // so the two can be shown side by side before anything is kept. Nothing here changes a project.
 import { collectionRows, mergeToParts, subtractParts } from './collection';
-import { homesInRecorded, planGaps } from './gaps';
+import { homesInRecorded, planGaps, pocketsFromSuggestion } from './gaps';
 import { recordedJobs } from './jobSuggest';
 import { splitKeptOut } from './keepOut';
 import { calibrationFrom, withCalibration } from './measure';
 import { buildTree, expandCompartments, leaves, sectionLabel } from './planner';
 import { analyseSetup, groupsOf, setupComps, setupMeasurements } from './setup';
-import type { Catalog, Part, Project } from './types';
+import type { Catalog, Part, Project, Setup } from './types';
 
 export interface PlanSummary {
   partTypes: number;
@@ -29,13 +29,13 @@ export interface PlanSummary {
   noRoom: number;
   /** where each part type would be: a drawer or pocket code, or '' for no room */
   place: Map<string, string>;
-  /** what the plan puts in each drawer not recorded yet, by its code */
+  /** what's in each drawer, recorded or suggested, by its code */
   drawers: Map<string, string[]>;
   names: Map<string, string>;
 }
 
-/** The same steps the app takes from a project to its plan, without the screens */
-export function summarise(project: Project, catalog: Catalog | null): PlanSummary {
+/** The parts the plan stores: the collection, less sets kept built and what's kept out, with fills applied */
+export function plannedParts(project: Project, catalog: Catalog | null): Part[] {
   const s = project.settings;
   const owned = mergeToParts(collectionRows(project), catalog, project.volumeOverrides);
   const subtraction = subtractParts(
@@ -43,10 +43,31 @@ export function summarise(project: Project, catalog: Catalog | null): PlanSummar
     project.excluded.filter((e) => e.enabled).flatMap((e) => e.rows),
     catalog,
   );
-  const base = expandCompartments(project.units, s);
-  const spaces = setupComps(base, project.setup.open);
+  const spaces = setupComps(expandCompartments(project.units, s), project.setup.open);
   const calibration = project.setup.useFills ? calibrationFrom(setupMeasurements(project.setup, spaces, subtraction.parts), s.volumeScale) : null;
-  const { planned: parts } = splitKeptOut(withCalibration(subtraction.parts, calibration), project.keepOut, project.units);
+  return splitKeptOut(withCalibration(subtraction.parts, calibration), project.keepOut, project.units).planned;
+}
+
+/**
+ * Every drawer sorted afresh, the ones you've recorded included: the whole collection planned into all the storage
+ * by the current sorting and plan settings, as if nothing were recorded. Units opened up, drawer uses and names stay.
+ * Accepted moves still to make are dropped, since the new layout replaces them. Nothing is changed here: this is
+ * the setup to preview, and to keep only if asked.
+ */
+export function resortedSetup(project: Project, catalog: Catalog | null, newId: () => string): Setup {
+  const parts = plannedParts(project, catalog);
+  const blank: Setup = { ...project.setup, drawers: {}, accepted: [] };
+  const gaps = planGaps(project.units, blank, parts, catalog?.categories ?? {}, project.settings, undefined, project.sorting);
+  const drawers: Setup['drawers'] = {};
+  for (const [key, c] of gaps.suggested) drawers[key] = pocketsFromSuggestion(c, newId);
+  return { ...blank, drawers };
+}
+
+/** The same steps the app takes from a project to its plan, without the screens */
+export function summarise(project: Project, catalog: Catalog | null): PlanSummary {
+  const s = project.settings;
+  const spaces = setupComps(expandCompartments(project.units, s), project.setup.open);
+  const parts = plannedParts(project, catalog);
   const categories = catalog?.categories ?? {};
   const tree = buildTree(parts, categories, s.volumeScale, {}, project.sorting);
   const analysis = analyseSetup(project.setup, spaces, parts, s, tree);
@@ -64,6 +85,9 @@ export function summarise(project: Project, catalog: Catalog | null): PlanSummar
 
   const drawers = new Map<string, string[]>();
   for (const c of gaps.suggested.values()) drawers.set(c.code, c.sections.map(sectionLabel));
+  // Recorded drawers by what's in each pocket: its label, or the group most of it is
+  for (const p of analysis.pockets) if (p.parts.length) drawers.set(p.comp.code, [...(drawers.get(p.comp.code) ?? []), p.label?.trim() || p.groupLabel]);
+  for (const [code, list] of drawers) drawers.set(code, [...new Set(list)]);
   const recorded = new Set(Object.entries(project.setup.drawers).filter(([, v]) => v.length).map(([k]) => k));
   const count = (n: { children: unknown[] }): number => (n.children as (typeof tree)[]).reduce((t, c) => t + (c.part ? 0 : 1 + count(c)), 0);
   return {
@@ -89,7 +113,7 @@ export interface Comparison {
   after: PlanSummary;
   /** part types that would be somewhere else ('' is no room; null is not in the collection) */
   moved: { partNum: string; name: string; from: string | null; to: string | null }[];
-  /** drawers not recorded yet whose suggested contents would change */
+  /** drawers whose contents, recorded or suggested, would change */
   drawers: { code: string; now: string[]; after: string[] }[];
 }
 
