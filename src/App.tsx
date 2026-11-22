@@ -149,7 +149,7 @@ export default function App() {
     map: { headline: 'Where everything is', sub: 'Each cupboard with its units shelf by shelf, and what’s in every drawer. Print it and stick it on the door.' },
     pick: { headline: 'Build a set from your drawers', sub: 'A checklist of the drawers to open and the parts to take, colour by colour, kept until you’re done.' },
     export: { headline: 'Your storage as a spreadsheet' },
-    settings: { headline: 'How the plan works', sub: `${project.settings.granularity[0].toUpperCase()}${project.settings.granularity.slice(1)} grouping, ${pct(project.settings.growth)} room to grow, drawers filled to ${pct(project.settings.practicalFill)}.` },
+    settings: { headline: 'Settings', sub: `${project.settings.granularity[0].toUpperCase()}${project.settings.granularity.slice(1)} grouping, ${pct(project.settings.growth)} room to grow, drawers filled to ${pct(project.settings.practicalFill)}.` },
     project: { headline: 'Your project is saved on the server', sub: 'Every device on the network sees the same project. A copy is kept from the start of each day it changes, for 30 days.' },
   };
   const head = heads[page];
@@ -180,9 +180,23 @@ export default function App() {
   else if (STORAGE_PAGES.has(page)) body = <StorageView page={page as StoragePage} model={model} project={project} update={update} parts={parts} keptOut={kept.map((k) => k.part)} kept={kept} owned={owned} catalog={catalog} goTo={setPage} />;
   else if (page === 'settings')
     body = (
-      <section className="card page-narrow">
-        <PlanSettings settings={project.settings} onChange={(settings) => update({ settings })} />
-      </section>
+      <div className="page-narrow">
+        <section className="card">
+          <h3 className="card-title">Look</h3>
+          <p className="muted small">How the app looks on this device.</p>
+          <div className="look-choices" role="radiogroup" aria-label="Look">
+            {LOOKS.map((l) => (
+              <label key={l.id} className={`look-choice ${look === l.id ? 'on' : ''}`}>
+                <input type="radio" name="look" checked={look === l.id} onChange={() => setLook(l.id as Look)} /> {l.label}
+              </label>
+            ))}
+          </div>
+        </section>
+        <section className="card">
+          <h3 className="card-title">The plan</h3>
+          <PlanSettings settings={project.settings} onChange={(settings) => update({ settings })} />
+        </section>
+      </div>
     );
   else
     body = (
@@ -231,16 +245,6 @@ export default function App() {
         <span className="topbar-note muted small">
           {parts.length ? `${totals.pieces.toLocaleString()} pieces · ${plural(project.units.length, 'unit')}` : 'Storage planner for LEGO® collections'}
         </span>
-        <label className="look-pick no-print">
-          Look
-          <select value={look} onChange={(e) => setLook(e.target.value as Look)} aria-label="How the app looks on this device">
-            {LOOKS.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-        </label>
       </header>
 
       {error && <div className="banner error">{error}</div>}

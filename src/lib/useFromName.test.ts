@@ -20,7 +20,7 @@ describe('a drawer use read from its name', () => {
     ['Brackets', { what: 'plate-special' }],
     ['Bricks: Studs', { what: 'group:bricks' }],
     ['Tiles: 2 x Circles', { what: 'group:plates' }],
-    ['Tiles: Cheese wedges', { what: 'tiles' }],
+    ['Tiles: Cheese wedges', { what: 'slopes' }],
     ['Clips and connectors', null],
     ['Plates and Bricks: 2 x circles', null],
     ['Odds and ends', null],

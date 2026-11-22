@@ -1,7 +1,7 @@
 // Moves to make: what you've accepted, set out as the work to do in the real drawers. Parts are grouped by the drawer
 // they come out of, so one trip does it; swaps of whole drawers are shown as where each drawer ends up.
 import { useState } from 'react';
-import { codeWithName, placeName } from '../../lib/codes';
+import { codeWithName } from '../../lib/codes';
 import type { SetupAnalysis, SetupComp } from '../../lib/setup';
 import { markDone, todoList, unmarkDone, type DoneStep } from '../../lib/todo';
 import type { Setup } from '../../lib/types';
@@ -13,9 +13,11 @@ interface Props {
   comps: SetupComp[];
   analysis: SetupAnalysis;
   goTo: (page: 'moves') => void;
+  /** what a drawer is called: your name for it, or what's in it */
+  titleOf: (key: string) => string;
 }
 
-export default function MovesToMake({ setup, setSetup, comps, analysis, goTo }: Props) {
+export default function MovesToMake({ setup, setSetup, comps, analysis, goTo, titleOf }: Props) {
   const [undo, setUndo] = useState<{ text: string; step: DoneStep } | null>(null);
   const byKey = new Map(comps.map((c) => [c.key, c]));
   const code = (key: string | null) => {
@@ -25,6 +27,9 @@ export default function MovesToMake({ setup, setSetup, comps, analysis, goTo }: 
   const shortCode = (key: string) => byKey.get(key)?.code ?? '?';
   const byNum = partsOf(analysis);
   const list = todoList(setup.accepted);
+  // Trips in the order the drawers stand, so going along the shelves does them in turn
+  const order = new Map(comps.map((c, i) => [c.key, i]));
+  const trips = [...list.trips].sort((a, b) => (a.from === null ? 1e9 : order.get(a.from) ?? 1e8) - (b.from === null ? 1e9 : order.get(b.from) ?? 1e8));
   const done = (indices: number[], text: string) => {
     // What undoing needs is worked out from the list as shown, the same moves the change takes off
     setUndo({ text, step: markDone(setup, indices).step });
@@ -70,11 +75,11 @@ export default function MovesToMake({ setup, setSetup, comps, analysis, goTo }: 
               {r.shifts.length > 0 && (
                 <ul className="todo-shifts">
                   {r.shifts.map((s) => {
-                    const c = byKey.get(s.to);
+                    const title = titleOf(s.to);
                     return (
                       <li key={s.to}>
                         Take the drawer out of <span className="code">{shortCode(s.from)}</span> and put it in <span className="code">{shortCode(s.to)}</span>
-                        {c && placeName(c) ? <span className="muted"> · {placeName(c)}</span> : null}
+                        {title ? <span className="muted"> · {title}</span> : null}
                       </li>
                     );
                   })}
@@ -88,20 +93,24 @@ export default function MovesToMake({ setup, setSetup, comps, analysis, goTo }: 
       {list.trips.length > 0 && (
         <section className="card">
           <h3 className="card-title">Parts to move</h3>
-          <p className="muted small">Grouped by the drawer they come out of. Done ticks the parts as there in their new drawer.</p>
-          {list.trips.map((t) => (
-            <div key={t.from ?? 'other'} className="todo-group">
-              <div className="todo-group-head">
+          <p className="muted small">Grouped by the drawer they come out of, in the order the drawers stand. Open one to see its moves. Done ticks the parts as there in their new drawer.</p>
+          {trips.map((t) => (
+            <details key={t.from ?? 'other'} className="todo-group">
+              <summary className="todo-group-head">
                 <b>Out of {code(t.from)}</b>
                 <span className="muted small">
                   {t.indices.length} {t.indices.length === 1 ? 'move' : 'moves'}
                 </span>
-                {t.indices.length > 1 && (
-                  <button className="small-btn" onClick={() => done(t.indices, `Done everything out of ${t.from ? shortCode(t.from) : 'other drawers'}`)}>
-                    All done
-                  </button>
-                )}
-              </div>
+                <button
+                  className="small-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    done(t.indices, `Done everything out of ${t.from ? shortCode(t.from) : 'other drawers'}`);
+                  }}
+                >
+                  {t.indices.length > 1 ? 'All done' : 'Done'}
+                </button>
+              </summary>
               <ul className="change-list">
                 {t.indices.map((i) => {
                   const m = setup.accepted[i];
@@ -118,7 +127,7 @@ export default function MovesToMake({ setup, setSetup, comps, analysis, goTo }: 
                   );
                 })}
               </ul>
-            </div>
+            </details>
           ))}
         </section>
       )}

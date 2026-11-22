@@ -14,7 +14,8 @@ import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../../lib/co
 import { setDrawerJob } from '../../lib/unitJobs';
 import { pocketsFromSuggestion } from '../../lib/gaps';
 import { applyCycle, undoLast } from '../../lib/rearrange';
-import { setupLabels } from '../../lib/labels';
+import { mainGroup, setupLabels } from '../../lib/labels';
+import { GroupDot } from '../GroupDot';
 import { planPlaces, setupPlaces } from '../../lib/pickList';
 import { leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner';
 import { acceptSuggestion, checkEverything, setChecked, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
@@ -348,17 +349,18 @@ export default function StorageView({ page, model, project, update, parts, keptO
             </p>
           );
         })()}
-        {lifted
-          .filter((c) => c.used > (c.total ?? 0))
-          .map((c) => {
-            const same = (x?: { name: string; w: number; d: number; h: number }) => !!x && x.name === c.container.name && x.w === c.container.w && x.d === c.container.d && x.h === c.container.h;
-            const where = comps.filter((x) => setup.drawers[x.key]?.some((p) => same(p.container))).map((x) => x.code);
-            return (
-              <p key={c.key} className="small setup-lifted warn-text">
-                {c.used} {c.container.name} containers are recorded standing in drawers ({where.join(', ')}), but only {c.total} {c.total === 1 ? 'is' : 'are'} lifted out of its unit. Lift more out, or take the extra ones out of those drawers.
-              </p>
-            );
-          })}
+        {(() => {
+          // More loose containers recorded in drawers than are lifted out of their units: one quiet line, as they may be spare cups
+          const over = lifted.filter((c) => c.used > (c.total ?? 0));
+          if (!over.length) return null;
+          const same = (x: { name: string; w: number; d: number; h: number } | undefined, c: (typeof over)[number]) => !!x && x.name === c.container.name && x.w === c.container.w && x.d === c.container.d && x.h === c.container.h;
+          const where = comps.filter((x) => setup.drawers[x.key]?.some((p) => over.some((c) => same(p.container, c)))).map((x) => x.code);
+          return (
+            <p className="muted small setup-lifted">
+              Drawers {where.join(', ')} hold more loose containers than are lifted out of their units ({over.map((c) => `${c.container.name}: ${c.used} in use, ${c.total} lifted out`).join('; ')}). If they’re spare containers, that’s fine; otherwise lift more out of a unit below.
+            </p>
+          );
+        })()}
         {[...kinds].map(([kind, list]) => {
           const recorded = list.filter((c) => setup.drawers[c.key]?.length).length;
           const suggested = list.filter((c) => gaps.suggested.has(c.key)).length;
@@ -446,7 +448,20 @@ export default function StorageView({ page, model, project, update, parts, keptO
         />
       </>
     );
-  else if (page === 'todo') body = <MovesToMake setup={setup} setSetup={setSetup} comps={comps} analysis={analysis} goTo={goTo} />;
+  else if (page === 'todo') body = (
+      <MovesToMake
+        setup={setup}
+        setSetup={setSetup}
+        comps={comps}
+        analysis={analysis}
+        goTo={goTo}
+        titleOf={(key) => {
+          const c = comps.find((x) => x.key === key);
+          const inUse = (placed.get(key) ?? []).filter((p) => p.parts.length);
+          return (c && placeName(c)) || [...new Set(inUse.map((p) => p.label?.trim() || contentsName(p)))].slice(0, 2).join(', ');
+        }}
+      />
+    );
   else if (page === 'moves')
     body = (
       <section className="card">
@@ -624,8 +639,8 @@ function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, suggest, onCli
   return (
     <button className={`setup-tile ${recorded ? '' : 'todo'} ${dim ? 'dim' : ''} ${family ? `fam-border-${family}` : ''}`} onClick={onClick} title={`${comp.sections ? `${comp.unitName}, whole box` : `${comp.unitName} › ${comp.label} — ${comp.w}×${comp.d}×${comp.h} mm`}${pockets.length > 1 ? ` · ${pockets.length} pockets` : ''}`}>
       <span className="setup-tile-head">
+        <GroupDot group={mainGroup(inUse)} />
         <span className="code">{comp.code}</span>
-        {title && <span className={`small setup-tile-title ${own ? 'place-name' : 'muted'}`}>{title}</span>}
         {inUse.length > 0 && (
           <span className={`small setup-tile-fill ${measured ? '' : 'muted'}`} title={measured ? 'How full you said it is' : 'Estimated from what’s in it (~). Enter how full each pocket is for a real figure.'}>
             {measured ? '' : '~'}
@@ -633,6 +648,7 @@ function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, suggest, onCli
           </span>
         )}
       </span>
+      {title && <span className={`small setup-tile-title ${own ? 'place-name' : 'muted'}`}>{title}</span>}
       {pics.length > 0 && <TilePics parts={pics} />}
       {(rest.length > 0 || !recorded || !names.length) && (
         <span className="small setup-tile-names">{recorded ? (rest.length ? rest.slice(0, 2).join(', ') + (rest.length > 2 ? ` + ${rest.length - 2}` : '') : 'Empty') : suggest ? 'Not recorded, nothing suggested' : 'Not recorded'}</span>

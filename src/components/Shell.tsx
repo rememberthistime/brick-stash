@@ -47,7 +47,7 @@ export const NAV: { group: string; pages: { id: Page; label: string; under?: Pag
   {
     group: 'Settings',
     pages: [
-      { id: 'settings', label: 'Plan settings' },
+      { id: 'settings', label: 'Settings' },
       { id: 'project', label: 'Project & versions' },
     ],
   },

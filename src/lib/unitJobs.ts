@@ -120,8 +120,9 @@ const SPECIAL_WORDS = /\bcircles?\b|\bround\b|\bstuds?\b|\bmodified\b|\bspecial\
 
 function familiesNamed(text: string): Set<string> {
   const found = new Set(NAME_WORDS.filter(([re]) => re.test(text)).map(([, fam]) => fam));
-  // "Bricks sloped", "Curved bricks": the slope says more than the brick
+  // "Bricks sloped", "Curved bricks": the slope says more than the brick. Cheese slopes are slopes whatever else is said.
   if (found.has('slopes')) found.delete('bricks');
+  if (/\bcheese\b/.test(text)) return new Set(['slopes']);
   // "Technic bricks", "Technic pins": Technic first
   if (/\btechnic\b/.test(text)) {
     found.delete('bricks');

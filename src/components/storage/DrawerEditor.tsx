@@ -147,6 +147,18 @@ export default function DrawerEditor({
     if (!touch) searchRef.current?.focus({ preventScroll: true });
   }, []);
 
+  // ← and → step to the previous and next drawer, unless you're typing
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'ArrowLeft') onPrev();
+      if (e.key === 'ArrowRight') onNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onPrev, onNext]);
+
   /** The search stays as typed, so several of what it found can be added one after another */
   const add = (nums: string[], pocket = activeIndex) => {
     if (!nums.length) return;
@@ -200,6 +212,14 @@ export default function DrawerEditor({
           <h3>
             <span className="code">{comp.code}</span> {comp.unitName} › {comp.label}
           </h3>
+          <span className="setup-editor-steps">
+            <button className="ghost small-btn" onClick={onPrev} title="Previous drawer (←)">
+              ‹
+            </button>
+            <button className="ghost small-btn" onClick={onNext} title="Next drawer (→)">
+              ›
+            </button>
+          </span>
           <button className="icon" aria-label="Close" onClick={onClose}>
             ✕
           </button>
@@ -214,108 +234,6 @@ export default function DrawerEditor({
             onChange={onName}
           />
         </label>
-        {onJob && !comp.sections && (
-          <div className="setup-editor-use small">
-            <span>Used for</span>
-            <select aria-label={`What ${comp.code} holds`} value={setUse ? comp.unitJob?.what ?? '' : ''} onChange={(e) => onJob(e.target.value ? { ...(setUse ? comp.unitJob : {}), what: e.target.value } : setUse && comp.unitJob?.size ? { size: comp.unitJob.size } : null)}>
-              <option value="">{setUse ? 'Anything' : comp.nameJob ? `From its name: ${jobLabel(comp.unitJob)}` : `As the unit: ${jobLabel(comp.baseJob) || 'anything'}`}</option>
-              {whatChoices().map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.indent ? `   ${c.label}` : c.label}
-                </option>
-              ))}
-            </select>
-            <select aria-label={`Size of part for ${comp.code}`} value={setUse ? comp.unitJob?.size ?? '' : ''} onChange={(e) => onJob(setUse && comp.unitJob?.what ? { what: comp.unitJob.what, ...(e.target.value ? { size: e.target.value as SizeClass } : {}) } : e.target.value ? { ...(comp.baseJob?.what ? { what: comp.baseJob.what } : {}), size: e.target.value as SizeClass } : null)}>
-              <option value="">Any size</option>
-              {SIZE_CLASSES.map((c) => (
-                <option key={c.key} value={c.key} title={c.hint}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            {setUse && (
-              <button className="link small" onClick={() => onJob(null)}>
-                {useFromName(comp.name) ? `As its name says (${jobLabel(useFromName(comp.name)!)})` : `Same as the unit${comp.baseJob ? ` (${jobLabel(comp.baseJob)})` : ''}`}
-              </button>
-            )}
-            {useHint && (
-              <span className="setup-use-hint">
-                {useHint.why}.{' '}
-                <button className="small-btn" onClick={() => onJob(useHint.job)}>
-                  Use it for {jobLabel(useHint.job)}
-                </button>
-              </span>
-            )}
-          </div>
-        )}
-        {pockets && (
-          <div className="drawer-tools small">
-            <PlacePicker label="Swap with another drawer…" title={`Swap ${comp.code} with…`} options={drawers} exclude={{ key: comp.key }} onPick={(o) => onSwap(o.key)} />
-            <span className="muted">Its pockets and name change places with the other drawer’s.</span>
-          </div>
-        )}
-        {comp.sections ? (
-          <div className="setup-layout small">
-            <label>
-              Holds{' '}
-              <input
-                type="number"
-                min={0.1}
-                step={0.1}
-                defaultValue={Number((comp.volume / 1000).toFixed(2))}
-                aria-label="What the whole box holds, litres"
-                onBlur={(e) => {
-                  const v = Number(e.target.value);
-                  if (v > 0) onLitres(v);
-                }}
-              />{' '}
-              L
-            </label>
-            <span className="muted">Whole box, without its {comp.sections} sections</span>
-            <button className="link small" onClick={onPutBack}>
-              Put the sections back
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="muted small">
-              {comp.w}×{comp.d}×{comp.h} mm · {L(comp.volume)}
-            </p>
-            {canOpen && (
-              <div className="setup-layout small">
-                <span className="muted">Not using this box’s sections?</span>
-                <button className="ghost small-btn" onClick={() => onOpen('dividers')}>
-                  Take the dividers out
-                </button>
-                <button className="ghost small-btn" onClick={() => onOpen('containers')}>
-                  Lift the containers out
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-
-
-        <div className="setup-count">
-          <span>Pockets</span>
-          <button className="ghost small-btn" aria-label="Fewer pockets" disabled={plain.length <= minPockets} onClick={() => onChange(resizePockets(current, plain.length - 1, uid))}>
-            −
-          </button>
-          <b>{plain.length}</b>
-          <button className="ghost small-btn" aria-label="More pockets" onClick={() => onChange(resizePockets(current, plain.length + 1, uid))}>
-            +
-          </button>
-          {plain.length > 0 && Math.abs(totalShare - 1) > 0.02 && <span className="muted small">Sizes add up to {pct(totalShare)}, and will be scaled to fit.</span>}
-        </div>
-
-        <ContainerAdder comp={comp} current={current} choices={choices} onAdd={(c, n) => onChange(addContainers(current, c, n, uid))} onNew={onNewContainer} />
-        {hasContainers && (
-          <p className={`muted small ${left < 0 ? 'warn-text' : ''}`}>
-            {left < 0 ? `These containers need ${pct(1 - left)} of the floor, so they won’t all stand in here.` : plain.length ? `Containers take ${pct(1 - left)} of the floor, and the pockets share the rest.` : `Containers take ${pct(1 - left)} of the floor. Add a pocket if you use the rest.`}
-          </p>
-        )}
-
         {(() => {
           const all = current.flatMap((p) => p.parts.map((x) => [p, x] as const));
           const ticked = all.filter(([p, x]) => isChecked(p, x)).length;
@@ -361,20 +279,6 @@ export default function DrawerEditor({
             onRemovePocket={pocket.container ? () => onChange(removePocket(current, i, uid)) : undefined}
           />
         ))}
-
-        {(homes.length > 0 || moves.length > 0) && pockets && (
-          <Waiting
-            homes={homes}
-            moves={moves}
-            divided={current.length > 1}
-            titleOf={titleOf}
-            byNum={byNum}
-            onAdd={(items) => onChange(items.reduce((list, h) => addToPocket(list, Math.min(h.pocket, list.length - 1), [h.part.partNum]), current))}
-            onNotHere={(h) => current[h.pocket] && onSkip(homeSkipId(h.part.partNum, current[h.pocket].id))}
-            onAccept={onAccept}
-            onSkip={onSkip}
-          />
-        )}
 
         {pickedItems.length > 0 && (
           <div className="selection-bar">
@@ -446,6 +350,139 @@ export default function DrawerEditor({
           </>
         )}
 
+        {(homes.length > 0 || moves.length > 0) && pockets && (
+          <Waiting
+            homes={homes}
+            moves={moves}
+            divided={current.length > 1}
+            titleOf={titleOf}
+            byNum={byNum}
+            onAdd={(items) => onChange(items.reduce((list, h) => addToPocket(list, Math.min(h.pocket, list.length - 1), [h.part.partNum]), current))}
+            onNotHere={(h) => current[h.pocket] && onSkip(homeSkipId(h.part.partNum, current[h.pocket].id))}
+            onAccept={onAccept}
+            onSkip={onSkip}
+          />
+        )}
+
+        <details className="drawer-settings" open={!pockets}>
+          <summary>
+            <b>Drawer settings</b>{' '}
+            <span className="muted small">
+              {[current.length > 1 ? `${current.length} pockets` : '1 pocket', !comp.sections && comp.unitJob ? `for ${jobLabel(comp.unitJob)}` : '', comp.sections ? `whole box, ${L(comp.volume)}` : `${comp.w}×${comp.d}×${comp.h} mm`].filter(Boolean).join(' · ')}
+            </span>
+          </summary>
+        {onJob && !comp.sections && (
+          <div className="setup-editor-use small">
+            <span>Used for</span>
+            <select aria-label={`What ${comp.code} holds`} value={setUse ? comp.unitJob?.what ?? '' : ''} onChange={(e) => onJob(e.target.value ? { ...(setUse ? comp.unitJob : {}), what: e.target.value } : setUse && comp.unitJob?.size ? { size: comp.unitJob.size } : null)}>
+              <option value="">{setUse ? 'Anything' : comp.nameJob ? `From its name: ${jobLabel(comp.unitJob)}` : `As the unit: ${jobLabel(comp.baseJob) || 'anything'}`}</option>
+              {whatChoices().map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.indent ? `   ${c.label}` : c.label}
+                </option>
+              ))}
+            </select>
+            <select aria-label={`Size of part for ${comp.code}`} value={setUse ? comp.unitJob?.size ?? '' : ''} onChange={(e) => onJob(setUse && comp.unitJob?.what ? { what: comp.unitJob.what, ...(e.target.value ? { size: e.target.value as SizeClass } : {}) } : e.target.value ? { ...(comp.baseJob?.what ? { what: comp.baseJob.what } : {}), size: e.target.value as SizeClass } : null)}>
+              <option value="">Any size</option>
+              {SIZE_CLASSES.map((c) => (
+                <option key={c.key} value={c.key} title={c.hint}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            {setUse && (
+              <button className="link small" onClick={() => onJob(null)}>
+                {useFromName(comp.name) ? `As its name says (${jobLabel(useFromName(comp.name)!)})` : `Same as the unit${comp.baseJob ? ` (${jobLabel(comp.baseJob)})` : ''}`}
+              </button>
+            )}
+            {useHint && (
+              <span className="setup-use-hint">
+                {useHint.why}.{' '}
+                <button className="small-btn" onClick={() => onJob(useHint.job)}>
+                  Use it for {jobLabel(useHint.job)}
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+        {pockets && (
+          <div className="drawer-tools small">
+            <PlacePicker label="Swap with another drawer…" title={`Swap ${comp.code} with…`} options={drawers} exclude={{ key: comp.key }} onPick={(o) => onSwap(o.key)} />
+            <span className="muted">Its pockets and name change places with the other drawer’s.</span>
+          </div>
+        )}
+        {comp.sections ? (
+          <div className="setup-layout small">
+            <label>
+              Holds{' '}
+              <input
+                type="number"
+                min={0.1}
+                step={0.1}
+                defaultValue={Number((comp.volume / 1000).toFixed(2))}
+                aria-label="What the whole box holds, litres"
+                onBlur={(e) => {
+                  const v = Number(e.target.value);
+                  if (v > 0) onLitres(v);
+                }}
+              />{' '}
+              L
+            </label>
+            <span className="muted">Whole box, without its {comp.sections} sections</span>
+            <button className="link small" onClick={onPutBack}>
+              Put the sections back
+            </button>
+          </div>
+        ) : (
+          <>
+            {canOpen && (
+              <div className="setup-layout small">
+                <span className="muted">Not using this box’s sections?</span>
+                <button className="ghost small-btn" onClick={() => onOpen('dividers')}>
+                  Take the dividers out
+                </button>
+                <button className="ghost small-btn" onClick={() => onOpen('containers')}>
+                  Lift the containers out
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+
+
+        <div className="setup-count">
+          <span>Pockets</span>
+          <button className="ghost small-btn" aria-label="Fewer pockets" disabled={plain.length <= minPockets} onClick={() => onChange(resizePockets(current, plain.length - 1, uid))}>
+            −
+          </button>
+          <b>{plain.length}</b>
+          <button className="ghost small-btn" aria-label="More pockets" onClick={() => onChange(resizePockets(current, plain.length + 1, uid))}>
+            +
+          </button>
+          {plain.length > 0 && Math.abs(totalShare - 1) > 0.02 && <span className="muted small">Sizes add up to {pct(totalShare)}, and will be scaled to fit.</span>}
+        </div>
+
+        <ContainerAdder comp={comp} current={current} choices={choices} onAdd={(c, n) => onChange(addContainers(current, c, n, uid))} onNew={onNewContainer} />
+        {hasContainers && (
+          <p className={`muted small ${left < 0 ? 'warn-text' : ''}`}>
+            {left < 0 ? `These containers need ${pct(1 - left)} of the floor, so they won’t all stand in here.` : plain.length ? `Containers take ${pct(1 - left)} of the floor, and the pockets share the rest.` : `Containers take ${pct(1 - left)} of the floor. Add a pocket if you use the rest.`}
+          </p>
+        )}
+
+          {pockets && (
+            <p className="drawer-forget">
+              <button
+                className="link small danger"
+                onClick={() => {
+                  if (confirm(`Forget what you’ve recorded for ${comp.code}? Your other drawers aren’t affected.`)) onForget();
+                }}
+              >
+                Forget this drawer
+              </button>
+            </p>
+          )}
+        </details>
         <div className="setup-editor-foot">
           <button className="ghost small-btn" onClick={onPrev}>
             ‹ Previous
@@ -456,16 +493,6 @@ export default function DrawerEditor({
           {!pockets && (
             <button className="ghost small-btn" onClick={() => onChange(current)}>
               It’s empty
-            </button>
-          )}
-          {pockets && (
-            <button
-              className="link small"
-              onClick={() => {
-                if (confirm(`Forget what you’ve recorded for ${comp.code}? Your other drawers aren’t affected.`)) onForget();
-              }}
-            >
-              Forget this drawer
             </button>
           )}
         </div>

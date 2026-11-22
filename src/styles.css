@@ -272,8 +272,8 @@ input.vol.overridden { border-color: var(--accent); }
 .unit-drawer-grid .code { min-width: 34px; font-weight: 700; }
 .unit-row-body .unit-drawer-grid input.name-input { width: 100%; }
 .place-name { font-weight: 600; }
-.setup-tile-title { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
-.setup-tile-head { align-items: flex-start; }
+.setup-tile-title { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.setup-tile-head { align-items: center; }
 .setup-tile-fill { margin-left: auto; }
 .setup-editor-name { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; }
 .setup-editor-name input { flex: 1; max-width: 360px; }
@@ -756,7 +756,7 @@ td.pic { width: 56px; padding: 3px 6px; }
 .waiting { border: 1px dashed var(--line); background: var(--soft); border-radius: 10px; padding: 4px 12px 10px; margin: 10px 0 12px; }
 .waiting-head { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: none; color: var(--ink); padding: 8px 0 4px; text-align: left; flex-wrap: wrap; }
 .waiting-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 2px 0 4px; }
-.waiting-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+.waiting-list { list-style: none; margin: 0; padding: 0; }
 .waiting-list li, .waiting-move { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
 .waiting-move { align-items: flex-start; }
 .waiting-move .move-name { display: block; }
@@ -1013,3 +1013,58 @@ main.wide .page-head { max-width: 1240px; }
 .setup-use-hint { flex-basis: 100%; padding: 6px 8px; border-radius: 8px; background: var(--soft); }
 .drawer-uses { margin-bottom: 16px; }
 .drawer-uses li { margin: 4px 0; }
+
+/* Red has one job: the main button. Links and part names are in the ink colour; small buttons are soft. */
+a { color: var(--ink); text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 2px; }
+a[href*="rebrickable.com/parts/"] { text-decoration: none; }
+a[href*="rebrickable.com/parts/"]:hover { text-decoration: underline; text-decoration-color: currentColor; }
+button.link { color: var(--ink); text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); text-underline-offset: 2px; }
+button.link:hover { text-decoration-color: currentColor; }
+button.link.danger, button.danger.link { color: var(--bad); }
+button.small-btn:not(.ghost) { background: var(--accent-soft); color: var(--ink); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+button.small-btn:not(.ghost):hover:not(:disabled) { border-color: var(--accent); }
+.undo-bar button.small-btn { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
+.tile-todo { color: var(--ink); font-weight: 600; }
+.tile-todo span { background: var(--soft); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+.setup-tile-head .group-dot { flex: none; }
+
+/* The drawer editor: pockets first, the drawer's own settings folded underneath */
+.setup-editor .detail-head { gap: 8px; }
+.setup-editor-steps { display: inline-flex; gap: 4px; margin-left: auto; }
+.drawer-settings { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-top: 14px; }
+.drawer-settings > summary { cursor: pointer; }
+.drawer-settings[open] > summary { margin-bottom: 8px; }
+.drawer-forget { margin: 10px 0 0; text-align: right; }
+
+/* Moves to make */
+.todo-group { border-top: 1px solid var(--line); padding: 10px 0; }
+.todo-group-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.todo-group-head .small-btn { margin-left: auto; }
+.todo-shifts { margin: 4px 0 0; padding-left: 20px; line-height: 1.9; }
+.todo-undo { margin-left: auto; }
+.setup-todo-line { background: var(--soft); border-radius: 8px; padding: 8px 12px; }
+
+/* Units: your units first, adding storage folded */
+.unit-totals { margin: 10px 0 0; }
+.add-storage { margin-top: 12px; }
+.add-storage > summary { cursor: pointer; font-weight: 600; }
+.add-storage[open] > summary { margin-bottom: 10px; }
+details.unit-jobs > summary { cursor: pointer; }
+details.unit-jobs[open] > summary { margin-bottom: 8px; }
+.look-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.look-choice { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.look-choice.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* On a phone: two drawer tiles to a row, and each part's buttons on a line of their own */
+@media (max-width: 600px) {
+  .setup-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .setup-tile { padding: 8px; }
+  .setup-tile .tile-pics { display: none; }
+  .setup-parts li { flex-wrap: wrap; }
+  .setup-parts li > span.part-actions { flex-basis: 100%; justify-content: flex-end; }
+  .setup-editor-steps .small-btn { padding: 3px 12px; }
+}
+details.todo-group > summary { cursor: pointer; list-style: none; }
+details.todo-group > summary::-webkit-details-marker { display: none; }
+details.todo-group > summary::before { content: '▸'; color: var(--muted); }
+details.todo-group[open] > summary::before { content: '▾'; }

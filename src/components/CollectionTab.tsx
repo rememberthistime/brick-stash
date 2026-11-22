@@ -56,7 +56,10 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
   const [messages, setMessages] = useState<string[]>([]);
   const [paste, setPaste] = useState('');
   const [drag, setDrag] = useState(false);
-  const [apiKey, setApiKey] = useState(readKey);
+  const [ownKey, setApiKey] = useState(readKey);
+  // This browser's own key, or the one kept with the project for every device
+  const apiKey = ownKey || project.rebrickableKey || '';
+  const shared = !!project.rebrickableKey;
   const [sets, setSets] = useState('');
   const [busy, setBusy] = useState('');
   const [open, setOpen] = useState<string | null>(null);
@@ -95,6 +98,7 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
     } catch {
       /* ignore */
     }
+    if (shared) update({ rebrickableKey: k || undefined });
   };
 
   const importSets = async () => {
@@ -115,7 +119,14 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
   };
 
   const keyInput = (
-    <input type="password" className="api-key" placeholder="Rebrickable API key (rebrickable.com → Profile → Settings → API)" value={apiKey} onChange={(e) => saveKey(e.target.value)} autoComplete="off" />
+    <>
+      <input type="password" className="api-key" placeholder="Rebrickable API key (rebrickable.com → Profile → Settings → API)" value={apiKey} onChange={(e) => saveKey(e.target.value)} autoComplete="off" />
+      {apiKey && (
+        <label className="small block key-share">
+          <input type="checkbox" checked={shared} onChange={(e) => update({ rebrickableKey: e.target.checked ? apiKey : undefined })} /> Keep it with the project, so your phone and other devices can look sets up too. Anyone who can open Brick Stash on your network could then use it.
+        </label>
+      )}
+    </>
   );
 
   const unknown = parts.filter((p) => !p.known);

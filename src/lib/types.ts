@@ -250,6 +250,8 @@ export interface Project {
   extraParts?: ExtraPart[];
   /** Pick lists kept as checklists, newest first */
   builds?: Build[];
+  /** a Rebrickable API key kept with the project, only if you chose to, so every device can look sets up */
+  rebrickableKey?: string;
 }
 
 export interface ColourTable {

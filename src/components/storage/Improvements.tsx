@@ -218,7 +218,7 @@ export function Findings({ findings, analysis }: { findings: Finding[]; analysis
 }
 
 const LAYOUT: { kind: LayoutKind; title: string; hint: string }[] = [
-  { kind: 'againstJob', title: 'Parts in another unit’s job', hint: 'Parts that don’t fit the job you gave their unit on Units.' },
+  { kind: 'againstJob', title: 'Parts that don’t fit their drawer’s use', hint: 'Parts that don’t fit their drawer’s use: the one set in the drawer, else what its name says, else its unit’s job.' },
   { kind: 'spread', title: 'Families in many units', hint: 'The more units a family is in, the more places there are to look.' },
   { kind: 'catchAll', title: 'Catch-all drawers', hint: 'Drawers holding parts from three or more groups, or a dozen pockets or more. Tick “Mixed on purpose” on a pocket to leave it out.' },
   { kind: 'unnamed', title: 'Drawers without a name', hint: 'A name says what belongs there, including what isn’t in yet. Without one, the label lists what’s inside.' },
