@@ -159,9 +159,36 @@ export function useProject() {
     location.reload();
   };
 
-  const update = (patch: Partial<Project> | ((p: Project) => Partial<Project>)) =>
-    setProject((p) => settled({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) }));
+  const update = (patch: Patch) => setProject((p) => patched(p, patch));
   return { project, update, replace: (p: Project) => setProject(settled(p)), sync, takeServerCopy };
+}
+
+export type Patch = Partial<Project> | ((p: Project) => Partial<Project>);
+export const patched = (p: Project, patch: Patch) => settled({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) });
+
+const TRIAL_KEY = 'brick-stash-trial';
+
+/**
+ * Try a change: a copy of the project to change freely, kept in this browser only, so you can see what a change does
+ * (new storage, a set kept built, another sorting) next to the project as it is, then keep it or throw it away.
+ */
+export function useTrial() {
+  const [trial, setTrial] = useState<Project | null>(() => {
+    const raw = recall(TRIAL_KEY);
+    try {
+      return raw ? withDefaults(JSON.parse(raw) as Project) : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => remember(TRIAL_KEY, trial ? JSON.stringify(trial) : null), [trial]);
+  return {
+    trial,
+    start: (from: Project) => setTrial(from),
+    update: (patch: Patch) => setTrial((t) => (t ? patched(t, patch) : t)),
+    replace: (p: Project) => setTrial(settled(p)),
+    stop: () => setTrial(null),
+  };
 }
 
 export function useCatalog() {

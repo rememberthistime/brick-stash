@@ -4,7 +4,7 @@
 import type { PlannedCompartment } from './planner';
 import { leaves } from './planner';
 import type { PlacedPocket } from './setup';
-import { FAMILIES, GROUPS, familyGroup, sizeClass } from './taxonomy';
+import { FAMILIES, GROUPS, familyFor, familyGroup, sizeClass } from './taxonomy';
 import type { Part, SizeClass, StorageUnit, UnitJob } from './types';
 import { fitsJob, jobLabel, shapeOf, sizeClassLabel, unitShape } from './unitJobs';
 
@@ -138,7 +138,7 @@ export function suggestJobs(units: StorageUnit[], pockets: PlacedPocket[], sugge
     else {
       const planned: Item[] = [...suggested.values()]
         .filter((c) => c.comp.unitId === u.id)
-        .flatMap((c) => c.sections.flatMap((s) => leaves(s.node).map((l) => ({ family: l.familyKey ?? s.node.familyKey, volume: l.volume, part: l.part }))));
+        .flatMap((c) => c.sections.flatMap((s) => leaves(s.node).map((l) => ({ family: l.part ? familyFor(l.part.catId).key : l.familyKey ?? s.node.familyKey, volume: l.volume, part: l.part }))));
       hint = jobFrom(planned, unitShape(u), planned.length ? 'planned' : 'none');
     }
     if (!hint || jobLabel(hint.job) === jobLabel(u.job)) continue;

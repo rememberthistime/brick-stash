@@ -15,7 +15,7 @@ export function useStorageModel(project: Project, parts: Part[], catalog: Catalo
   const setup = project.setup;
   const scale = project.settings.volumeScale;
   const categories = catalog?.categories ?? NO_CATEGORIES;
-  const tree = useMemo(() => buildTree(parts, categories, scale), [parts, categories, scale]);
+  const tree = useMemo(() => buildTree(parts, categories, scale, {}, project.sorting), [parts, categories, scale, project.sorting]);
   const base = useMemo(() => expandCompartments(project.units, project.settings), [project.units, project.settings]);
   const spaces = useMemo(() => setupComps(base, setup.open), [base, setup.open]);
   const analysis = useMemo(() => analyseSetup(setup, spaces, parts, project.settings, tree), [setup, spaces, parts, project.settings, tree]);
@@ -27,7 +27,7 @@ export function useStorageModel(project: Project, parts: Part[], catalog: Catalo
   const forGaps = useMemo(() => analysis.unplaced.filter((p) => !recordedHomes.has(p.partNum)), [analysis.unplaced, recordedHomes]);
   // A unit with no job of its own is planned for the job its recorded drawers point to
   const recorded = useMemo(() => recordedJobs(project.units, analysis.pockets), [project.units, analysis.pockets]);
-  const gaps = useMemo(() => planGaps(project.units, setup, forGaps, categories, project.settings, recorded), [project.units, setup, forGaps, categories, project.settings, recorded]);
+  const gaps = useMemo(() => planGaps(project.units, setup, forGaps, categories, project.settings, recorded, project.sorting), [project.units, setup, forGaps, categories, project.settings, recorded, project.sorting]);
   const jobHints = useMemo(() => suggestJobs(project.units, analysis.pockets, gaps.suggested), [project.units, analysis.pockets, gaps.suggested]);
   const comps = gaps.comps;
   const openable = useMemo(() => openableUnits(base), [base]);

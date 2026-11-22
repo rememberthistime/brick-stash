@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { download, uid, useCatalog, useProject, withDefaults } from './state';
+import { download, uid, useCatalog, useProject, useTrial, withDefaults } from './state';
+import SortingSettings from './components/SortingSettings';
+import TryChange from './components/TryChange';
 import { moveParts } from './lib/move';
 import { placeOptions } from './components/storage/places';
 import { history } from './components/storage/history';
@@ -25,7 +27,13 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString
 
 export default function App() {
   const { catalog, error } = useCatalog();
-  const { project, update, replace, sync, takeServerCopy } = useProject();
+  const real = useProject();
+  const { sync, takeServerCopy } = real;
+  // While trying a change, every page works on a copy of the project; the project itself stays as it is until it's kept
+  const trying = useTrial();
+  const project = trying.trial ?? real.project;
+  const update = trying.trial ? trying.update : real.update;
+  const replace = trying.trial ? trying.replace : real.replace;
   const ready = project.units.length > 0 && collectionRows(project).length > 0;
   const [page, setPage] = usePage(ready);
   const [menu, setMenu] = useState(false);
@@ -193,6 +201,10 @@ export default function App() {
           </div>
         </section>
         <section className="card">
+          <h3 className="card-title">How parts are grouped</h3>
+          <SortingSettings key={JSON.stringify(project.sorting ?? null)} project={project} catalog={catalog} parts={parts} onApply={(sorting) => update({ sorting })} />
+        </section>
+        <section className="card">
           <h3 className="card-title">The plan</h3>
           <PlanSettings settings={project.settings} onChange={(settings) => update({ settings })} />
         </section>
@@ -245,6 +257,11 @@ export default function App() {
         <span className="topbar-note muted small">
           {parts.length ? `${totals.pieces.toLocaleString()} pieces · ${plural(project.units.length, 'unit')}` : 'Storage planner for LEGO® collections'}
         </span>
+        {!trying.trial && ready && (
+          <button className="ghost topbar-try" title="Make changes on a copy and see what they'd do before keeping them" onClick={() => trying.start(real.project)}>
+            Try a change
+          </button>
+        )}
       </header>
 
       {error && <div className="banner error">{error}</div>}
@@ -258,6 +275,18 @@ export default function App() {
         </div>
       )}
 
+      {trying.trial && (
+        <TryChange
+          real={real.project}
+          trial={trying.trial}
+          catalog={catalog}
+          keep={() => {
+            real.replace(trying.trial!);
+            trying.stop();
+          }}
+          discard={trying.stop}
+        />
+      )}
       <PartZoom />
       <div className="shell">
         <Sidebar page={page} setPage={setPage} counts={counts} open={menu} setOpen={setMenu} />

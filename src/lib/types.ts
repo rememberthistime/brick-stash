@@ -233,6 +233,22 @@ export interface Setup {
 
 export const EMPTY_SETUP: Setup = { drawers: {}, skipped: [], accepted: [], useFills: false, open: {}, containers: [] };
 
+/**
+ * A way of grouping parts. Looks like: by appearance (flat, round, curved, clips…) then outline. Catalogue: by
+ * Rebrickable's families and categories, as the app always has. Used for: vehicles, scenery, Technic and so on.
+ */
+export type Lens = 'looks' | 'catalogue' | 'usedFor';
+
+/** How parts are grouped for planning: a lens for each level, top first, and parts put in a group by hand */
+export interface Sorting {
+  levels: Lens[];
+  /** part number → the name of the group you've put it in: one the lenses make, or a new one of your own */
+  parts?: Record<string, string>;
+}
+
+/** With no sorting saved, parts group by the catalogue, as they always have */
+export const DEFAULT_SORTING: Sorting = { levels: ['catalogue'] };
+
 export interface Project {
   version: 1;
   rows: InventoryRow[];
@@ -252,6 +268,8 @@ export interface Project {
   builds?: Build[];
   /** a Rebrickable API key kept with the project, only if you chose to, so every device can look sets up */
   rebrickableKey?: string;
+  /** how parts are grouped for planning; the catalogue when not set */
+  sorting?: Sorting;
 }
 
 export interface ColourTable {

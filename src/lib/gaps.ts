@@ -7,7 +7,7 @@ import { buildTree, expandCompartments, leaves, plan, SHARE_OVERHEAD, targetFill
 import { newPocket, setupComps, type PlacedPocket, type SetupComp } from './setup';
 import { familyFor, familyGroup } from './taxonomy';
 import { withRecordedJobs } from './jobSuggest';
-import type { Part, Settings, Setup, SetupPocket, StorageUnit, UnitJob } from './types';
+import type { Part, Settings, Setup, SetupPocket, Sorting, StorageUnit, UnitJob } from './types';
 
 export interface GapPlan {
   /** every space, as the Drawers page shows them: opened-up units are one space */
@@ -24,14 +24,14 @@ export interface GapPlan {
  * `unsorted` are the parts in no recorded drawer. A unit that's been opened up into one space is planned as that one
  * space, with as many sections as its floor and the settings allow.
  */
-export function planGaps(units: StorageUnit[], setup: Setup, unsorted: Part[], categories: Record<string, string>, s: Settings, jobs?: Map<string, UnitJob>): GapPlan {
+export function planGaps(units: StorageUnit[], setup: Setup, unsorted: Part[], categories: Record<string, string>, s: Settings, jobs?: Map<string, UnitJob>, sorting?: Sorting): GapPlan {
   // Units without a job of their own are planned for the job their recorded drawers point to
   const comps = setupComps(expandCompartments(jobs ? withRecordedJobs(units, jobs) : units, s), setup.open);
   const forPlanning = comps.map((c) =>
     c.sections ? { ...c, cap: c.volume * targetFill(s), maxSections: Math.max(1, Math.min(s.maxSections, Math.floor(c.w / 45) * Math.floor(c.d / 45))), classKey: `whole:${c.unitId}` } : c,
   );
   const recorded = new Set(comps.filter((c) => setup.drawers[c.key]?.length).map((c) => c.key));
-  const result = plan(buildTree(unsorted, categories, 1), units, s, recorded, forPlanning);
+  const result = plan(buildTree(unsorted, categories, 1, {}, sorting), units, s, recorded, forPlanning);
   const codeOf = new Map(comps.map((c) => [c.key, c.code]));
   const suggested = new Map<string, PlannedCompartment & { code: string }>();
   const homeOf = new Map<string, string>();
@@ -112,8 +112,10 @@ export function homesInRecorded(unsorted: Part[], pockets: PlacedPocket[], setup
     const need = partVolume(part, s.volumeScale) * SHARE_OVERHEAD;
     let best: { p: PlacedPocket; sameGroup: boolean; free: number } | null = null;
     for (const p of pockets) {
-      if (!p.parts.length || p.family !== fam || turnedDown.has(homeSkipId(part.partNum, p.id))) continue;
+      if (!p.parts.length || turnedDown.has(homeSkipId(part.partNum, p.id))) continue;
       const sameGroup = !!group && groupsIn.get(p.id)!.has(group);
+      // Beside its own family, or beside its own group however the sorting draws it (a round tile with round plates)
+      if (p.family !== fam && !sameGroup) continue;
       // A pocket labelled "Fences" is for fences, not any part of its family
       if (!sameGroup && p.label?.trim()) continue;
       const free = room.get(p.id)! - need;
