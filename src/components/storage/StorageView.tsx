@@ -14,7 +14,8 @@ import { codeWithName, drawerKeyOf, placeName, setPlaceName } from '../../lib/co
 import { setDrawerJob } from '../../lib/unitJobs';
 import { pocketsFromSuggestion } from '../../lib/gaps';
 import { applyCycle, undoLast } from '../../lib/rearrange';
-import { setupLabels } from '../../lib/labels';
+import { mainGroup, setupLabels } from '../../lib/labels';
+import { GroupDot } from '../GroupDot';
 import { planPlaces, setupPlaces } from '../../lib/pickList';
 import { leaves, sectionLabel, type PlannedCompartment } from '../../lib/planner';
 import { acceptSuggestion, checkEverything, setChecked, closeUnit, contentsName, partMatcher, howManyFit, openUnit, wholeKey, type PlacedPocket, type SetupComp } from '../../lib/setup';
@@ -32,6 +33,7 @@ import DrawerEditor from './DrawerEditor';
 import { EstimateCheck, Findings, LayoutCheck, Suggestions } from './Improvements';
 import type { StorageModel } from './model';
 import SortPage from './SortPage';
+import MovesToMake from './MovesToMake';
 import Rearrange from './Rearrange';
 import { ColourKey } from './PlanSettings';
 import SuggestedDrawer from './Suggested';
@@ -40,8 +42,8 @@ import { history, useHistory } from './history';
 import { SuggestionsSwitch, useSuggestions } from './suggestionsSwitch';
 import { drawerOptions, placeOptions, spotTitle, spotsOf } from './places';
 
-export type StoragePage = 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export';
-export const STORAGE_PAGES = new Set<Page>(['drawers', 'put-away', 'moves', 'tidy', 'review', 'labels', 'map', 'pick', 'export']);
+export type StoragePage = 'drawers' | 'put-away' | 'todo' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export';
+export const STORAGE_PAGES = new Set<Page>(['drawers', 'put-away', 'todo', 'moves', 'tidy', 'review', 'labels', 'map', 'pick', 'export']);
 
 interface Props {
   page: StoragePage;
@@ -347,11 +349,18 @@ export default function StorageView({ page, model, project, update, parts, keptO
             </p>
           );
         })()}
-        {lifted.length > 0 && (
-          <p className="muted small setup-lifted">
-            <b>Loose containers in use:</b> {lifted.map((c) => `${c.used} ${c.container.name}${c.used > (c.total ?? 0) ? `, more than the ${c.total} lifted out` : ''}`).join(' · ')}
-          </p>
-        )}
+        {(() => {
+          // More loose containers recorded in drawers than are lifted out of their units: one quiet line, as they may be spare cups
+          const over = lifted.filter((c) => c.used > (c.total ?? 0));
+          if (!over.length) return null;
+          const same = (x: { name: string; w: number; d: number; h: number } | undefined, c: (typeof over)[number]) => !!x && x.name === c.container.name && x.w === c.container.w && x.d === c.container.d && x.h === c.container.h;
+          const where = comps.filter((x) => setup.drawers[x.key]?.some((p) => over.some((c) => same(p.container, c)))).map((x) => x.code);
+          return (
+            <p className="muted small setup-lifted">
+              Drawers {where.join(', ')} hold more loose containers than are lifted out of their units ({over.map((c) => `${c.container.name}: ${c.used} in use, ${c.total} lifted out`).join('; ')}). If they’re spare containers, that’s fine; otherwise lift more out of a unit below.
+            </p>
+          );
+        })()}
         {[...kinds].map(([kind, list]) => {
           const recorded = list.filter((c) => setup.drawers[c.key]?.length).length;
           const suggested = list.filter((c) => gaps.suggested.has(c.key)).length;
@@ -439,10 +448,25 @@ export default function StorageView({ page, model, project, update, parts, keptO
         />
       </>
     );
+  else if (page === 'todo') body = (
+      <MovesToMake
+        setup={setup}
+        setSetup={setSetup}
+        comps={comps}
+        analysis={analysis}
+        goTo={goTo}
+        titleOf={(key) => {
+          const c = comps.find((x) => x.key === key);
+          const inUse = (placed.get(key) ?? []).filter((p) => p.parts.length);
+          return (c && placeName(c)) || [...new Set(inUse.map((p) => p.label?.trim() || contentsName(p)))].slice(0, 2).join(', ');
+        }}
+      />
+    );
   else if (page === 'moves')
     body = (
       <section className="card">
         <Suggestions
+          goTo={goTo}
           setup={setup}
           setSetup={setSetup}
           analysis={analysis}
@@ -488,7 +512,7 @@ export default function StorageView({ page, model, project, update, parts, keptO
         [
           ['moves', 'Moves worth making', analysis.suggestions.length + analysis.drawerUses.length],
           ['tidy', 'Tidy the layout', layoutMoves.reduce((t, r) => t + r.cycles.length, 0)],
-          ['review', 'Review', analysis.findings.length + analysis.layout.length],
+          ['review', 'Review', new Set([...analysis.findings.map((f) => f.kind), ...analysis.layout.map((f) => f.kind)]).size],
         ] as const
       ).map(([id, label, count]) => (
         <button key={id} role="tab" aria-selected={page === id} className={page === id ? 'on' : ''} onClick={() => goTo(id)}>
@@ -608,21 +632,27 @@ function DrawerTile({ comp, recorded, pockets, toAdd, moves, dim, suggest, onCli
   // Ticked as really there: all of it, or how many are left to check once checking has started here
   const all = inUse.flatMap((p) => p.parts.map((x) => x.part.partNum).filter(Boolean).map((n) => p.checked.has(n)));
   const ticked = all.filter(Boolean).length;
+  // Your own name heads the tile, in full. Without one, what's in it does, in grey, and isn't repeated below.
+  const own = placeName(comp);
+  const title = own || names[0] || '';
+  const rest = own ? names : names.slice(1);
   return (
-    <button className={`setup-tile ${recorded ? '' : 'todo'} ${dim ? 'dim' : ''} ${family ? `fam-border-${family}` : ''}`} onClick={onClick} title={comp.sections ? `${comp.unitName}, whole box` : `${comp.unitName} › ${comp.label} — ${comp.w}×${comp.d}×${comp.h} mm`}>
+    <button className={`setup-tile ${recorded ? '' : 'todo'} ${dim ? 'dim' : ''} ${family ? `fam-border-${family}` : ''}`} onClick={onClick} title={`${comp.sections ? `${comp.unitName}, whole box` : `${comp.unitName} › ${comp.label} — ${comp.w}×${comp.d}×${comp.h} mm`}${pockets.length > 1 ? ` · ${pockets.length} pockets` : ''}`}>
       <span className="setup-tile-head">
+        <GroupDot group={mainGroup(inUse)} />
         <span className="code">{comp.code}</span>
-        {placeName(comp) && <span className="small place-name setup-tile-title">{placeName(comp)}</span>}
-        {pockets.length > 1 && <span className="muted small">{pockets.length} pockets</span>}
         {inUse.length > 0 && (
-          <span className={`small setup-tile-fill ${measured ? '' : 'muted'}`}>
+          <span className={`small setup-tile-fill ${measured ? '' : 'muted'}`} title={measured ? 'How full you said it is' : 'Estimated from what’s in it (~). Enter how full each pocket is for a real figure.'}>
             {measured ? '' : '~'}
             {pct(used / capacity)}
           </span>
         )}
       </span>
+      {title && <span className={`small setup-tile-title ${own ? 'place-name' : 'muted'}`}>{title}</span>}
       {pics.length > 0 && <TilePics parts={pics} />}
-      <span className="small setup-tile-names">{recorded ? (names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` + ${names.length - 2}` : '') : 'Empty') : suggest ? 'Not recorded, nothing suggested' : 'Not recorded'}</span>
+      {(rest.length > 0 || !recorded || !names.length) && (
+        <span className="small setup-tile-names">{recorded ? (rest.length ? rest.slice(0, 2).join(', ') + (rest.length > 2 ? ` + ${rest.length - 2}` : '') : 'Empty') : suggest ? 'Not recorded, nothing suggested' : 'Not recorded'}</span>
+      )}
       {all.length > 0 && ticked === all.length && <span className="tile-checked small">✓ checked</span>}
       {ticked > 0 && ticked < all.length && <span className="tile-check small">{all.length - ticked} to check</span>}
       {(toAdd > 0 || moves > 0) && (

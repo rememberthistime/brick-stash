@@ -8,7 +8,7 @@ import { codeWithName } from '../../lib/codes';
 import type { SetupComp } from '../../lib/setup';
 import type { Settings } from '../../lib/types';
 import PartImage from '../PartImage';
-import { L, pct } from './format';
+import { L, pcs, pct } from './format';
 
 type Suggestion = PlannedCompartment & { code: string };
 
@@ -43,7 +43,7 @@ export default function SuggestedDrawer({ c, comp, settings, onRecord, onRecordB
             <h4>
               <span className={`swatch fam-${sec.node.familyKey}`} /> {c.sections.length > 1 && `${i + 1}. `}
               {sectionLabel(sec)}
-              <span className="muted small"> · {sec.pieces.toLocaleString()} pcs · {L(sec.volume)}</span>
+              <span className="muted small"> · {pcs(sec.pieces)} · {L(sec.volume)}</span>
             </h4>
             <table className="parts">
               <tbody>

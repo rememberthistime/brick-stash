@@ -15,11 +15,11 @@ const familyName = (f: string | null) => (f ? familyLabel(f) : 'empty');
 
 export default function Rearrange({ plans, comps, onSwap }: Props) {
   const byKey = new Map(comps.map((c) => [c.key, c]));
-  if (!plans.length) return <p className="muted small">Each family’s drawers are already together, for every kind of drawer you’ve recorded.</p>;
+  if (!plans.length) return <p className="muted small">Within each kind of drawer, every family is already in one run. Swaps you accept go on Moves to make.</p>;
   return (
     <>
       <p className="muted small">
-        Drawers that slot into each other’s places (the same product and size) can be moved round, within a unit or between units, so each family sits in one run. Only recorded drawers are moved, each with its pockets and name. A drawer takes the code of the slot it moves to, so reprint its label.
+        Only recorded drawers move, each with its pockets, name and use. Accepted swaps go on Moves to make.
       </p>
       {plans.map((r) => {
         // Each swap changes what's in its two slots, so describe each from the layout as it will be by then

@@ -127,7 +127,7 @@ export default function BuiltSets({ project, update, apiKey, apiKeyInput, subtra
                     <input type="checkbox" checked={e.enabled} title="Include in the subtraction" onChange={(ev) => patch(e.id, { enabled: ev.target.checked })} />
                   </td>
                   <td>{e.label}</td>
-                  <td className="num">{pieces(e).toLocaleString()} pcs</td>
+                  <td className="num">{pieces(e).toLocaleString()} {pieces(e) === 1 ? 'pc' : 'pcs'}</td>
                   <td>
                     <button className="icon danger" title="Remove" onClick={() => update((p) => ({ excluded: p.excluded.filter((x) => x.id !== e.id) }))}>
                       ✕

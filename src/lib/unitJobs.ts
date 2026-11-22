@@ -94,3 +94,65 @@ export function unitShape(u: Pick<StorageUnit, 'compartments'>): SizeClass | nul
 }
 
 export const sizeClassLabel = sizeLabel;
+
+// ─── A drawer's use, read from the name you gave it ───
+
+/** Words in a drawer's name that point to a family. Checked all at once; the rules below settle overlaps. */
+const NAME_WORDS: [RegExp, string][] = [
+  [/\bslop(e|es|ed)\b|\bwedges?\b|\bcheese\b|\bcurved\b|\barch(es)?\b/, 'slopes'],
+  [/\btiles?\b/, 'tiles'],
+  [/\bplates?\b/, 'plates'],
+  [/\bbricks?\b/, 'bricks'],
+  [/\bbrackets?\b/, 'plate-special'],
+  [/\bhinges?\b|\bclips?\b|\bbars?\b|\bjoints?\b/, 'snot'],
+  [/\bpins?\b|\baxles?\b|\baxels?\b|\bconnectors?\b/, 'technic-conn'],
+  [/\bbeams?\b|\bliftarms?\b/, 'technic-struct'],
+  [/\bgears?\b/, 'technic-mech'],
+  [/\bwheels?\b|\btyres?\b|\btires?\b|\bvehicles?\b|\bwindscreens?\b|\bmudguards?\b/, 'wheels'],
+  [/\bwindows?\b|\bdoors?\b|\bpanels?\b|\bfences?\b|\bcolumns?\b/, 'building'],
+  [/\bbaseplates?\b/, 'large'],
+  [/\bminifig(ure)?s?\b/, 'minifig'],
+  [/\baccess?or(y|ies)\b|\bweapons?\b|\btools?\b/, 'minifig-acc'],
+  [/\bplants?\b|\bflowers?\b|\banimals?\b|\btrees?\b|\bleaf\b|\bleaves\b|\brocks?\b/, 'nature'],
+];
+/** Words that say the parts are the unusual sort of their kind (round, printed, modified), so only the group is sure */
+const SPECIAL_WORDS = /\bcircles?\b|\bround\b|\bstuds?\b|\bmodified\b|\bspecial\b|\bpatterns?\b|\bheadlights?\b/;
+
+function familiesNamed(text: string): Set<string> {
+  const found = new Set(NAME_WORDS.filter(([re]) => re.test(text)).map(([, fam]) => fam));
+  // "Bricks sloped", "Curved bricks": the slope says more than the brick. Cheese slopes are slopes whatever else is said.
+  if (found.has('slopes')) found.delete('bricks');
+  if (/\bcheese\b/.test(text)) return new Set(['slopes']);
+  // "Technic bricks", "Technic pins": Technic first
+  if (/\btechnic\b/.test(text)) {
+    found.delete('bricks');
+    found.delete('plates');
+    if (![...found].some((f) => f.startsWith('technic'))) found.add('technic-struct');
+  }
+  // "Minifigure accessories" are accessories; "Accessory clips" are still accessories
+  if (found.has('minifig-acc')) {
+    found.delete('minifig');
+    found.delete('snot');
+  }
+  return found;
+}
+
+/**
+ * What a drawer's name says it's for: one family where the name is clear ("Plates 2x6 and longer" is for long plates,
+ * "Technic pins" for Technic connectors), the group where it names several families of one group or the unusual sort
+ * of one ("Bricks: Studs"), and nothing where it names parts of different groups or none at all. Before a colon is
+ * what the drawer is; after it, which of those.
+ */
+export function useFromName(name: string | undefined): UnitJob | null {
+  const text = name?.trim().toLowerCase();
+  if (!text) return null;
+  const groupsOf = (fams: Set<string>) => new Set([...fams].map((f) => familyGroup(f)));
+  let fams = familiesNamed(text);
+  if (groupsOf(fams).size > 1 && text.includes(':')) fams = familiesNamed(text.slice(0, text.indexOf(':')));
+  if (!fams.size) return null;
+  const groups = groupsOf(fams);
+  if (groups.size > 1) return null;
+  const what = fams.size === 1 && !SPECIAL_WORDS.test(text) ? [...fams][0] : `group:${[...groups][0]}`;
+  const long = /\blonger\b|\blong\b/.test(text);
+  return { what, ...(long ? { size: 'long' as SizeClass } : {}) };
+}

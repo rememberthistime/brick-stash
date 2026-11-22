@@ -54,7 +54,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
   const [look, setLook] = useState<'real' | 'plan'>(fromSetup?.size ? 'real' : 'plan');
   const [hideTicked, setHideTicked] = useState(() => recall(HIDE_STORE) === '1');
   const [colourError, setColourError] = useState('');
-  const apiKey = savedApiKey();
+  const apiKey = savedApiKey() || project.rebrickableKey || '';
   const builds = project.builds ?? [];
   const build = builds.find((b) => b.id === openId) ?? null;
   const table = project.colours ?? null;
@@ -231,7 +231,7 @@ export default function PickListView({ catalog, owned, keptOut, fromPlan, fromSe
             />
           </label>
         </div>
-        {!apiKey && <p className="muted small">Looking a set up by number uses your Rebrickable key, which this browser doesn’t have yet: add it on Import, under Add whole sets. A parts file needs no key: on Rebrickable, open the set’s Inventory and export it as CSV, or use a BrickLink wanted list (XML).</p>}
+        {!apiKey && <p className="muted small">Looking a set up by number uses your Rebrickable key, which this browser doesn’t have yet: add it on Import, under Add whole sets, and tick Keep it with the project to use it on every device. A parts file needs no key: on Rebrickable, open the set’s Inventory and export it as CSV, or use a BrickLink wanted list (XML).</p>}
         <details>
           <summary>…or paste a parts list</summary>
           <textarea rows={5} placeholder={'Part,Color,Quantity\n3001,Red,4'} value={pasted} onChange={(e) => setPasted(e.target.value)} />

@@ -19,7 +19,8 @@ interface Props {
 const MAX_NAMES = 3;
 
 export default function StorageMap({ project, update, comps, placed }: Props) {
-  const [arranging, setArranging] = useState(false);
+  // Nothing placed in a cupboard yet: start arranging, since that's what the map needs first
+  const [arranging, setArranging] = useState(() => project.spaces.length > 0 && !project.units.some((u) => u.spaceId));
 
   const drawersOf = (u: StorageUnit): MapDrawer[] =>
     comps
@@ -54,7 +55,7 @@ export default function StorageMap({ project, update, comps, placed }: Props) {
             {g.space?.name ?? (project.spaces.length ? 'Not in a cupboard' : 'Your storage')}{' '}
             {g.space && <small className="muted">{(g.space.w / 10).toFixed(0)} × {(g.space.h / 10).toFixed(0)} cm</small>}
           </h2>
-          {!g.shelves.length && <p className="muted small">No units in here yet. Put units in it on Units.</p>}
+          {!g.shelves.length && <p className="muted small">No units in here yet. Tick Arrange above, then choose this cupboard for a unit.</p>}
           <div className="map-frame">
             {g.shelves.map((row, s) => (
               <div key={s} className="map-shelf">
