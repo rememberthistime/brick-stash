@@ -1,5 +1,5 @@
 import type { Granularity, Lens, Part, Settings, Sorting, StorageUnit, UnitJob } from './types';
-import { KINDS, LOOK_GROUPS, kindByHeading, OUTLINE_ORDER, USE_GROUPS, kindPlace, lookGroup, outlineLabel, traitsOf, useGroup, usedFor } from './traits';
+import { KINDS, LOOK_GROUPS, OUTLINE_ORDER, USE_GROUPS, kindPlace, lookGroup, outlineLabel, traitsOf, useGroup, usedFor } from './traits';
 import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeClass, sizeGroupName, sortKeyInfo, registerSortKey } from './taxonomy';
 import { jobLabel, shapeOf, useFromName } from './unitJobs';
 
@@ -187,7 +187,7 @@ interface Seg {
 }
 
 /** What one lens says about a part, at the top of the tree or under another lens's group */
-function segmentsFor(lens: Lens, part: Part, top: boolean, categories: Record<string, string>, under: string | null): Seg[] {
+function segmentsFor(lens: Lens, part: Part, top: boolean, categories: Record<string, string>, under: string | null, kindAbove = false): Seg[] {
   const within = (label: string) => (under ? `${under}: ${label}` : label);
   if (lens === 'looks') {
     const t = traitsOf(part);
@@ -197,14 +197,25 @@ function segmentsFor(lens: Lens, part: Part, top: boolean, categories: Record<st
     return out;
   }
   if (lens === 'kind') {
+    const k = kindPlace(part).kind;
+    return [{ id: k.key, label: within(k.label), order: KINDS.indexOf(k) }];
+  }
+  if (lens === 'base' || lens === 'size' || lens === 'exact') {
     const k = kindPlace(part);
-    const out: Seg[] = [{ id: k.kind.key, label: within(k.kind.label), order: KINDS.indexOf(k.kind) }];
-    const lower = k.kind.label.replace(/^(?!Technic)\w/, (c) => c.toLowerCase());
-    if (k.band) out.push({ id: `b${k.band.id}`, label: k.band.label.startsWith('On ') || k.band.id === 'other' ? `${k.kind.label}, ${k.band.label.toLowerCase()}` : `${k.band.label} ${lower}`, order: k.band.order });
-    if (k.size) out.push({ id: `s${k.size}`, label: `${k.kind.label} ${k.size}`, order: k.size.split('×').reduce((t, x) => t * (parseFloat(x) || 1), 1) });
-    // Kinds with nothing to measure (minifig parts, plants, Technic bits) go by catalogue heading instead
-    else if (!k.band && kindByHeading(k.kind.key) && part.catId != null) out.push({ id: `c${part.catId}`, label: categoryName(categories[part.catId] ?? `Category ${part.catId}`), order: catOrder(part.catId) });
-    return out;
+    // With Kind a level above, the kind names the group ("Small clips on a plate", "Clips 1×1 on a plate"); without
+    // it, the group is only what this level says ("On a plate", "Small", "1×1")
+    const noun = kindAbove ? k.kind.label : '';
+    const on = kindAbove && k.base && k.base.id !== 'other' ? ` ${k.base.label.toLowerCase()}` : '';
+    const seg = (id: string, label: string, plain: string, order: number): Seg[] => {
+      const key = `${lens}-${id}`;
+      if (top && !sortKeyInfo(key)) registerSortKey(key, plain, 'bricks', 500 + order);
+      return [{ id: key, label: noun ? label : within(plain), order }];
+    };
+    // First of all, a part this level says nothing about still needs a group
+    const none = (): Seg[] => (top ? seg('none', '', lens === 'base' ? 'Not on a plate, brick or tile' : 'No size to go by', 99) : []);
+    if (lens === 'base') return k.base ? seg(k.base.id, `${noun} ${k.base.label.toLowerCase()}`, k.base.label, k.base.order) : none();
+    if (lens === 'size') return k.band ? seg(k.band.id, `${k.band.label} ${noun.replace(/^(?!Technic)\w/, (c) => c.toLowerCase())}${on}`, k.band.label, k.band.order) : none();
+    return k.size ? seg(k.size, `${noun} ${k.size}${on}`, k.size, k.size.split('×').reduce((t, x) => t * (parseFloat(x) || 1), 1)) : none();
   }
   if (lens === 'usedFor') {
     const g = useGroup(usedFor(part))!;
@@ -243,7 +254,7 @@ function lensTree(parts: Part[], categories: Record<string, string>, volumeScale
     const path: Seg[] = [];
     levels.forEach((lens, i) => {
       const under = i === 0 ? null : path[path.length - 1]?.label ?? null;
-      path.push(...segmentsFor(lens, p, i === 0, categories, under));
+      path.push(...segmentsFor(lens, p, i === 0, categories, under, levels.slice(0, i).includes('kind')));
     });
     return path;
   };
