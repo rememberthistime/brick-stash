@@ -9,14 +9,18 @@ import { DEFAULT_SORTING, type Catalog, type Lens, type Part, type Project, type
 import WhatIf from './WhatIf';
 
 const LENSES: { k: Lens; label: string; hint: string }[] = [
-  { k: 'kind', label: 'Kind, then size', hint: 'Windscreens, bricks, clips… then small, long or large (or what it’s on), then exact size' },
+  { k: 'kind', label: 'Kind', hint: 'Windscreens, bricks, plates, clips, Technic beams… the kind of part a builder looks for first' },
+  { k: 'base', label: 'Built on', hint: 'For clips, bars, hinges and side studs: on a plate, on a brick or on a tile' },
+  { k: 'size', label: 'Rough size', hint: 'Small, long or large (short, medium or long for Technic beams and axles)' },
+  { k: 'exact', label: 'Exact size', hint: '1×2, 2×4, 1×6×3… as the part’s name gives it' },
   { k: 'looks', label: 'Looks like', hint: 'Flat pieces, rounds, curves, clips and bars… then by outline (1×2, 2×4…)' },
   { k: 'catalogue', label: 'Catalogue', hint: 'Rebrickable’s families and categories: plates, modified plates, tiles…' },
   { k: 'usedFor', label: 'Used for', hint: 'General building, vehicles, scenery, Technic, figures (a rough guess)' },
 ];
 
 export const SORTING_PRESETS: { label: string; levels: Lens[] }[] = [
-  { label: 'Kind, then size (the builder’s way)', levels: ['kind'] },
+  { label: 'Kind, built on, rough size, exact size (the builder’s way)', levels: ['kind', 'base', 'size', 'exact'] },
+  { label: 'Kind, rough size, exact size', levels: ['kind', 'size', 'exact'] },
   { label: 'Looks like, then catalogue', levels: ['looks', 'catalogue'] },
   { label: 'Catalogue only (as before)', levels: ['catalogue'] },
   { label: 'Used for, then looks like', levels: ['usedFor', 'looks'] },
@@ -91,7 +95,7 @@ export default function SortingSettings({ project, catalog, parts, onApply }: { 
         ))}
       </div>
       <div className="sorting-levels">
-        {[0, 1, 2].map((i) => {
+        {LENSES.map((_, i) => {
           if (i > draft.levels.length) return null;
           const options = LENSES.filter((l) => !draft.levels.slice(0, i).includes(l.k));
           if (!options.length) return null;

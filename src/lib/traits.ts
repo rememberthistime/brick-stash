@@ -253,8 +253,6 @@ const KIND_GROUP: Record<string, string> = { bricks: 'bricks', plates: 'plates',
 const BY_BASE = new Set(['side-studs', 'clips', 'bars', 'hinges', 'ball-joints']);
 /** Kinds with no useful size */
 const UNSIZED = new Set(['minifig', 'minifig-acc', 'plants', 'animals', 'rocks', 'other-systems', 'other', 'technic-pins', 'technic-bushes', 'technic-connectors', 'technic-other', 'gears', 'wheels', 'tyres', 'turntables']);
-/** Kinds whose parts have no size to go by, so they're split by catalogue heading instead (heads, torsos, legs…) */
-export const kindByHeading = (key: string) => UNSIZED.has(key.replace(/^kind-/, ''));
 
 function kindKey(name: string, catId: number | null): string {
   const fam = familyFor(catId).key;
@@ -336,30 +334,45 @@ function exactSize(name: string): string | null {
   return l ? `${l[1]}L` : null;
 }
 
+/** One step of a part's place under the kind lenses */
+export interface Band {
+  id: string;
+  label: string;
+  order: number;
+}
+
+/**
+ * A part's place under the builder's lenses, each one thing only: its kind (windscreens, bricks, clips…), what it's
+ * built on (for clips, bars, hinges and side studs: a plate, a brick or a tile), its rough size (small, long or large;
+ * short, medium or long for Technic beams and axles) and its exact size. Any but kind can be missing.
+ */
 export interface KindPlace {
   kind: Kind;
-  /** small, long or large; or what it's on; or short, medium or long for Technic */
-  band?: { id: string; label: string; order: number };
+  base?: Band;
+  band?: Band;
   size?: string;
 }
 
-const BANDS = { small: ['Small', 0], long: ['Long', 1], large: ['Large', 2], short: ['Short', 0], medium: ['Medium', 1], longT: ['Long', 2], plate: ['On a plate', 0], brick: ['On a brick', 1], tile: ['On a tile', 2], other: ['Other', 3] } as const;
+const BANDS = { small: ['Small', 0], long: ['Long', 1], large: ['Large', 2], short: ['Short', 0], medium: ['Medium', 1], longT: ['Long', 2] } as const;
+const BASES = { plate: ['On a plate', 0], brick: ['On a brick', 1], tile: ['On a tile', 2], other: ['On something else', 3] } as const;
 
 export function kindPlace(part: Pick<Part, 'name' | 'catId'>): KindPlace {
   const k = kindKey(part.name, part.catId);
-  const kind = kindInfo(`kind-${k}`)!;
-  const s = parseSize(part.name);
-  const size = UNSIZED.has(k) ? undefined : exactSize(part.name) ?? undefined;
-  const band = (b: keyof typeof BANDS) => ({ id: b, label: BANDS[b][0], order: BANDS[b][1] });
+  const out: KindPlace = { kind: kindInfo(`kind-${k}`)! };
   if (BY_BASE.has(k)) {
     const lead = leadOf(part.name);
     const on = /\bPlate\b/i.test(lead) ? 'plate' : /\bBrick\b/i.test(lead) ? 'brick' : /\bTile\b/i.test(lead) ? 'tile' : 'other';
-    return { kind, band: band(on), ...(size ? { size } : {}) };
+    out.base = { id: on, label: BASES[on][0], order: BASES[on][1] };
   }
-  if (!s || UNSIZED.has(k)) return { kind, ...(size ? { size } : {}) };
-  if (k === 'technic-beams' || k === 'technic-axles') return { kind, band: band(s.b <= 4 ? 'short' : s.b <= 8 ? 'medium' : 'longT'), ...(size ? { size } : {}) };
-  const b = s.a <= 2 && s.b >= 6 ? 'long' : (s.a >= 3 && s.b >= 3) || s.a * s.b >= 12 ? 'large' : 'small';
-  return { kind, band: band(b), ...(size ? { size } : {}) };
+  if (UNSIZED.has(k)) return out;
+  const size = exactSize(part.name);
+  if (size) out.size = size;
+  const s = parseSize(part.name);
+  if (!s) return out;
+  const b: keyof typeof BANDS =
+    k === 'technic-beams' || k === 'technic-axles' ? (s.b <= 4 ? 'short' : s.b <= 8 ? 'medium' : 'longT') : s.a <= 2 && s.b >= 6 ? 'long' : (s.a >= 3 && s.b >= 3) || s.a * s.b >= 12 ? 'large' : 'small';
+  out.band = { id: b, label: BANDS[b][0], order: BANDS[b][1] };
+  return out;
 }
 
 KINDS.forEach((k, i) => {

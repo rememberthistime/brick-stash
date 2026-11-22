@@ -238,7 +238,7 @@ export const EMPTY_SETUP: Setup = { drawers: {}, skipped: [], accepted: [], useF
  * then exact size. Looks like: by appearance (flat, round, curved, clips…) then outline. Catalogue: by
  * Rebrickable's families and categories, as the app always has. Used for: vehicles, scenery, Technic and so on.
  */
-export type Lens = 'kind' | 'looks' | 'catalogue' | 'usedFor';
+export type Lens = 'kind' | 'base' | 'size' | 'exact' | 'looks' | 'catalogue' | 'usedFor';
 
 /** How parts are grouped for planning: a lens for each level, top first, and parts put in a group by hand */
 export interface Sorting {

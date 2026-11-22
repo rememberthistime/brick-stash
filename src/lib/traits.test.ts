@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Catalog, Part } from './types';
+import type { Catalog, Lens, Part } from './types';
 import { kindPlace, leadOf, traitsOf, usedFor } from './traits';
 import { buildTree, leaves, plan } from './planner';
 import { summarise, compare, resortedSetup } from './whatIf';
@@ -118,33 +118,46 @@ describe('what if', () => {
   });
 });
 
-describe('kind, then size (the builder’s way)', () => {
+describe('the builder’s lenses: kind, built on, rough size, exact size', () => {
   const kp = (n: string) => kindPlace(part(n));
-  it('puts every windscreen together, then small or large, then exact size', () => {
+  const builder = { levels: ['kind', 'base', 'size', 'exact'] as Lens[] };
+  it('works out each level on its own', () => {
     for (const n of ['21', '1874', '2437']) expect(kp(n).kind.key).toBe('kind-windscreens');
-    expect(kp('21').band?.id).toBe('small');
-    expect(kp('1874').band?.id).toBe('large');
+    expect(kp('21')).toMatchObject({ band: { id: 'small' } });
     expect(kp('21').size).toMatch(/^2×4/);
-  });
-  it('puts bricks together, short or long, then exact size', () => {
+    expect(kp('21').base).toBeUndefined();
+    expect(kp('1874').band?.id).toBe('large');
     expect(kp('3004')).toMatchObject({ kind: { key: 'kind-bricks' }, band: { id: 'small' }, size: '1×2' });
     expect(kp('3008')).toMatchObject({ kind: { key: 'kind-bricks' }, band: { id: 'long' }, size: '1×8' });
-  });
-  it('puts clips together, then by what they’re on', () => {
-    expect(kp('6019')).toMatchObject({ kind: { key: 'kind-clips' }, band: { id: 'plate' } });
-    expect(kp('2555')).toMatchObject({ kind: { key: 'kind-clips' }, band: { id: 'tile' } });
-  });
-  it('splits Technic beams short, medium or long', () => {
+    expect(kp('6019')).toMatchObject({ kind: { key: 'kind-clips' }, base: { id: 'plate' }, band: { id: 'small' }, size: '1×1' });
+    expect(kp('2555')).toMatchObject({ kind: { key: 'kind-clips' }, base: { id: 'tile' } });
     expect(kp('32278')).toMatchObject({ kind: { key: 'kind-technic-beams' }, band: { id: 'longT' } });
   });
-  it('builds a tree of kind, band and size', () => {
-    const tree = buildTree(['21', '1874', '2437', '3004', '3008', '3001', '6019', '2555'].map((n) => part(n, 50)), catalog.categories, 1, {}, { levels: ['kind'] });
-    const top = tree.children.map((c) => c.label);
-    expect(top.some((l) => /windscreen/i.test(l))).toBe(true);
-    expect(top.some((l) => /bricks/i.test(l))).toBe(true);
+  it('Kind alone is one level, with nothing under it', () => {
+    const tree = buildTree(['21', '1874', '3004', '3008'].map((n) => part(n, 50)), catalog.categories, 1, {}, { levels: ['kind'] });
+    for (const g of tree.children) expect(g.children.every((c) => c.part)).toBe(true);
+  });
+  it('builds kind, then built on, then rough size, then exact size, named from the kind', () => {
+    const tree = buildTree(['21', '1874', '2437', '3004', '3008', '3001', '6019', '61252', '2555', '63868'].map((n) => part(n, 50)), catalog.categories, 1, {}, builder);
     const bricks = tree.children.find((c) => c.familyKey === 'kind-bricks')!;
-    // A band with only one part in it folds into that part's size
+    // A group with only one thing in it folds away: the one long brick stands on its own
     expect(bricks.children.map((c) => c.label)).toEqual(['Small bricks', 'Brick 1×8']);
-    expect(leaves(tree).filter((l) => l.part).length).toBe(8);
+    const clips = tree.children.find((c) => c.familyKey === 'kind-clips')!;
+    // Every clip on a plate here is small, so that level folds into the next
+    expect(clips.children.map((c) => c.label)).toContain('Small clips on a plate');
+    const labels: string[] = [];
+    const walk = (n: typeof tree) => n.children.forEach((c) => (labels.push(c.label), walk(c)));
+    walk(clips);
+    expect(labels).toContain('Clips 1×1 on a plate');
+    expect(leaves(tree).filter((l) => l.part).length).toBe(10);
+  });
+  it('any level can go first, with plain names, and parts it says nothing about still get a group', () => {
+    const tree = buildTree(['21', '3004', '6019', '2555', '3626c'].map((n) => part(n, 50)), catalog.categories, 1, {}, { levels: ['base', 'kind'] });
+    expect(new Set(tree.children.map((c) => c.familyKey))).toEqual(new Set(['base-plate', 'base-tile', 'base-none']));
+    expect(tree.children.find((c) => c.familyKey === 'base-none')!.label).toBe('Not on a plate, brick or tile');
+    expect(leaves(tree).filter((l) => l.part).length).toBe(5);
+    const bySize = buildTree(['21', '3004', '3008'].map((n) => part(n, 50)), catalog.categories, 1, {}, { levels: ['size'] });
+    expect(bySize.children.map((c) => c.familyKey).sort()).toEqual(['size-long', 'size-small']);
+    expect(bySize.children.find((c) => c.familyKey === 'size-small')!.label).toBe('Small');
   });
 });
