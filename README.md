@@ -80,7 +80,7 @@ The sidebar lists every job the app does, in groups, the ones used most first (S
 
 **Settings**
 - **Settings**: the look on this device, and how finely the suggestions sort, how much room to leave to grow and how full they fill each drawer.
-- **Project & versions**: download the project as a file, open one, or go back to the project as it was at the start of an earlier day.
+- **Project & versions**: download the project as a file, open one, or go back to the project as it was at the start of an earlier day. **Profiles** keep separate setups side by side on the server (the main one is the project as it always was, in `project.json`; others are in `profiles/<id>/`, each with its own `backups/`, and a removed one is moved to `removed-profiles/`); each device picks the one it uses. **Start fresh** clears the parts, drawers and anything else you tick, tried first on a copy if you like, with Undo.
 
 ## How the suggestions are made
 
@@ -129,7 +129,7 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - `src/components/CollectionTab.tsx` (Parts, Import, Sets kept built, Kept out), `StorageTab.tsx` (Units, Spaces), `PickList.tsx`, `Labels.tsx`, `TapeLabels.tsx`, `ExtraParts.tsx` (parts added by hand), `Versions.tsx`, `PartImage.tsx` — the other pages and views
 - `src/look.ts` and the top of `src/styles.css` — the three looks, as colour and type tokens
 - `src/state.ts`, `src/lib/sync.ts` — keeping the browser and the server's project in step
-- `server/api.mjs` — the shared project and its daily versions; `server/index.mjs` — runs the built app for the network
+- `server/api.mjs` — the shared project and its daily versions, per profile (`/api/profiles`, `?profile=`); `src/components/Profiles.tsx` and `StartFresh.tsx` (`lib/fresh.ts`) are the profile list and Start fresh; `server/index.mjs` — runs the built app for the network
 - `Dockerfile`, `.github/workflows/docker.yml` — the image Unraid runs, built and published from `main`
 
 ## Data & resources
@@ -184,5 +184,6 @@ Volumes are estimated from the part name (stud dimensions × brick or plate heig
 - [x] Design storage around what parts look like rather than only the official categories, with other ways to group as options, and let me override the presets — *How parts are grouped, on Settings: a way of grouping for each level (Looks like, Catalogue, Used for), presets such as "Looks like, then catalogue", and parts put in a group by hand (an existing group or a new one); nothing changes until Use this sorting*
 - [x] Before any change, show what happens: now next to with the change — *the grouping shows its effect before you use it; Try a change makes a copy of the whole project to change anything on (storage, sets, parts, settings) and compares it with now until you keep it or throw it away*
 - [x] Make it easy to see and change a part's group wherever the part appears, and allow re-sorting everything, recorded drawers included — *a group tag beside every part name, clicked to change it, with where the part would go now and then; Re-sort everything on Settings, previewed against now, with Undo*
+- [x] No way to start with a clean slate: Replace on Import didn't overwrite anything; and separate profiles for two or more setups at once — *Replace only ever swapped the parts list, leaving drawers, sets kept built and hand-added parts (it now says so, and several files dropped at once are all kept). **Start fresh** on Project & versions clears what you tick (parts, sets kept built, drawers, pick lists, and optionally storage, grouping choices and settings), tried first on a copy or done straight away, with Undo. **Profiles** keep separate setups on the same server, each with its own versions; each device picks the one it uses, and a new one can start empty, with the same storage, or as a copy*
 - [x] Kind, then size should be separate levels, each one thing only, like Catalogue and Used for — *Kind, Built on, Rough size and Exact size are now four ways of grouping to pick per level (up to as many levels as there are ways), with "Kind, built on, rough size, exact size" and "Kind, rough size, exact size" as presets*
 - [x] Groups are accurate but too specific to be useful (five windscreen groups split by odd sizes); look for kind, then large or small, then exact size, then colour, and show a master list — *a Kind, then size grouping (windscreens → small, long or large → 2×4…; clips → on a plate, brick or tile → 1×1…), now the first preset; a Groups page listing every group level by level with pieces, drawers and each part's colours, to preview another grouping before using it*

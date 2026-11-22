@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { withDefaults } from '../state';
+import { apiUrl, withDefaults } from '../state';
 import type { Project } from '../lib/types';
 
 interface Version {
@@ -17,7 +17,7 @@ export default function Versions({ restore, close }: { restore: (p: Project) => 
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/versions')
+    fetch(apiUrl('/api/versions'))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? 'The server needs updating before it keeps earlier versions.' : `The server said ${r.status}.`))))
       .then(setVersions)
       .catch((e) => setError(e instanceof TypeError ? 'Can’t reach the Brick Stash server.' : e.message));
@@ -26,7 +26,7 @@ export default function Versions({ restore, close }: { restore: (p: Project) => 
   const bringBack = async (v: Version) => {
     if (!confirm(`Go back to the project as it was at the start of ${dayOf(v.date)}? Everything changed since then is replaced, on every device. Use Save project first if you might want today’s changes back.`)) return;
     try {
-      const r = await fetch(`/api/versions/${v.name}`);
+      const r = await fetch(apiUrl(`/api/versions/${v.name}`));
       if (!r.ok) throw new Error(`The server said ${r.status}.`);
       const p = (await r.json()) as Project;
       if (p.version !== 1 || !Array.isArray(p.rows)) throw new Error('That isn’t a Brick Stash project.');

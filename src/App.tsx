@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { download, uid, useCatalog, useProject, useTrial, withDefaults } from './state';
+import { PROFILE, download, uid, useCatalog, useProject, useTrial, withDefaults } from './state';
 import SortingSettings, { presetLabel } from './components/SortingSettings';
 import GroupsPage from './components/GroupsPage';
 import TryChange from './components/TryChange';
@@ -24,6 +24,8 @@ import { PlanSettings } from './components/storage/PlanSettings';
 import { L, pct } from './components/storage/format';
 import { PageHead, Sidebar, usePage, type Page } from './components/Shell';
 import Versions from './components/Versions';
+import StartFresh from './components/StartFresh';
+import Profiles, { useProfiles } from './components/Profiles';
 import { PartZoom } from './components/PartImage';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -34,6 +36,8 @@ export default function App() {
   const { sync, takeServerCopy } = real;
   // While trying a change, every page works on a copy of the project; the project itself stays as it is until it's kept
   const trying = useTrial();
+  const [profiles, reloadProfiles] = useProfiles();
+  const profileName = profiles.length > 1 ? profiles.find((p) => p.id === PROFILE)?.name : undefined;
   const project = trying.trial ?? real.project;
   const update = trying.trial ? trying.update : real.update;
   const replace = trying.trial ? trying.replace : real.replace;
@@ -292,6 +296,8 @@ export default function App() {
             />
           </div>
         </section>
+        <Profiles project={project} profiles={profiles} reload={reloadProfiles} />
+        <StartFresh project={project} trying={!!trying.trial} tryIt={(p) => trying.start(p)} apply={real.replace} />
         <Versions restore={replace} />
       </div>
     );
@@ -313,6 +319,7 @@ export default function App() {
           <h1>Brick Stash</h1>
         </div>
         <span className="topbar-note muted small">
+          {profileName && <b className="topbar-profile">{profileName} · </b>}
           {parts.length ? `${totals.pieces.toLocaleString()} pieces · ${plural(project.units.length, 'unit')}` : 'Storage planner for LEGO® collections'}
         </span>
         {!trying.trial && ready && (

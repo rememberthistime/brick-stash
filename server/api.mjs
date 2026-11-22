@@ -1,4 +1,5 @@
-// What the app needs a server for: one project, shared by every device, and a version of it kept for each day.
+// What the app needs a server for: the project, shared by every device, and a version of it kept for each day. More
+// than one profile can be kept: the main one where the project always was, and others each in a folder of their own.
 // No dependencies, so the same code runs inside the Vite dev server, from `npm run serve` and in Docker.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,7 +42,8 @@ function readBody(req, limit) {
   });
 }
 
-export function createApi({ dataDir }) {
+/** One profile's project and its versions, in a folder of its own */
+function projectStore(dataDir) {
   const projectFile = path.join(dataDir, 'project.json');
   const revOf = () => (fs.existsSync(projectFile) ? String(fs.statSync(projectFile).mtimeMs) : null);
 
@@ -96,25 +98,118 @@ export function createApi({ dataDir }) {
     return send(res, 200, { rev: revOf() });
   }
 
+  return { projectFile, revOf, versionsDir, listVersions, saveProject };
+}
+
+/** The project and versions routes, for one profile */
+async function projectRequest({ projectFile, revOf, versionsDir, listVersions, saveProject }, p, req, res) {
+  if (p === '/api/project' && req.method === 'GET') {
+    const rev = revOf();
+    if (rev === null) send(res, 404, { error: 'No project yet.' });
+    else send(res, 200, JSON.parse(fs.readFileSync(projectFile, 'utf8')), { 'X-Rev': rev, 'Cache-Control': 'no-store' });
+  } else if (p === '/api/project' && req.method === 'PUT') await saveProject(req, res);
+  else if (p === '/api/versions' && req.method === 'GET') send(res, 200, listVersions(), { 'Cache-Control': 'no-store' });
+  else if (p.startsWith('/api/versions/') && req.method === 'GET') {
+    // The pattern allows no slashes or dots beyond the extension, so a name can't leave the folder
+    const name = p.slice('/api/versions/'.length);
+    const file = VERSION_NAME.test(name) ? path.join(versionsDir, name) : null;
+    if (!file || !fs.existsSync(file)) send(res, 404, { error: 'No such version.' });
+    else send(res, 200, JSON.parse(fs.readFileSync(file, 'utf8')), { 'Cache-Control': 'no-store' });
+  } else send(res, 404, { error: 'Not found.' });
+}
+
+const PROFILE_ID = /^[a-z0-9-]{1,48}$/;
+const MAIN = 'main';
+
+const readJson = async (req) => {
+  try {
+    return JSON.parse((await readBody(req, 4096)).toString('utf8'));
+  } catch {
+    return null;
+  }
+};
+
+export function createApi({ dataDir }) {
+  const profilesFile = path.join(dataDir, 'profiles.json');
+  const profilesDir = path.join(dataDir, 'profiles');
+  const readProfiles = () => {
+    try {
+      const list = JSON.parse(fs.readFileSync(profilesFile, 'utf8'));
+      return Array.isArray(list) ? list.filter((x) => x && PROFILE_ID.test(x.id) && typeof x.name === 'string') : [];
+    } catch {
+      return [];
+    }
+  };
+  const writeProfiles = (list) => {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(`${profilesFile}.tmp`, JSON.stringify(list, null, 2));
+    fs.renameSync(`${profilesFile}.tmp`, profilesFile);
+  };
+  /** Every profile, the main one first; it's called "My stash" until renamed */
+  const allProfiles = () => {
+    const list = readProfiles();
+    const main = list.find((x) => x.id === MAIN) ?? { id: MAIN, name: 'My stash' };
+    return [main, ...list.filter((x) => x.id !== MAIN)];
+  };
+  const known = (id) => PROFILE_ID.test(id) && allProfiles().some((x) => x.id === id);
+  const stores = new Map();
+  /** The main profile lives where the project always has, so an existing setup carries on as it is */
+  const storeFor = (id) => {
+    if (!stores.has(id)) stores.set(id, projectStore(id === MAIN ? dataDir : path.join(profilesDir, id)));
+    return stores.get(id);
+  };
+  const nameFrom = (body) => String(body?.name ?? '').trim().slice(0, 80);
+
+  async function createProfile(req, res) {
+    const name = nameFrom(await readJson(req));
+    if (!name) return send(res, 400, { error: 'A profile needs a name.' });
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'profile';
+    const id = `${slug}-${Math.random().toString(36).slice(2, 7)}`;
+    fs.mkdirSync(path.join(profilesDir, id), { recursive: true });
+    writeProfiles([...allProfiles(), { id, name, created: new Date().toISOString() }]);
+    return send(res, 201, { id, name });
+  }
+
+  async function renameProfile(req, res, id) {
+    const name = nameFrom(await readJson(req));
+    if (!name) return send(res, 400, { error: 'A profile needs a name.' });
+    writeProfiles(allProfiles().map((x) => (x.id === id ? { ...x, name } : x)));
+    return send(res, 200, { id, name });
+  }
+
+  /** A profile taken away is moved aside on the server, not deleted */
+  function removeProfile(res, id) {
+    if (id === MAIN) return send(res, 400, { error: 'The main profile can’t be removed.' });
+    const from = path.join(profilesDir, id);
+    if (fs.existsSync(from)) {
+      const to = path.join(dataDir, 'removed-profiles');
+      fs.mkdirSync(to, { recursive: true });
+      fs.renameSync(from, path.join(to, `${id}-${Date.now()}`));
+    }
+    stores.delete(id);
+    writeProfiles(allProfiles().filter((x) => x.id !== id));
+    return send(res, 200, { removed: id });
+  }
+
   /** Resolves true if it answered the request */
   return async function api(req, res) {
     const url = new URL(req.url, 'http://local');
     const p = url.pathname;
     if (!p.startsWith('/api/')) return false;
     try {
-      if (p === '/api/project' && req.method === 'GET') {
-        const rev = revOf();
-        if (rev === null) send(res, 404, { error: 'No project yet.' });
-        else send(res, 200, JSON.parse(fs.readFileSync(projectFile, 'utf8')), { 'X-Rev': rev, 'Cache-Control': 'no-store' });
-      } else if (p === '/api/project' && req.method === 'PUT') await saveProject(req, res);
-      else if (p === '/api/versions' && req.method === 'GET') send(res, 200, listVersions(), { 'Cache-Control': 'no-store' });
-      else if (p.startsWith('/api/versions/') && req.method === 'GET') {
-        // The pattern allows no slashes or dots beyond the extension, so a name can't leave the folder
-        const name = p.slice('/api/versions/'.length);
-        const file = VERSION_NAME.test(name) ? path.join(versionsDir, name) : null;
-        if (!file || !fs.existsSync(file)) send(res, 404, { error: 'No such version.' });
-        else send(res, 200, JSON.parse(fs.readFileSync(file, 'utf8')), { 'Cache-Control': 'no-store' });
-      } else send(res, 404, { error: 'Not found.' });
+      if (p === '/api/profiles' && req.method === 'GET') send(res, 200, allProfiles(), { 'Cache-Control': 'no-store' });
+      else if (p === '/api/profiles' && req.method === 'POST') await createProfile(req, res);
+      else if (p.startsWith('/api/profiles/')) {
+        const id = p.slice('/api/profiles/'.length);
+        if (!known(id)) send(res, 404, { error: 'No such profile.' });
+        else if (req.method === 'PATCH') await renameProfile(req, res, id);
+        else if (req.method === 'DELETE') removeProfile(res, id);
+        else send(res, 405, { error: 'Not allowed.' });
+      } else {
+        const id = url.searchParams.get('profile') || MAIN;
+        if (!known(id)) send(res, 404, { error: 'No such profile.' });
+        else await projectRequest(storeFor(id), p, req, res);
+      }
     } catch (e) {
       // A body cut short by the limit leaves the connection unusable, so close it after answering
       if (!res.headersSent) send(res, e.status ?? 500, { error: e.message }, e.status === 413 ? { Connection: 'close' } : {});
