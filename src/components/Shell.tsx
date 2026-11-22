@@ -3,17 +3,19 @@
 // browser's back button and bookmarks work.
 import { useEffect, useState, type ReactNode } from 'react';
 
-export type Page = 'import' | 'parts' | 'built' | 'kept' | 'units' | 'spaces' | 'drawers' | 'put-away' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export' | 'settings' | 'project';
+export type Page = 'import' | 'parts' | 'built' | 'kept' | 'units' | 'spaces' | 'drawers' | 'put-away' | 'todo' | 'moves' | 'tidy' | 'review' | 'labels' | 'map' | 'pick' | 'export' | 'settings' | 'project';
 
 /** The pages, grouped. A page `under` another is reached from that page's tabs, not listed in the sidebar itself. */
 export const NAV: { group: string; pages: { id: Page; label: string; under?: Page }[] }[] = [
+  // The pages used most come first: putting parts away and moving them, then the drawers themselves
   {
-    group: 'Collection',
+    group: 'Sort',
     pages: [
-      { id: 'parts', label: 'Parts' },
-      { id: 'import', label: 'Import' },
-      { id: 'built', label: 'Sets kept built' },
-      { id: 'kept', label: 'Kept out' },
+      { id: 'put-away', label: 'Put away & move' },
+      { id: 'todo', label: 'Moves to make' },
+      { id: 'moves', label: 'Suggestions' },
+      { id: 'tidy', label: 'Tidy the layout', under: 'moves' },
+      { id: 'review', label: 'Review', under: 'moves' },
     ],
   },
   {
@@ -25,21 +27,21 @@ export const NAV: { group: string; pages: { id: Page; label: string; under?: Pag
     ],
   },
   {
-    group: 'Sort',
-    pages: [
-      { id: 'put-away', label: 'Put away & move' },
-      { id: 'moves', label: 'Suggestions' },
-      { id: 'tidy', label: 'Tidy the layout', under: 'moves' },
-      { id: 'review', label: 'Review', under: 'moves' },
-    ],
-  },
-  {
     group: 'Print & lists',
     pages: [
       { id: 'labels', label: 'Labels' },
       { id: 'map', label: 'Storage map' },
       { id: 'pick', label: 'Pick list' },
       { id: 'export', label: 'Export' },
+    ],
+  },
+  {
+    group: 'Collection',
+    pages: [
+      { id: 'parts', label: 'Parts' },
+      { id: 'import', label: 'Import' },
+      { id: 'built', label: 'Sets kept built' },
+      { id: 'kept', label: 'Kept out' },
     ],
   },
   {

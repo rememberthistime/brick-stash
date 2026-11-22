@@ -12,7 +12,7 @@ import { codeWithName, placeName } from '../../lib/codes';
 import { stem } from '../../lib/storageList';
 import type { Part, Setup } from '../../lib/types';
 import PartImage from '../PartImage';
-import { L, pct } from './format';
+import { L, pcs, pct } from './format';
 import PlacePicker from './PlacePicker';
 import { spotTitle, type PlaceOption } from './places';
 
@@ -258,7 +258,7 @@ export default function SortPage(props: Props) {
                           <PartName part={p} />
                         </a>
                         <span className="part-meta">
-                          <span className="mono">{p.partNum}</span> · {p.qty.toLocaleString()} pcs
+                          <span className="mono">{p.partNum}</span> · {pcs(p.qty)}
                         </span>
                         {there ? (
                           <span className="sort-hint small">
@@ -451,7 +451,7 @@ export default function SortPage(props: Props) {
                       <span className="sort-part-name small">
                         <PartName part={x.part} />
                         <span className="part-meta">
-                          <span className="mono">{x.part.partNum}</span> · {x.part.qty.toLocaleString()} pcs
+                          <span className="mono">{x.part.partNum}</span> · {pcs(x.part.qty)}
                         </span>
                       </span>
                       <span className="part-actions">

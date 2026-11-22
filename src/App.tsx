@@ -71,7 +71,12 @@ export default function App() {
   const unsorted = analysis.unplaced.length;
   const withRoom = analysis.unplaced.filter((p) => recordedHomes.has(p.partNum)).length;
   const swaps = layoutMoves.reduce((t, r) => t + r.cycles.length, 0);
-  const moves = analysis.suggestions.length + analysis.drawerUses.length;
+  const moveCount = analysis.suggestions.length;
+  const useCount = analysis.drawerUses.length;
+  const moves = moveCount + useCount;
+  const todo = project.setup.accepted.length;
+  // Review lists the first few of each kind of finding, so it's counted by kind
+  const reviewAreas = new Set([...analysis.findings.map((f) => f.kind), ...analysis.layout.map((f) => f.kind)]).size;
   const overflow = gaps.plan.stats.overflowVolume;
   const n = (x: number) => (x ? x.toLocaleString() : '');
   const counts: Partial<Record<Page, ReactNode>> = {
@@ -83,17 +88,19 @@ export default function App() {
     drawers: storageReady ? `${analysis.drawersRecorded}/${analysis.drawersTotal}` : '',
     'put-away': storageReady ? n(unsorted) : '',
     // Suggestions are counted only with the switch on, so with it off nothing nags
-    moves: storageReady && suggest ? `${n(moves)}${moves && analysis.moreSuggestions ? '+' : ''}` : '',
+    // Moves already accepted are your own to-do list, so they're counted whatever the switch says
+    todo: n(todo),
+    moves: storageReady && suggest ? n(moves) : '',
     tidy: storageReady && suggest ? n(swaps) : '',
-    review: storageReady && suggest ? n(analysis.findings.length + analysis.layout.length) : '',
+    review: storageReady && suggest ? n(reviewAreas) : '',
   };
 
   const heads: Record<Page, { headline: ReactNode; sub?: ReactNode }> = {
     parts: parts.length
-      ? { headline: `${plural(parts.length, 'part type')}, ${totals.pieces.toLocaleString()} pieces`, sub: `About ${(totals.volume / 1000).toFixed(1)} L loose. Colours are merged, as parts are stored by type. Untick a family or part to keep it out of storage; click a family to see its parts.` }
+      ? { headline: `${plural(parts.length, 'part type')}, ${totals.pieces.toLocaleString()} pieces`, sub: `About ${(totals.volume / 1000).toFixed(1)} L loose, colours merged. Click a family for its parts; untick one to keep it out of storage.` }
       : { headline: 'No parts yet' },
     import: project.rows.length
-      ? { headline: `${plural(project.rows.length, 'row')} loaded`, sub: 'Load a parts list from Rebrickable, BrickLink, Brickset or any spreadsheet, or add whole sets. Replace swaps the collection for the new list; Add puts it on top.' }
+      ? { headline: `${plural(project.rows.length, 'row')} loaded`, sub: 'A parts list from Rebrickable, BrickLink, Brickset or any spreadsheet, or whole sets.' }
       : { headline: 'Start with your parts list', sub: 'Any spreadsheet saved as CSV works, as do Rebrickable, BrickLink and Brickset exports.' },
     built: built
       ? { headline: `${plural(built, 'set')} kept built`, sub: `${subtraction.removed.toLocaleString()} pieces are taken off the collection, as they don't need a drawer.` }
@@ -101,16 +108,16 @@ export default function App() {
     kept: kept.length
       ? { headline: `${plural(keptSummary.pieces, 'piece')} kept out of storage`, sub: `${keptSummary.labels.join(', ')}. About ${L(keptSummary.volume)}. They’re still in the pick list.` }
       : { headline: 'Nothing kept out', sub: 'Minifigures, bulky parts or anything else you don’t keep in drawers can be left out of the plan.' },
-    units: project.units.length ? { headline: `${plural(project.units.length, 'storage unit')}`, sub: 'Pick each product you own and how many. The most-used parts go in the units marked easiest to reach.' } : { headline: 'No storage yet', sub: 'Add the drawers and boxes you have, or plan to buy.' },
+    units: project.units.length ? { headline: `${plural(project.units.length, 'storage unit')}`, sub: 'The drawers and boxes you own. Expand one to change its sizes, letter or names.' } : { headline: 'No storage yet', sub: 'Add the drawers and boxes you have, or plan to buy.' },
     spaces: project.spaces.length
-      ? { headline: plural(project.spaces.length, 'space'), sub: 'Cupboards, shelves or the space under them, inside size in mm. Put units in a space (on Units, expand a unit, then In) to see how much of it they take and what else would fit.' }
+      ? { headline: plural(project.spaces.length, 'space'), sub: 'Cupboards and shelves, by inside size. Put units in one (on the Storage map, with Arrange) to see what else would fit.' }
       : { headline: 'No spaces yet', sub: 'Optional: the cupboards and shelves your units sit in, to see what else would fit.' },
     drawers: storageReady
       ? {
           headline: `${analysis.drawersRecorded} of ${plural(analysis.drawersTotal, 'drawer')} recorded`,
           sub: (
             <>
-              {pct(analysis.volumePlaced)} of the collection, by volume, is in a recorded drawer{analysis.capacity ? `, and those drawers are ${pct(analysis.used / analysis.capacity)} full` : ''}. Click a drawer to record what’s in it, or to move parts out of it. {suggest ? 'Dashed ones aren’t recorded: they show what the plan suggests, and nothing changes unless you take it.' : 'Turn Suggestions on to see what the app would put in the drawers you haven’t recorded.'}
+              {pct(analysis.volumePlaced)} of the collection is in a recorded drawer{analysis.capacity ? `, and those drawers are ${pct(analysis.used / analysis.capacity)} full` : ''}. Click a drawer to record or change it.{suggest ? ' Dashed ones show what the app suggests for them.' : ''}
             </>
           ),
         }
@@ -125,11 +132,19 @@ export default function App() {
           }
         : { headline: 'Everything is in a drawer' }
       : { headline: 'Put away & move' },
+    todo: todo ? { headline: plural(todo, 'move') + ' to make', sub: 'Moves you’ve accepted. They’re recorded here already; these are still to do in the real drawers.' } : { headline: 'Nothing to move' },
     moves: storageReady
-      ? { headline: moves ? `${moves}${analysis.moreSuggestions ? '+' : ''} ${moves === 1 && !analysis.moreSuggestions ? 'move' : 'moves'} worth making` : analysis.drawersRecorded ? 'No moves to suggest' : 'Record some drawers first', sub: 'Each is optional. Accepting one only changes what’s recorded here, and adds it to a list of moves to make.' }
+      ? {
+          headline: moves ? [moveCount ? plural(moveCount, 'move') : '', useCount ? plural(useCount, 'drawer use') : ''].filter(Boolean).join(' and ') + ' to look at' : analysis.drawersRecorded ? 'No moves to suggest' : 'Record some drawers first',
+          sub: 'Each is optional. Accepting one changes what’s recorded here and adds it to Moves to make.',
+        }
       : { headline: 'Suggested moves' },
-    tidy: storageReady ? { headline: swaps ? `${plural(swaps, 'swap')} would bring each family together` : 'Each family is together', sub: 'Whole drawers swapped between units of the same kind, so similar parts sit side by side. Optional, and can be undone.' } : { headline: 'Tidy the layout' },
-    review: storageReady ? { headline: analysis.findings.length + analysis.layout.length ? `${plural(analysis.findings.length + analysis.layout.length, 'thing')} to look at` : 'Nothing to look at', sub: 'Whether someone else could find their way round, what stands out in the drawers as recorded, and how the size estimates compare with the fills you’ve entered.' } : { headline: 'Review' },
+    tidy: storageReady
+      ? swaps
+        ? { headline: `${plural(swaps, 'swap')} would bring each family together`, sub: 'Whole drawers swapped between slots of the same product and size, so similar parts sit side by side.' }
+        : { headline: 'Each family is together', sub: 'Only drawers of the same product and size can swap places. Families spread over different kinds of unit are on Review.' }
+      : { headline: 'Tidy the layout' },
+    review: storageReady ? { headline: reviewAreas ? `${plural(reviewAreas, 'thing')} to look at` : 'Nothing to look at', sub: 'Whether someone else could find their way round, and what stands out in the drawers. The first few of each are shown.' } : { headline: 'Review' },
     labels: { headline: 'Labels for your drawers', sub: 'Brother tape labels, or a sheet of sticky labels, for every recorded drawer.' },
     map: { headline: 'Where everything is', sub: 'Each cupboard with its units shelf by shelf, and what’s in every drawer. Print it and stick it on the door.' },
     pick: { headline: 'Build a set from your drawers', sub: 'A checklist of the drawers to open and the parts to take, colour by colour, kept until you’re done.' },

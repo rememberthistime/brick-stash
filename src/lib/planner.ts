@@ -1,6 +1,6 @@
 import type { Granularity, Part, Settings, StorageUnit, UnitJob } from './types';
 import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeClass, sizeGroupName } from './taxonomy';
-import { jobLabel, shapeOf } from './unitJobs';
+import { jobLabel, shapeOf, useFromName } from './unitJobs';
 
 const familyLabelOf = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? 'Parts';
 import { compartmentVolume } from './volume';
@@ -194,6 +194,8 @@ export interface Compartment {
   baseJob?: UnitJob;
   /** the drawer has a use of its own */
   drawerJob?: boolean;
+  /** that use is read from the drawer's name, not set on it */
+  nameJob?: boolean;
   name?: string;
   label: string;
   w: number;
@@ -226,9 +228,12 @@ export function expandCompartments(units: StorageUnit[], s: Settings): Compartme
           unitCode: u.code,
           ...(u.title?.trim() ? { unitTitle: u.title.trim() } : {}),
           ...(() => {
-            const own = u.drawerJobs?.[drawerKey(spec.id, i)];
+            // A use set on the drawer wins; then what the drawer's name says it's for; then the unit's job
+            const set = u.drawerJobs?.[drawerKey(spec.id, i)];
+            const named = set ? null : useFromName(u.drawerNames?.[drawerKey(spec.id, i)]);
+            const own = set ?? named;
             const job = own ?? u.job;
-            return { ...(job ? { unitJob: job } : {}), ...(u.job ? { baseJob: u.job } : {}), ...(own ? { drawerJob: true } : {}) };
+            return { ...(job ? { unitJob: job } : {}), ...(u.job ? { baseJob: u.job } : {}), ...(own ? { drawerJob: true } : {}), ...(named ? { nameJob: true } : {}) };
           })(),
           ...(u.drawerNames?.[drawerKey(spec.id, i)]?.trim() ? { name: u.drawerNames[drawerKey(spec.id, i)].trim() } : {}),
           label: spec.qty > 1 ? `${spec.label} ${i + 1}` : spec.label,

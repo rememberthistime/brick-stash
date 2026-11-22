@@ -10,7 +10,6 @@ import { compartmentVolume } from '../lib/volume';
 import { expandCompartments } from '../lib/planner';
 import { describeCompartments, groupUnits, parseStorageList, stem, unitsFromPreset, type UnitGroup } from '../lib/storageList';
 import { uid } from '../state';
-import { Stat } from './CollectionTab';
 
 export type StoragePageView = 'units' | 'spaces';
 
@@ -69,8 +68,19 @@ export default function StorageTab({ view, project, update, jobHints, jobMoves =
       return [...us.slice(0, i + 1), copy, ...us.slice(i + 1)];
     });
   };
+  /** Take away the last n of a kind of unit. It asks first, naming them and any drawers recorded in them, as those go too. */
   const removeCopies = (g: UnitGroup, n: number) => {
-    const gone = new Set(g.units.slice(-n).map((u) => u.id));
+    const going = g.units.slice(-n);
+    const gone = new Set(going.map((u) => u.id));
+    const recorded = Object.entries(project.setup.drawers)
+      .filter(([key, pockets]) => pockets?.length && [...gone].some((id) => key.startsWith(`${id}:`) || key === `whole:${id}`))
+      .map(([key]) => key);
+    const letters = going.map((u) => u.code).filter(Boolean).join(', ');
+    const what = n === 1 ? `${g.name}${letters ? ` (${letters})` : ''}` : `${n} of ${g.name}${letters ? ` (${letters})` : ''}`;
+    const ask = recorded.length
+      ? `Remove ${what}? What you've recorded in ${recorded.length} of its drawers goes with it. Earlier versions, on Project & versions, can bring it back.`
+      : `Remove ${what}?`;
+    if (!confirm(ask)) return;
     setUnits((us) => us.filter((u) => !gone.has(u.id)));
   };
 
@@ -145,56 +155,48 @@ export default function StorageTab({ view, project, update, jobHints, jobMoves =
       </section>
       </div>
     );
+  const adder = (
+    <>
+      <div className="add-unit">
+        <select value={preset} onChange={(e) => setPreset(e.target.value)}>
+          {retailers.map((r) => (
+            <optgroup key={r} label={r}>
+              {PRESETS.filter((p) => p.retailer === r).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <input type="number" className="add-count" min={1} max={50} value={count} title="How many" onChange={(e) => setCount(Math.min(50, Math.max(1, Number(e.target.value) || 1)))} />
+        <button onClick={addPreset}>Add</button>
+        <button className="ghost" onClick={addCustom}>
+          Custom unit
+        </button>
+      </div>
+      <p className="muted small">
+        {preview.compartments.map((c) => `${c.qty}× ${c.label} ${c.w}×${c.d}×${c.h} mm`).join(' + ')}
+        {preview.notes ? ` — ${preview.notes}` : ' — approximate: measure yours and edit.'}
+      </p>
+      <details className="paste-list">
+        <summary>Paste a list of what you own</summary>
+        <p className="muted small">One product per line: how many, then its link or name from the list above, e.g. "8x https://www.officeworks.com.au/…sort6comp".</p>
+        <textarea rows={5} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={'8x https://www.officeworks.com.au/shop/officeworks/p/ezy-storage-sort-it-2-5l-6-compartment-storage-container-sort6comp\n7x Sterilite Clearview 3 drawer unit'} />
+        <div className="row">
+          <button disabled={!paste.trim()} onClick={() => importList(false)}>
+            Add to my storage
+          </button>
+          <button className="ghost" disabled={!paste.trim()} onClick={() => importList(true)}>
+            Replace my storage
+          </button>
+        </div>
+      </details>
+    </>
+  );
   return (
     <>
       <section className="card">
-        <div className="stats">
-          <Stat label="Units" value={String(units.length)} hint={`${groups.length} kinds`} />
-          <Stat label="Compartments" value={String(comps.length)} />
-          <Stat label="Total volume" value={`${(comps.reduce((t, c) => t + c.volume, 0) / 1000).toFixed(1)} L`} />
-          <Stat label="Planned capacity" value={`${(comps.reduce((t, c) => t + c.cap, 0) / 1000).toFixed(1)} L`} hint="after growth headroom" />
-        </div>
-
-        <div className="add-unit">
-          <select value={preset} onChange={(e) => setPreset(e.target.value)}>
-            {retailers.map((r) => (
-              <optgroup key={r} label={r}>
-                {PRESETS.filter((p) => p.retailer === r).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <input type="number" className="add-count" min={1} max={50} value={count} title="How many" onChange={(e) => setCount(Math.min(50, Math.max(1, Number(e.target.value) || 1)))} />
-          <button onClick={addPreset}>Add</button>
-          <button className="ghost" onClick={addCustom}>
-            Custom unit
-          </button>
-        </div>
-        <p className="muted small">
-          {preview.compartments.map((c) => `${c.qty}× ${c.label} ${c.w}×${c.d}×${c.h} mm`).join(' + ')}
-          {preview.notes ? ` — ${preview.notes}` : ' — approximate: measure yours and edit.'}
-        </p>
-
-        <details className="paste-list">
-          <summary>Paste a list of what you own</summary>
-          <p className="muted small">One product per line: how many, then its link or name from the list above, e.g. "8x https://www.officeworks.com.au/…sort6comp".</p>
-          <textarea rows={5} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder={'8x https://www.officeworks.com.au/shop/officeworks/p/ezy-storage-sort-it-2-5l-6-compartment-storage-container-sort6comp\n7x Sterilite Clearview 3 drawer unit'} />
-          <div className="row">
-            <button disabled={!paste.trim()} onClick={() => importList(false)}>
-              Add to my storage
-            </button>
-            <button className="ghost" disabled={!paste.trim()} onClick={() => importList(true)}>
-              Replace my storage
-            </button>
-          </div>
-        </details>
-        {note && <div className={`banner ${note.warn ? 'warn' : ''}`}>{note.text}</div>}
-
-        {units.length === 0 && <div className="empty-state">No storage yet. Add a product above, or paste a list.</div>}
-
         {groups.length > 0 && (
           <div className="unit-rows">
             {groups.map((g) => (
@@ -212,6 +214,23 @@ export default function StorageTab({ view, project, update, jobHints, jobMoves =
               />
             ))}
           </div>
+        )}
+        {units.length > 0 && (
+          <p className="muted small unit-totals">
+            {units.length} units of {groups.length} kinds, {comps.length} compartments, {(comps.reduce((t, c) => t + c.volume, 0) / 1000).toFixed(1)} L in all ({(comps.reduce((t, c) => t + c.cap, 0) / 1000).toFixed(1)} L planned, leaving room to grow).
+          </p>
+        )}
+        {note && <div className={`banner ${note.warn ? 'warn' : ''}`}>{note.text}</div>}
+        {units.length === 0 ? (
+          <>
+            <div className="empty-state">No storage yet. Add a product below, or paste a list.</div>
+            {adder}
+          </>
+        ) : (
+          <details className="add-storage">
+            <summary>Add storage…</summary>
+            {adder}
+          </details>
         )}
       </section>
 
@@ -295,7 +314,7 @@ function GroupRow({
         <button
           className="icon danger"
           title={copies > 1 ? `Remove all ${copies}` : 'Remove'}
-          onClick={() => (copies === 1 || confirm(`Remove all ${copies} of ${group.name}?`)) && onRemove(copies)}
+          onClick={() => onRemove(copies)}
         >
           ✕
         </button>

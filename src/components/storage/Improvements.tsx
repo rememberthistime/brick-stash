@@ -24,7 +24,7 @@ const FINDINGS: { kind: FindingKind; title: string; hint: string }[] = [
 const SHOWN_FINDINGS = 6;
 
 /** Every part recorded in a drawer, by number, so a move or finding can show the parts it's about */
-const partsOf = (analysis: SetupAnalysis) => new Map(analysis.pockets.flatMap((p) => p.parts.map((x) => [x.part.partNum, x.part] as const)));
+export const partsOf = (analysis: SetupAnalysis) => new Map(analysis.pockets.flatMap((p) => p.parts.map((x) => [x.part.partNum, x.part] as const)));
 
 /** The parts something is about: a picture, the name linking to Rebrickable, the part number and how many you have */
 export function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map<string, Part>; max?: number }) {
@@ -52,30 +52,21 @@ export function PartStrip({ nums, byNum, max = 8 }: { nums: string[]; byNum: Map
   );
 }
 
-export function Suggestions({ setup, setSetup, analysis, onUndo, onUse }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis; onUndo: () => void; onUse?: (uses: DrawerUse[]) => void }) {
+export function Suggestions({ setup, setSetup, analysis, onUndo, onUse, goTo }: { setup: Setup; setSetup: (f: (s: Setup) => Setup) => void; analysis: SetupAnalysis; onUndo: () => void; onUse?: (uses: DrawerUse[]) => void; goTo: (page: 'todo') => void }) {
   const byNum = partsOf(analysis);
   return (
     <>
       {setup.accepted.length > 0 && (
-        <div className="setup-todo">
-          <h4>Moves to make</h4>
-          <ul className="change-list">
-            {setup.accepted.map((a, i) => (
-              <li key={`${a.id}-${i}`}>
-                {a.text}{' '}
-                <button className="link small" onClick={() => setSetup((s) => ({ ...s, accepted: s.accepted.filter((_, n) => n !== i) }))}>
-                  Done
-                </button>{' '}
-                {i === setup.accepted.length - 1 && (
-                  <button className="link small" onClick={onUndo}>
-                    Undo
-                  </button>
-                )}
-                {a.parts && <PartStrip nums={a.parts} byNum={byNum} max={4} />}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <p className="setup-todo-line small">
+          {setup.accepted.length === 1 ? '1 accepted move is' : `${setup.accepted.length.toLocaleString()} accepted moves are`} waiting to be done in the drawers, on{' '}
+          <button className="link small" onClick={() => goTo('todo')}>
+            Moves to make
+          </button>
+          .{' '}
+          <button className="link small" onClick={onUndo}>
+            Undo the last one accepted
+          </button>
+        </p>
       )}
       {onUse && analysis.drawerUses.length > 0 && (
         <div className="drawer-uses">
@@ -132,8 +123,8 @@ export function Suggestions({ setup, setSetup, analysis, onUndo, onUse }: { setu
             </button>{' '}
           </>
         )}
-        {analysis.suggestions.length > 0 && 'Accepting updates your record here and adds it to Moves to make. '}
-        {analysis.moreSuggestions > 0 && `${analysis.moreSuggestions} more possible, shown as you work through these. `}
+        
+        {analysis.moreSuggestions > 0 && 'More appear as you work through these. '}
         {setup.skipped.some((id) => !id.startsWith('home:')) && (
           <button className="link small" onClick={() => setSetup((s) => ({ ...s, skipped: s.skipped.filter((id) => id.startsWith('home:')) }))}>
             Bring back {setup.skipped.filter((id) => !id.startsWith('home:')).length} skipped

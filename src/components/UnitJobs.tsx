@@ -20,10 +20,12 @@ export default function UnitJobs({ units, setUnits, hints = new Map(), moves = 0
   const forEmpty = units.filter((u) => !jobLabel(u.job) && hints.has(u.id));
   const useAll = () => setUnits((us) => us.reduce((acc, u) => (!jobLabel(u.job) && hints.has(u.id) ? setJob(acc, u.id, hints.get(u.id)!.job) : acc), us));
   return (
-    <section className="card unit-jobs">
-      <h3>What each unit is for</h3>
+    <details className="card unit-jobs">
+      <summary>
+        <b>Unit jobs</b> <span className="muted small">{withJob} of {units.length} set · the default use for drawers that don’t have one of their own</span>
+      </summary>
       <p className="muted small">
-        Give each unit a job, such as Bricks, Technic, or Plates &amp; Tiles in its flat parts, so anyone can tell where a part belongs. A single drawer can have a use of its own, set in the drawer (Used for), and Suggestions offers one for a drawer that’s mostly another sort of part. Each unit has a suggested job, from what’s already in it (or, for an empty unit, what the suggestions would put there) and what its drawers’ shape suits. Moving a part offers the units whose job it fits first, the suggestions for drawers not yet recorded follow the jobs, Suggestions offers moves for parts in another unit’s job, and the layout check on Review points them out.
+        A drawer’s use comes from what you set in the drawer (Used for), then from its name (“Plates 2x6 and longer” is for long plates), and only then from its unit’s job. Once your drawers are named, these rarely matter. Moving a part offers drawers whose use fits first, and Review points out parts that don’t fit theirs.
       </p>
       <table className="unit-jobs-table">
         <thead>
@@ -107,6 +109,6 @@ export default function UnitJobs({ units, setUnits, hints = new Map(), moves = 0
           {moves} {moves === 1 ? 'part or pocket is' : 'parts and pockets are'} in a unit whose job {moves === 1 ? 'it doesn’t' : 'they don’t'} fit, with room in one whose job {moves === 1 ? 'it does' : 'they do'}. <a href="#/moves">See the moves on Suggestions</a>, to accept or skip.
         </p>
       )}
-    </section>
+    </details>
   );
 }
