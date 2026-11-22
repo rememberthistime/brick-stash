@@ -1,8 +1,9 @@
-import type { Granularity, Part, Settings, StorageUnit, UnitJob } from './types';
-import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeClass, sizeGroupName } from './taxonomy';
+import type { Granularity, Lens, Part, Settings, Sorting, StorageUnit, UnitJob } from './types';
+import { LOOK_GROUPS, OUTLINE_ORDER, USE_GROUPS, lookGroup, outlineLabel, traitsOf, useGroup, usedFor } from './traits';
+import { FAMILIES, bucketOrder, catOrder, categoryName, familyFor, familyGroup, familyOrder, mixedName, otherName, parseSize, sizeBucket, sizeClass, sizeGroupName, sortKeyInfo, registerSortKey } from './taxonomy';
 import { jobLabel, shapeOf, useFromName } from './unitJobs';
 
-const familyLabelOf = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? 'Parts';
+const familyLabelOf = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? sortKeyInfo(key)?.label ?? 'Parts';
 import { compartmentVolume } from './volume';
 import { partVolume } from './collection';
 import { drawerKey, inReachOrder, withUnitCodes } from './codes';
@@ -29,6 +30,8 @@ export interface TreeNode {
   plus?: { base: string; added: TreeNode[] };
   /** a group held together by hand sorts as its main part would */
   sortAs?: Part;
+  /** where a group made by a lens comes among its siblings */
+  order?: number;
 }
 
 /** "Brick 2 x 6 + Brick 4 x 6", or "Brick 2 x 6 + 3 more" */
@@ -77,7 +80,16 @@ function togetherHosts(parts: Part[], together: Record<string, string>) {
   return { guests, isGuest: (p: Part) => hostOf(p.partNum) != null };
 }
 
-export function buildTree(parts: Part[], categories: Record<string, string>, volumeScale = 1, together: Record<string, string> = {}): TreeNode {
+/**
+ * The tree of groups the planner lays out. With no sorting, or the catalogue alone, it's Rebrickable's families and
+ * categories, as it always was; other sortings build it from their lenses, level by level (see lensTree).
+ */
+export function buildTree(parts: Part[], categories: Record<string, string>, volumeScale = 1, together: Record<string, string> = {}, sorting?: Sorting): TreeNode {
+  const plain = !sorting || (sorting.levels.length <= 1 && (sorting.levels[0] ?? 'catalogue') === 'catalogue' && !Object.keys(sorting.parts ?? {}).length);
+  return plain ? catalogueTree(parts, categories, volumeScale, together) : lensTree(parts, categories, volumeScale, together, sorting!);
+}
+
+function catalogueTree(parts: Part[], categories: Record<string, string>, volumeScale: number, together: Record<string, string>): TreeNode {
   const root: TreeNode = { id: 'root', label: 'Collection', familyKey: '', children: [], pieces: 0, volume: 0, seq: 0 };
   const child = (parent: TreeNode, id: string, label: string, familyKey: string) => {
     let c = parent.children.find((n) => n.id === id);
@@ -134,6 +146,11 @@ export function buildTree(parts: Part[], categories: Record<string, string>, vol
     }
   }
 
+  return finishTree(root);
+}
+
+/** Order the tree, number it, drop levels that hold just one group, and add up what each group holds */
+function finishTree(root: TreeNode): TreeNode {
   let seq = 0;
   const finish = (n: TreeNode): void => {
     n.seq = seq++;
@@ -151,9 +168,121 @@ export function buildTree(parts: Part[], categories: Record<string, string>, vol
   return root;
 }
 
+// ─── Trees built from lenses ─────────────────────────────────────────────────
+
+/** One level of a part's place in a lens tree: "Rounds & cones", then "Round 1×1" */
+interface Seg {
+  id: string;
+  label: string;
+  order: number;
+}
+
+/** What one lens says about a part, at the top of the tree or under another lens's group */
+function segmentsFor(lens: Lens, part: Part, top: boolean, categories: Record<string, string>, under: string | null): Seg[] {
+  const within = (label: string) => (under ? `${under}: ${label}` : label);
+  if (lens === 'looks') {
+    const t = traitsOf(part);
+    const look = lookGroup(t.look)!;
+    const out: Seg[] = [{ id: look.key, label: within(look.label), order: LOOK_GROUPS.indexOf(look) }];
+    if (t.outline) out.push({ id: `o${t.outline}`, label: outlineLabel(look, t.outline), order: OUTLINE_ORDER.indexOf(t.outline) });
+    return out;
+  }
+  if (lens === 'usedFor') {
+    const g = useGroup(usedFor(part))!;
+    return [{ id: g.key, label: within(g.label), order: USE_GROUPS.indexOf(g) }];
+  }
+  const fam = familyFor(part.catId);
+  const catName = part.catId == null ? 'Unknown parts' : categoryName(categories[part.catId] ?? `Category ${part.catId}`);
+  const kind = builderKind(part);
+  const out: Seg[] = [];
+  if (top) {
+    out.push({ id: fam.key, label: fam.label, order: familyOrder(fam.key) });
+    if (fam.cats.length > 1 && part.catId != null) out.push({ id: `c${part.catId}`, label: catName, order: catOrder(part.catId) });
+    const at = fam.cats.length > 1 && part.catId != null ? catName : fam.label;
+    const b = sizeBucket(part.name, fam.key);
+    if (kind) out.push({ id: `k${kind.key}`, label: kind.label, order: 50 });
+    else if (b) out.push({ id: `b${b}`, label: sizeGroupName(at, b), order: bucketOrder(b) });
+  } else {
+    // Under another lens's group, the builder's sort of part says most where there is one ("Bricks with clips"),
+    // and its catalogue heading otherwise
+    if (kind) out.push({ id: `k${kind.key}`, label: within(kind.label), order: 5000 + familyOrder(fam.key) });
+    else out.push({ id: `c${part.catId ?? 'none'}`, label: within(catName), order: familyOrder(fam.key) * 100 + catOrder(part.catId) });
+  }
+  return out;
+}
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'group';
+
+/**
+ * Groups built level by level from the chosen lenses: with Looks like then Catalogue, "Rounds & cones" → "Round 1×1" →
+ * "Round 1×1: Round tiles". Every group under a top-level one plans with it, as a family does. A part you've put in a
+ * group by hand goes there: into the group of that name if the lenses make one, or into a new group of its own name.
+ */
+function lensTree(parts: Part[], categories: Record<string, string>, volumeScale: number, together: Record<string, string>, sorting: Sorting): TreeNode {
+  const levels = sorting.levels.length ? sorting.levels : (['catalogue'] as Lens[]);
+  const pathOf = (p: Part): Seg[] => {
+    const path: Seg[] = [];
+    levels.forEach((lens, i) => {
+      const under = i === 0 ? null : path[path.length - 1]?.label ?? null;
+      path.push(...segmentsFor(lens, p, i === 0, categories, under));
+    });
+    return path;
+  };
+  const paths = new Map(parts.map((p) => [p.partNum, pathOf(p)]));
+  // Every group the lenses make, by name, so a part put in "Round 1×1" by hand lands in that very group
+  const named = new Map<string, Seg[]>();
+  for (const path of paths.values()) path.forEach((seg, i) => named.set(seg.label.toLowerCase(), named.get(seg.label.toLowerCase()) ?? path.slice(0, i + 1)));
+  for (const p of parts) {
+    const want = sorting.parts?.[p.partNum]?.trim();
+    if (!want) continue;
+    const found = named.get(want.toLowerCase());
+    if (found) paths.set(p.partNum, found);
+    else {
+      const key = `own-${slug(want)}`;
+      registerSortKey(key, want, familyGroup(familyFor(p.catId).key), 300);
+      paths.set(p.partNum, [{ id: key, label: want, order: 300 }]);
+    }
+  }
+
+  const root: TreeNode = { id: 'root', label: 'Collection', familyKey: '', children: [], pieces: 0, volume: 0, seq: 0 };
+  const { guests, isGuest } = togetherHosts(parts, together);
+  for (const p of parts) {
+    if (isGuest(p)) continue;
+    const path = paths.get(p.partNum)!;
+    const famKey = path[0].id;
+    let at = root;
+    for (const seg of path) {
+      const id = at === root ? seg.id : `${at.id}/${seg.id}`;
+      let c = at.children.find((n) => n.id === id);
+      if (!c) {
+        c = { id, label: seg.label, familyKey: famKey, children: [], pieces: 0, volume: 0, seq: 0, order: seg.order };
+        at.children.push(c);
+      }
+      at = c;
+    }
+    const leafOf = (x: Part): TreeNode => ({ id: `part:${x.partNum}`, label: plainName(x.name, x.partNum), familyKey: famKey, children: [], part: x, pieces: x.qty, volume: partVolume(x, volumeScale), seq: 0 });
+    const added = (guests.get(p.partNum) ?? []).map(leafOf);
+    at.children.push(
+      added.length
+        ? { id: `together:${p.partNum}`, label: plusLabel(plainName(p.name, p.partNum), added), familyKey: famKey, children: [leafOf(p), ...added], pieces: 0, volume: 0, seq: 0, lump: true, plus: { base: plainName(p.name, p.partNum), added }, sortAs: p }
+        : leafOf(p),
+    );
+  }
+  return finishTree(root);
+}
+
+/** The Rebrickable family most of a group's room goes to, whatever sort it's planned as */
+export function mainFamily(n: TreeNode): string {
+  const by = new Map<string, number>();
+  for (const l of leaves(n)) if (l.part) by.set(familyFor(l.part.catId).key, (by.get(familyFor(l.part.catId).key) ?? 0) + l.volume);
+  return [...by.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? n.familyKey;
+}
+
 function compareNodes(a: TreeNode, b: TreeNode): number {
   const partA = a.part ?? a.sortAs;
   const partB = b.part ?? b.sortAs;
+  // Groups made by a lens carry their own order
+  if (!partA && !partB && a.order != null && b.order != null) return a.order - b.order || a.label.localeCompare(b.label);
   if (partA && partB) {
     const sa = parseSize(partA.name);
     const sb = parseSize(partB.name);
@@ -588,7 +717,8 @@ function jobCost(groups: TreeNode[], z: Zone): number {
   // Each drawer by its own use, or its unit's job
   const jobs = zoneCells(z).map((c) => c.unitJob?.what);
   if (!groups.length || !jobs.some(Boolean)) return 0;
-  const fam = groups[0].familyKey;
+  // A group planned by looks or use still matches a drawer for the family most of it belongs to
+  const fam = FAMILIES.some((f) => f.key === groups[0].familyKey) ? groups[0].familyKey : mainFamily(groups[0]);
   const mine = (what: string | undefined) => !!what && (what.startsWith('group:') ? familyGroup(fam) === what.slice(6) : what === fam);
   if (jobs.some(mine)) return -JOB_WEIGHT;
   return jobs.every(Boolean) ? JOB_WEIGHT : 0;
@@ -945,7 +1075,7 @@ function layout(r: PackResult, comps: Compartment[], tree: TreeNode, s: Settings
   return { compartments: out, overflow: r.unplaced, stats, settings: s, zones: r.zones, notes };
 }
 
-export const familyLabel = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? key;
+export const familyLabel = (key: string) => FAMILIES.find((f) => f.key === key)?.label ?? sortKeyInfo(key)?.label ?? key;
 
 /** Short human label for a section, e.g. "Plate 2 x 4" or "Plates 1 × 3+" */
 export function sectionLabel(sec: Section): string {

@@ -1,6 +1,6 @@
 // How the planner fills the drawers you haven't recorded yet, and the key to its family colours.
 import { familyLabel, targetFill } from '../../lib/planner';
-import { FAMILIES } from '../../lib/taxonomy';
+import { FAMILIES, sortOrder } from '../../lib/taxonomy';
 import { DEFAULT_SETTINGS, type Granularity, type Settings } from '../../lib/types';
 import Fold, { type Folds } from '../Fold';
 import { pct } from './format';
@@ -72,9 +72,10 @@ function Slider({ label, value, min, max, step, fmt, hint, onChange }: { label: 
 
 /** Each colour is a family of part types; click one to highlight the drawers holding it */
 export function ColourKey({ counts, highlight, setHighlight, folds }: { counts: Map<string, number>; highlight: string | null; setHighlight: (k: string | null) => void; folds: Folds }) {
-  const present = FAMILIES.filter((f) => counts.has(f.key));
+  // Families first, then any other sorts the sorting plans by (Looks like, Used for, your own groups)
+  const present = [...FAMILIES.filter((f) => counts.has(f.key)), ...[...counts.keys()].filter((k) => !FAMILIES.some((f) => f.key === k)).sort((a, b) => sortOrder(a) - sortOrder(b)).map((k) => ({ key: k, label: familyLabel(k) }))];
   return (
-    <Fold id="storage:key" folds={folds} className="key" title="Colour key" summary={highlight ? `Showing ${familyLabel(highlight)}` : `${present.length} families`} force={!!highlight}>
+    <Fold id="storage:key" folds={folds} className="key" title="Colour key" summary={highlight ? `Showing ${familyLabel(highlight)}` : `${present.length} groups`} force={!!highlight}>
       <p className="muted small">Each colour is a family of part types (not a brick colour). Click one to highlight the drawers holding it.</p>
       <div className="key-items">
         {present.map((f) => (

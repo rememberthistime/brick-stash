@@ -55,8 +55,19 @@ export const GROUP_COLOURS: Record<string, { name: string; hex: string }> = {
 };
 
 const groupOf = new Map(FAMILIES.map((f) => [f.key, f.group]));
-/** The group a family belongs to */
-export const familyGroup = (familyKey: string) => groupOf.get(familyKey) ?? 'figures';
+
+/**
+ * Sorts that aren't Rebrickable families: the "Looks like" and "Used for" groups, and groups you've named yourself.
+ * The planner treats each like a family, so they're registered here with a label, a colour group and an order.
+ */
+const sortKeys = new Map<string, { label: string; group: string; order: number }>();
+export function registerSortKey(key: string, label: string, group: string, order: number) {
+  sortKeys.set(key, { label, group, order });
+}
+export const sortKeyInfo = (key: string) => sortKeys.get(key);
+
+/** The group a family (or another sort the planner works with) belongs to */
+export const familyGroup = (familyKey: string) => groupOf.get(familyKey) ?? sortKeys.get(familyKey)?.group ?? 'figures';
 export const groupLabel = (key: string) => GROUPS.find((g) => g.key === key)?.label ?? key;
 
 const familyByCat = new Map<number, Family>();
@@ -66,6 +77,14 @@ export const familyFor = (catId: number | null): Family =>
   (catId != null && familyByCat.get(catId)) || FAMILIES[FAMILIES.length - 1];
 
 export const familyOrder = (key: string) => FAMILIES.findIndex((f) => f.key === key);
+
+/** Where a family or other sort comes in the layout: families first in their own order, then other sorts in theirs */
+export const sortOrder = (key: string) => {
+  const f = familyOrder(key);
+  if (f >= 0) return f;
+  const o = sortKeys.get(key)?.order;
+  return o == null ? -1 : o;
+};
 
 /** Order of categories within their family, as listed above */
 export const catOrder = (catId: number | null) => {
