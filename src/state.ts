@@ -4,14 +4,35 @@ import { startupAction } from './lib/sync';
 import type { Catalog, Project } from './lib/types';
 import { DEFAULT_KEEP_OUT, DEFAULT_SETTINGS, EMPTY_SETUP } from './lib/types';
 
-const KEY = 'brick-stash-project';
+/** Which profile this browser uses; none for the main one */
+const PROFILE_KEY = 'brick-stash-profile';
+const readProfile = () => {
+  try {
+    return localStorage.getItem(PROFILE_KEY) || 'main';
+  } catch {
+    return 'main';
+  }
+};
+/** The profile this browser uses, fixed for the life of the page: switching reloads it */
+export const PROFILE = readProfile();
+/** Each profile keeps its own copy in this browser; the main one under the names it always had */
+const scoped = (key: string) => (PROFILE === 'main' ? key : `${key}:${PROFILE}`);
+/** A server address for this browser's profile */
+export const apiUrl = (path: string) => (PROFILE === 'main' ? path : `${path}${path.includes('?') ? '&' : '?'}profile=${encodeURIComponent(PROFILE)}`);
+/** Use another profile on this browser. The page reloads, so nothing of one profile carries into another. */
+export function switchProfile(id: string) {
+  remember(PROFILE_KEY, id === 'main' ? null : id);
+  location.reload();
+}
+
+const KEY = scoped('brick-stash-project');
 /** The server version this browser last agreed with */
-const KEY_REV = 'brick-stash-rev';
+const KEY_REV = scoped('brick-stash-rev');
 /**
  * Set while this browser holds edits the server hasn't confirmed, to the server version they were made on top of.
  * KEY_REV can't say that: every tab shares it, so another tab's save moves it on.
  */
-const KEY_DIRTY = 'brick-stash-dirty';
+const KEY_DIRTY = scoped('brick-stash-dirty');
 
 export const emptyProject = (): Project => ({ version: 1, rows: [], units: [], spaces: [], settings: DEFAULT_SETTINGS, volumeOverrides: {}, excluded: [], keepOut: DEFAULT_KEEP_OUT, setup: EMPTY_SETUP });
 
@@ -83,7 +104,7 @@ export function useProject() {
       const sending = latest.current;
       if (blocked.current || sending === confirmed.current) return;
       try {
-        const r = await fetch('/api/project', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Base-Rev': rev.current ?? '' }, body: JSON.stringify(sending) });
+        const r = await fetch(apiUrl('/api/project'), { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Base-Rev': rev.current ?? '' }, body: JSON.stringify(sending) });
         if (r.status === 409) {
           blocked.current = true;
           setSync('conflict');
@@ -112,7 +133,9 @@ export function useProject() {
     if (dirtyBase !== null) rev.current = dirtyBase || null;
     (async () => {
       try {
-        const r = await fetch('/api/project');
+        const r = await fetch(apiUrl('/api/project'));
+        // The profile this browser was using has been removed on another device
+        if (r.status === 404 && PROFILE !== 'main' && (await r.clone().json().catch(() => null))?.error === 'No such profile.') return switchProfile('main');
         if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`);
         const serverRev = r.ok ? r.headers.get('X-Rev') : null;
         const local = latest.current;
@@ -166,7 +189,7 @@ export function useProject() {
 export type Patch = Partial<Project> | ((p: Project) => Partial<Project>);
 export const patched = (p: Project, patch: Patch) => settled({ ...p, ...(typeof patch === 'function' ? patch(p) : patch) });
 
-const TRIAL_KEY = 'brick-stash-trial';
+const TRIAL_KEY = scoped('brick-stash-trial');
 
 /**
  * Try a change: a copy of the project to change freely, kept in this browser only, so you can see what a change does

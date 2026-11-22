@@ -107,3 +107,34 @@ it('leaves everything outside /api/ for the app', async () => {
   const api = createApi({ dataDir: dir });
   expect(await api({ url: '/plan', method: 'GET' }, {})).toBe(false);
 });
+
+describe('profiles', () => {
+  const json = { 'Content-Type': 'application/json' };
+  it('keeps the main profile where the project always was, and others apart from it', async () => {
+    expect(await (await fetch(`${base}/api/profiles`)).json()).toEqual([{ id: 'main', name: 'My stash' }]);
+    await fetch(`${base}/api/project`, { method: 'PUT', body: project({ note: 'main' }) });
+    const made = await (await fetch(`${base}/api/profiles`, { method: 'POST', headers: json, body: JSON.stringify({ name: 'Second go' }) })).json();
+    expect(made.id).toMatch(/^second-go-/);
+    expect((await fetch(`${base}/api/project?profile=${made.id}`)).status).toBe(404);
+    await fetch(`${base}/api/project?profile=${made.id}`, { method: 'PUT', body: project({ note: 'second' }) });
+    expect((await (await fetch(`${base}/api/project?profile=${made.id}`)).json()).note).toBe('second');
+    expect((await (await fetch(`${base}/api/project`)).json()).note).toBe('main');
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'data', 'project.json'), 'utf8')).note).toBe('main');
+    expect(fs.existsSync(path.join(dir, 'data', 'profiles', made.id, 'project.json'))).toBe(true);
+  });
+  it('renames, and moves a removed profile aside rather than deleting it', async () => {
+    const { id } = await (await fetch(`${base}/api/profiles`, { method: 'POST', headers: json, body: JSON.stringify({ name: 'Spare' }) })).json();
+    await fetch(`${base}/api/project?profile=${id}`, { method: 'PUT', body: project({ note: 'spare' }) });
+    await fetch(`${base}/api/profiles/main`, { method: 'PATCH', headers: json, body: JSON.stringify({ name: 'Simon’s' }) });
+    expect((await (await fetch(`${base}/api/profiles`)).json()).map((x) => x.name)).toEqual(['Simon’s', 'Spare']);
+    expect((await fetch(`${base}/api/profiles/main`, { method: 'DELETE' })).status).toBe(400);
+    expect((await fetch(`${base}/api/profiles/${id}`, { method: 'DELETE' })).status).toBe(200);
+    expect((await (await fetch(`${base}/api/profiles`)).json()).length).toBe(1);
+    expect((await fetch(`${base}/api/project?profile=${id}`)).status).toBe(404);
+    expect(fs.readdirSync(path.join(dir, 'data', 'removed-profiles'))[0]).toMatch(new RegExp(`^${id}-`));
+  });
+  it('refuses profile ids that are unknown or could leave the folder', async () => {
+    for (const bad of ['nope', '..', '..%2F..%2Fetc']) expect((await fetch(`${base}/api/project?profile=${bad}`)).status).toBe(404);
+    expect((await fetch(`${base}/api/profiles`, { method: 'POST', headers: json, body: JSON.stringify({ name: ' ' }) })).status).toBe(400);
+  });
+});

@@ -19,7 +19,7 @@ export type CollectionPage = 'import' | 'parts' | 'built' | 'kept';
 
 interface Props {
   view: CollectionPage;
-  goTo: (p: 'import') => void;
+  goTo: (p: 'import' | 'project') => void;
   project: Project;
   update: (p: Partial<Project> | ((p: Project) => Partial<Project>)) => void;
   catalog: Catalog | null;
@@ -84,9 +84,24 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
     addRows(r.rows, r.warnings, source);
   };
 
+  // Several files at once count as one import, so Replace keeps them all rather than only the last
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
-    for (const f of Array.from(files)) importText(await f.text(), f.name);
+    const rows: InventoryRow[] = [];
+    const warnings: string[] = [];
+    const names: string[] = [];
+    for (const f of Array.from(files)) {
+      const text = await f.text();
+      if (parseSetList(text)) {
+        warnings.push(`${f.name} is a set list, not a parts list. Use "Add whole sets from Rebrickable" for sets you want to add, or "Sets you keep built" for sets to take off.`);
+        continue;
+      }
+      const r = parseInventory(text);
+      rows.push(...r.rows);
+      warnings.push(...r.warnings.map((w) => (files.length > 1 ? `${f.name}: ${w}` : w)));
+      names.push(f.name);
+    }
+    addRows(rows, warnings, names.join(', ') || 'those files');
   };
 
   const loadSample = async () => importText(await (await fetch('/samples/sample-collection.csv')).text(), 'the sample collection');
@@ -185,6 +200,15 @@ export default function CollectionTab({ view, goTo, project, update, catalog, pa
             </label>
           </div>
 
+          {mode === 'replace' && (
+            <p className="muted small">
+              Replace swaps the parts list only: drawers, sets kept built and parts added by hand stay.{' '}
+              <button className="link small" onClick={() => goTo('project')}>
+                Start fresh
+              </button>{' '}
+              clears those too.
+            </p>
+          )}
           <label
             className={`dropzone ${drag ? 'drag' : ''}`}
             onDragOver={(e) => {
