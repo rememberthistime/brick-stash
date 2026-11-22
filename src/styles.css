@@ -1031,7 +1031,7 @@ button.small-btn:not(.ghost):hover:not(:disabled) { border-color: var(--accent);
 /* The drawer editor: pockets first, the drawer's own settings folded underneath */
 .setup-editor .detail-head { gap: 8px; }
 .setup-editor-steps { display: inline-flex; gap: 4px; margin-left: auto; }
-.drawer-settings { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-top: 14px; }
+.drawer-settings { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 4px 0 12px; }
 .drawer-settings > summary { cursor: pointer; }
 .drawer-settings[open] > summary { margin-bottom: 8px; }
 .drawer-forget { margin: 10px 0 0; text-align: right; }
@@ -1068,3 +1068,4 @@ details.todo-group > summary { cursor: pointer; list-style: none; }
 details.todo-group > summary::-webkit-details-marker { display: none; }
 details.todo-group > summary::before { content: '▸'; color: var(--muted); }
 details.todo-group[open] > summary::before { content: '▾'; }
+.waiting-title { margin: 12px 0 4px; font-size: 0.85rem; }
