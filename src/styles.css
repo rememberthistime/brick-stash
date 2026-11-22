@@ -1106,3 +1106,14 @@ button.ghost.on { border-color: var(--accent); color: var(--accent); }
 @media (max-width: 600px) {
   .sorting-level { grid-template-columns: 1fr; }
 }
+
+/* A part's group, beside its name, and the picker that changes it */
+button.part-group { display: inline-block; margin-left: 6px; padding: 0 7px; font-size: 11px; font-weight: 500; line-height: 18px; border-radius: 9px; background: var(--soft); color: var(--muted); border: 1px solid var(--line); vertical-align: 1px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.part-group:hover { color: var(--accent); border-color: var(--accent); }
+button.part-group.own { color: var(--accent); border-color: var(--accent); }
+.group-picker-back { position: fixed; inset: 0; z-index: 60; }
+.group-picker { position: fixed; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 12px; box-shadow: var(--overlay-shadow); display: grid; gap: 6px; text-align: left; font-weight: 400; }
+.group-picker-path { font-weight: 600; }
+.group-picker label { display: grid; gap: 4px; }
+.group-picker .row { margin: 4px 0 0; }
+.group-picker-preview { background: var(--soft); border-radius: 8px; padding: 6px 8px; display: grid; gap: 2px; }

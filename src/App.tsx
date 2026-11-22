@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { download, uid, useCatalog, useProject, useTrial, withDefaults } from './state';
 import SortingSettings from './components/SortingSettings';
 import TryChange from './components/TryChange';
+import ResortAll from './components/ResortAll';
 import { moveParts } from './lib/move';
 import { placeOptions } from './components/storage/places';
 import { history } from './components/storage/history';
@@ -9,8 +10,9 @@ import { collectionRows, mergeToParts, partVolume, subtractParts } from './lib/c
 import { splitKeptOut, summariseKept } from './lib/keepOut';
 import { calibrationFrom, withCalibration } from './lib/measure';
 import { setupComps, setupMeasurements } from './lib/setup';
-import { buildTree, expandCompartments } from './lib/planner';
-import type { Project } from './lib/types';
+import { buildTree, expandCompartments, familyLabel, type TreeNode } from './lib/planner';
+import { PartGroupContext, type PartGroups } from './components/PartGroup';
+import { DEFAULT_SORTING, type Project } from './lib/types';
 import CollectionTab, { type CollectionPage } from './components/CollectionTab';
 import StorageTab from './components/StorageTab';
 import StorageView, { STORAGE_PAGES, type StoragePage } from './components/storage/StorageView';
@@ -55,6 +57,47 @@ export default function App() {
   const keptSummary = useMemo(() => summariseKept(kept, project.keepOut, project.settings.volumeScale), [kept, project.keepOut, project.settings.volumeScale]);
   // The Parts page lists everything, kept out or not, so any of it can be switched back
   const everything = useMemo(() => buildTree(calibrated, catalog?.categories ?? {}, project.settings.volumeScale), [calibrated, catalog, project.settings.volumeScale]);
+  const updateRef = useRef(update);
+  updateRef.current = update;
+  // Every part's group under the chosen sorting, kept out or not, so it can be shown and changed wherever the part is
+  const partGroups = useMemo<PartGroups>(() => {
+    const tree = buildTree(calibrated, catalog?.categories ?? {}, project.settings.volumeScale, {}, project.sorting);
+    const at = new Map<string, TreeNode>();
+    const names = new Set<string>();
+    const walk = (n: TreeNode) => {
+      for (const c of n.children) {
+        if (c.part) at.set(c.part.partNum, c);
+        else {
+          if (!c.sortAs) names.add(c.label);
+          walk(c);
+        }
+      }
+    };
+    walk(tree);
+    const own = project.sorting?.parts ?? {};
+    return {
+      groupOf: (num) => {
+        const leaf = at.get(num);
+        if (!leaf) return null;
+        const path: string[] = [];
+        for (let n = leaf.parent; n && n !== tree; n = n.parent) if (!n.sortAs) path.push(n.label);
+        // A group of one part is folded into the part itself, so it's named by its sort
+        if (!path.length) path.push(familyLabel(leaf.familyKey));
+        return { path, own: !!own[num] };
+      },
+      names: [...names],
+      set: (num, group) =>
+        updateRef.current((p) => {
+          const s = p.sorting ?? DEFAULT_SORTING;
+          const parts = { ...(s.parts ?? {}) };
+          if (group) parts[num] = group;
+          else delete parts[num];
+          return { sorting: { ...s, parts } };
+        }),
+      project,
+      catalog,
+    };
+  }, [calibrated, catalog, project]);
   const totals = useMemo(() => ({ pieces: parts.reduce((t, p) => t + p.qty, 0), volume: parts.reduce((t, p) => t + partVolume(p, project.settings.volumeScale), 0) }), [parts, project.settings.volumeScale]);
   const model = useStorageModel(project, parts, catalog);
   const { analysis, gaps, recordedHomes, layoutMoves } = model;
@@ -205,6 +248,17 @@ export default function App() {
           <SortingSettings key={JSON.stringify(project.sorting ?? null)} project={project} catalog={catalog} parts={parts} onApply={(sorting) => update({ sorting })} />
         </section>
         <section className="card">
+          <h3 className="card-title">Re-sort everything</h3>
+          <ResortAll
+            project={project}
+            catalog={catalog}
+            apply={(setup, undo) => {
+              update({ setup });
+              history.push(undo);
+            }}
+          />
+        </section>
+        <section className="card">
           <h3 className="card-title">The plan</h3>
           <PlanSettings settings={project.settings} onChange={(settings) => update({ settings })} />
         </section>
@@ -240,6 +294,7 @@ export default function App() {
     );
 
   return (
+    <PartGroupContext.Provider value={partGroups}>
     <div className="app">
       <header className="topbar no-print">
         <button className="ghost menu-btn" aria-label="Pages" aria-expanded={menu} onClick={() => setMenu(!menu)}>
@@ -302,5 +357,6 @@ export default function App() {
         </main>
       </div>
     </div>
+    </PartGroupContext.Provider>
   );
 }
