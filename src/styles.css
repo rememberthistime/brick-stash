@@ -1084,6 +1084,33 @@ details.todo-group[open] > summary::before { content: '▾'; }
 .fam-look-other-systems, .fam-border-look-other-systems, .fam-look-odd, .fam-border-look-odd { --fam: #ae3ec9; }
 .fam-use-general, .fam-border-use-general { --fam: #e8590c; }
 [class*="fam-own-"], [class*="fam-border-own-"] { --fam: #f783ac; }
+[class*="fam-kind-"], [class*="fam-border-kind-"] { --fam: #d6301f; }
+[class*="fam-kind-"][class*="plate"], [class*="fam-kind-"][class*="tile"], [class*="fam-kind-"][class*="jumper"], [class*="fam-kind-"][class*="dish"] { --fam: #1f6fd6; }
+[class*="fam-kind-"][class*="slope"], [class*="fam-kind-"][class*="curve"] { --fam: #2f9e44; }
+[class*="fam-kind-"][class*="clip"], [class*="fam-kind-"][class*="bar"], [class*="fam-kind-"][class*="hinge"], [class*="fam-kind-"][class*="ball"], [class*="fam-kind-"][class*="bracket"], [class*="fam-kind-"][class*="side"], [class*="fam-kind-"][class*="turntable"] { --fam: #845ef7; }
+[class*="fam-kind-"][class*="wind"], [class*="fam-kind-"][class*="door"], [class*="fam-kind-"][class*="panel"], [class*="fam-kind-"][class*="fence"], [class*="fam-kind-"][class*="ladder"], [class*="fam-kind-"][class*="support"], [class*="fam-kind-"][class*="container"] { --fam: #15aabf; }
+[class*="fam-kind-technic"], [class*="fam-kind-gears"] { --fam: #495057; }
+[class*="fam-kind-wheel"], [class*="fam-kind-tyre"], [class*="fam-kind-vehicle"] { --fam: #343a40; }
+[class*="fam-kind-baseplate"] { --fam: #74b816; }
+[class*="fam-kind-minifig"] { --fam: #fcc419; }
+[class*="fam-kind-plant"], [class*="fam-kind-animal"], [class*="fam-kind-rock"] { --fam: #5c940d; }
+[class*="fam-kind-other"] { --fam: #ae3ec9; }
+
+/* Groups: the master list */
+.groups-page { display: grid; gap: 12px; }
+.groups-search { flex: 1; min-width: 160px; }
+.group-list { list-style: none; margin: 0; padding: 0 0 0 18px; }
+.group-list.top { padding: 0; }
+.group-node { margin: 2px 0; }
+.group-list.top > .group-node { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 8px; }
+.group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; text-align: left; background: none; border: 0; padding: 6px 2px; color: inherit; cursor: pointer; font: inherit; }
+.group-head:hover b { text-decoration: underline; }
+.group-caret { width: 1em; color: var(--muted, #888); }
+.group-parts { width: 100%; border-collapse: collapse; margin: 4px 0 8px 18px; max-width: calc(100% - 18px); }
+.group-parts td { padding: 3px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
+.group-parts .num { text-align: right; white-space: nowrap; }
+.group-parts .part-img-cell { width: 44px; }
+@media (max-width: 640px) { .group-parts td:nth-child(4) { display: none; } }
 
 /* What if: now, next to with the change */
 .what-if { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: var(--radius); background: var(--card); }
